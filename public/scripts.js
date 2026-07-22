@@ -1730,6 +1730,6 @@ var AdminView = {
 };
 
 // ── INIT ──────────────────────────────────────────────────────
-window.addEventListener('load', function() {
-  APP.init();
-});
+// scripts.js loads with strategy="afterInteractive" — DOM is already
+// ready, so we call APP.init() directly instead of waiting for 'load'.
+APP.init();
