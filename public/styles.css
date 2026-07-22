@@ -38,6 +38,9 @@ nav { flex: 1; padding: 12px 8px; overflow-y: auto; }
 .nav-item .material-icons-round { font-size: 18px; }
 .nav-badge { margin-left: auto; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; min-width: 18px; text-align: center; }
 
+/* ── APP SHELL WRAPPER (Next.js inserts this between body and sidebar/main) ── */
+#app-shell { display: flex; flex: 1; height: 100vh; overflow: hidden; }
+
 /* ── MAIN ── */
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 header { height: var(--header-h); background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 16px; flex-shrink: 0; box-shadow: var(--shadow); }
