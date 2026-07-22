@@ -246,6 +246,26 @@ textarea { resize: vertical; min-height: 80px; }
 .progress-wrap { background: var(--bg); border-radius: 99px; height: 6px; overflow: hidden; }
 .progress-fill { height: 100%; border-radius: 99px; background: var(--primary); transition: width .5s; }
 
+/* ── Admin element codes (solo admins/HR ven esto) ── */
+body.show-codes [data-code] { position: relative !important; }
+body.show-codes [data-code]::after {
+  content: attr(data-code);
+  position: absolute;
+  top: 0; right: 0;
+  background: #e55f00;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+  padding: 0 5px;
+  line-height: 16px;
+  border-radius: 0 4px 0 4px;
+  z-index: 9990;
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: .9;
+}
+
 @media (max-width: 768px) {
   :root { --sidebar-w: 60px; }
   .sidebar-logo-text, .sidebar-user-info, .nav-item span:not(.material-icons-round):not(.nav-badge) { display: none; }

@@ -138,6 +138,7 @@ var APP = {
         APP.data = null;
         APP.renderHeader();
         APP.renderSidebar();
+        CODES.start();
         APP.navigate('dashboard');
       })
       .catch(function() { APP.hideLoader(); APP.renderLoginScreen(); });
@@ -154,6 +155,7 @@ var APP = {
   },
 
   navigate: function(view) {
+    APP.currentView = view;
     document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
     var el = document.getElementById('view-' + view);
@@ -1726,6 +1728,91 @@ var AdminView = {
     }
     APP.api('employees.list',    {}, function(err,d){done('employees',d||[]);});
     APP.api('vacations.teamList',{}, function(err,d){done('vacations',d||[]);});
+  }
+};
+
+// ── ADMIN ELEMENT CODES ───────────────────────────────────────
+// Solo admins/HR ven los códigos naranja en cada elemento.
+// Esquema: A=sidebar, H=header, D=dashboard, E=empleados,
+//          O=organigrama, K=kpis, V=vacaciones, B=cumpleaños,
+//          C=comunicados, X=admin, M=modal
+var CODES = {
+  _tagged: [],
+  _obs: null,
+  _timer: null,
+
+  start: function() {
+    if (!APP.user || (!APP.user.isAdmin && !APP.user.isHR)) return;
+    document.body.classList.add('show-codes');
+    var self = this;
+    this._obs = new MutationObserver(function(muts) {
+      var hasNew = muts.some(function(m) {
+        return Array.from(m.addedNodes).some(function(n) { return n.nodeType === 1; });
+      });
+      if (!hasNew) return;
+      clearTimeout(self._timer);
+      self._timer = setTimeout(function() { self._run(); }, 120);
+    });
+    this._obs.observe(document.body, { childList: true, subtree: true });
+    this._run();
+  },
+
+  _clear: function() {
+    this._tagged.forEach(function(el) { el.removeAttribute('data-code'); });
+    this._tagged = [];
+  },
+
+  _tag: function(el, code) {
+    if (!el || el.getAttribute('data-code')) return;
+    el.setAttribute('data-code', code);
+    this._tagged.push(el);
+  },
+
+  _run: function() {
+    this._clear();
+    this._labelSidebar();
+    this._labelHeader();
+    this._labelMain();
+    this._labelModal();
+  },
+
+  _labelSidebar: function() {
+    document.querySelectorAll('#sidebar .nav-item').forEach(function(el, i) {
+      CODES._tag(el, 'A' + (i + 1));
+    });
+  },
+
+  _labelHeader: function() {
+    var n = 1;
+    document.querySelectorAll('#header button, #header .btn').forEach(function(el) {
+      CODES._tag(el, 'H' + n++);
+    });
+  },
+
+  _labelMain: function() {
+    var view = APP.currentView || 'dashboard';
+    var prefix = {
+      dashboard: 'D', employees: 'E', orgchart: 'O', kpis: 'K',
+      vacations: 'V', birthdays: 'B', teams: 'T', announcements: 'C', admin: 'X'
+    }[view] || 'Z';
+    var main = document.getElementById('main');
+    if (!main) return;
+    var n = 1;
+    main.querySelectorAll(
+      '.view-title, .stat-card, .card, .emp-card, .kpi-card, ' +
+      '.form-group, button, th, h2, h3, .tab-btn, .nav-tab'
+    ).forEach(function(el) {
+      CODES._tag(el, prefix + n++);
+    });
+  },
+
+  _labelModal: function() {
+    var modal = document.querySelector('#modal-root .modal');
+    if (!modal) return;
+    var n = 1;
+    modal.querySelectorAll('h3, h4, .form-group, button, .card, th').forEach(function(el) {
+      CODES._tag(el, 'M' + n++);
+    });
   }
 };
 
