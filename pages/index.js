@@ -93,7 +93,7 @@ var SHELL = `
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <span style="color:#475569;font-size:11px">IKAN HR · v2.0</span>
-      <button onclick="window.location.href='/api/auth/logout'" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
+      <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
     </div>
@@ -262,6 +262,12 @@ export default function Home() {
         suppressHydrationWarning
       />
 
+      {/* Expose public Supabase config for scripts.js */}
+      <script dangerouslySetInnerHTML={{ __html:
+        `window.__SB_URL__='${process.env.NEXT_PUBLIC_SUPABASE_URL}';window.__SB_KEY__='${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}';`
+      }} />
+      {/* Supabase browser SDK — handles PKCE OAuth automatically */}
+      <Script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" strategy="beforeInteractive" />
       {/* Client-side app logic; loads after page is interactive */}
       <Script src="/scripts.js" strategy="afterInteractive" />
     </>

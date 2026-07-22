@@ -1,8 +1,5 @@
-// POST /api/auth/logout — sign out
-import { createServerSupabase } from '../../../lib/supabase.js'
-
-export default async function handler(req, res) {
-  var supabase = createServerSupabase(req, res)
-  await supabase.auth.signOut()
+// Logout is now handled by the browser Supabase SDK (_sb.auth.signOut()).
+// This route is kept as a fallback redirect.
+export default function handler(req, res) {
   res.redirect('/')
 }
