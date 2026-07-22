@@ -600,10 +600,9 @@ function _scoreLabel(score) {
   if (score === null || score === undefined || score === '') return 'Sin calificar'
   var s = parseFloat(score)
   if (isNaN(s)) return 'Sin calificar'
-  if (s >= 90) return 'Excepcional'
-  if (s >= 70) return 'Cumple'
-  if (s >= 50) return 'En desarrollo'
-  return 'Requiere mejora'
+  if (s >= 75) return 'Logrado'
+  if (s >= 25) return 'Parcialmente'
+  return 'No logrado'
 }
 
 function _calcTrend(periodResults) {

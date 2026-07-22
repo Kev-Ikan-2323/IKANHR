@@ -293,6 +293,14 @@ var APP = {
   initials: function(name) { return (name || '').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); },
   fmtDate: function(d) { if (!d) return '—'; var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; },
   fmtScore: function(s) { var n = parseFloat(s); return isNaN(n) ? '—' : n.toFixed(1); },
+  semLabel: function(s) {
+    if (s === null || s === undefined || s === '') return '—';
+    var n = parseFloat(s);
+    if (isNaN(n)) return '—';
+    if (n >= 75) return '🟢 Logrado';
+    if (n >= 25) return '🟡 Parcialmente';
+    return '🔴 No logrado';
+  },
   scoreColor: function(s) { var n=parseFloat(s); if(isNaN(n)) return ''; if(n>=9) return 'green'; if(n>=7) return ''; if(n>=5) return 'orange'; return 'red'; },
   badgeStatus: function(s) {
     var map = { 'Aprobado':'success','Pendiente':'warning','Pendiente Manager':'info','Rechazado':'danger','Completado':'success','En Revisión':'info','Borrador':'gray','activo':'success','inactivo':'gray' };
@@ -545,12 +553,17 @@ var OrgChartView = {
 // ── KPIs VIEW ─────────────────────────────────────────────────
 var KPIsView = {
   tab: 'self',
+  _pendingPeriods: {},  // kpiIds por período para submitPeriodSelf
+  _reviewGroups: {},
+  _reviewOrder: [],
+
   load: function() {
     var el = document.getElementById('kpi-content');
     if (!el) return;
     KPIsView.renderTabs();
     KPIsView.loadTab('self');
   },
+
   renderTabs: function() {
     var el = document.getElementById('kpi-content');
     var isManager = APP.user && (APP.user.isManager || APP.user.isAdmin || APP.user.isHR);
@@ -561,6 +574,7 @@ var KPIsView = {
       (APP.user && (APP.user.isAdmin||APP.user.isHR) ? '<div class="tab" onclick="KPIsView.loadTab(\'config\')" id="tab-config">⚙️ Configurar</div>' : '') +
       '</div><div id="kpi-tab-content"><div class="loader"><div class="spinner"></div></div></div>';
   },
+
   loadTab: function(tab) {
     KPIsView.tab = tab;
     document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -594,37 +608,98 @@ var KPIsView = {
       });
     }
   },
+
+  // ── P2: semaphore HTML helper ─────────────────────────────────
+  _semHtml: function(key, curVal) {
+    var opts = [
+      { val: 0,   label: '🔴 No logrado',   cls: 'red'    },
+      { val: 50,  label: '🟡 Parcialmente', cls: 'yellow' },
+      { val: 100, label: '🟢 Logrado',      cls: 'green'  }
+    ];
+    var cur = (curVal !== undefined && curVal !== '') ? parseInt(curVal) : null;
+    var btns = opts.map(function(o) {
+      var sel = (cur !== null && cur === o.val) ? ' selected-' + o.cls : '';
+      return '<button type="button" class="sem-btn' + sel + '" onclick="KPIsView.setSem(\'' + key + '\',' + o.val + ')" data-val="' + o.val + '">' + o.label + '</button>';
+    }).join('');
+    return '<div class="sem-sel" id="sem-sel-' + key + '">' + btns + '</div>' +
+           '<input type="hidden" id="sem-val-' + key + '" value="' + (cur !== null ? cur : '') + '">';
+  },
+
+  setSem: function(key, val) {
+    var hidden = document.getElementById('sem-val-' + key);
+    if (hidden) hidden.value = val;
+    var cls = { 0: 'red', 50: 'yellow', 100: 'green' };
+    var sel = document.getElementById('sem-sel-' + key);
+    if (!sel) return;
+    sel.querySelectorAll('.sem-btn').forEach(function(btn) {
+      btn.classList.remove('selected-red', 'selected-yellow', 'selected-green');
+      if (parseInt(btn.dataset.val) === val) btn.classList.add('selected-' + (cls[val] || ''));
+    });
+  },
+
+  // ── P1: self-assessment for a full period at once ─────────────
   renderSelfDashboard: function(d) {
     var pending = d.pendingSelf || 0;
-    var avg = d.avgScore ? APP.fmtScore(d.avgScore) : '—';
+    var avgLabel = d.avgScore !== null && d.avgScore !== undefined ? APP.semLabel(d.avgScore) : '—';
     var html = '<div class="grid grid-3 mb-20">' +
-      '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">analytics</span></div><div><div class="stat-value">' + avg + '</div><div class="stat-label">Score promedio ' + (d.avgScoreLabel||'') + '</div></div></div>' +
-      '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">pending_actions</span></div><div><div class="stat-value">' + pending + '</div><div class="stat-label">Pendientes de autocalificar</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">analytics</span></div><div><div class="stat-value" style="font-size:18px">' + avgLabel + '</div><div class="stat-label">Resultado general</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">pending_actions</span></div><div><div class="stat-value">' + pending + '</div><div class="stat-label">Períodos pendientes</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">trending_up</span></div><div><div class="stat-value">' + (d.kpisForRole||[]).length + '</div><div class="stat-label">KPIs en tu rol</div></div></div>' +
       '</div>';
+
+    // ── P1: group pending items by period, one form per period ──
     var pendingItems = d.pendingItems || [];
     if (pendingItems.length > 0) {
-      html += '<div class="card mb-20"><div class="card-title">⚡ Pendientes de Autocalificación</div>';
+      KPIsView._pendingPeriods = {};
+      var pendingByPeriod = {}, periodOrder = [];
       pendingItems.forEach(function(item) {
-        var kpi = item.kpi; var period = item.period;
-        html += '<div class="kpi-card pending mt-8">' +
-          '<div class="kpi-name">' + kpi.name + '</div>' +
-          '<div class="kpi-meta"><span>📅 ' + period.name + '</span><span>📦 ' + kpi.periodType + '</span><span>⚖️ ' + kpi.weight + '%</span><span>🎯 Meta: ' + kpi.target + '</span></div>' +
-          '<button class="btn btn-primary btn-sm" onclick="KPIsView.openSelfAssessment(\'' + kpi.id + '\',\'' + period.id + '\')"><span class="material-icons-round">edit</span>Autocalificarme</button>' +
-          '</div>';
+        var pid = item.period.id;
+        if (!pendingByPeriod[pid]) { pendingByPeriod[pid] = { period: item.period, items: [] }; periodOrder.push(pid); }
+        pendingByPeriod[pid].items.push(item);
       });
-      html += '</div>';
+      periodOrder.forEach(function(pid) {
+        var pg = pendingByPeriod[pid];
+        var period = pg.period;
+        KPIsView._pendingPeriods[pid] = pg.items.map(function(i) { return i.kpi.id; });
+        html += '<div class="card mb-20">' +
+          '<div class="card-title">⚡ Autoevaluación — ' + period.name + '</div>' +
+          (period.selfAssessmentDeadline
+            ? '<p class="text-sm text-muted mb-16">📅 Fecha límite: <strong>' + APP.fmtDate(period.selfAssessmentDeadline) + '</strong></p>'
+            : '<p class="text-sm text-muted mb-16">Período activo. Selecciona tu resultado en cada KPI.</p>');
+        pg.items.forEach(function(item) {
+          var kpi = item.kpi;
+          var draftScore   = item.draft && item.draft.selfScore !== '' ? item.draft.selfScore : undefined;
+          var draftComment = item.draft ? (item.draft.selfComments || '') : '';
+          html += '<div class="kpi-review-row">' +
+            '<div class="kpi-row-name">' + kpi.name + '</div>' +
+            '<div class="kpi-row-meta">' +
+              (kpi.target ? '<span>🎯 ' + kpi.target + '</span>' : '') +
+              '<span>⚖️ ' + kpi.weight + '%</span>' +
+              '<span>📦 ' + kpi.periodType + '</span>' +
+            '</div>' +
+            (kpi.instructions ? '<div class="alert info" style="margin-bottom:10px;font-size:12px">📋 ' + kpi.instructions + '</div>' : '') +
+            KPIsView._semHtml(kpi.id, draftScore) +
+            '<textarea id="sem-comment-' + kpi.id + '" class="mt-8" rows="2" placeholder="Contexto o evidencia (opcional)...">' + draftComment + '</textarea>' +
+          '</div>';
+        });
+        html += '<div style="text-align:right;margin-top:16px">' +
+          '<button class="btn btn-primary" onclick="KPIsView.submitPeriodSelf(\'' + pid + '\')">' +
+            '<span class="material-icons-round">send</span> Enviar autoevaluación →</button></div>' +
+        '</div>';
+      });
     }
+
     html += '<div class="card"><div class="card-title">📅 Historial de Evaluaciones</div>';
     if (!(d.periodResults||[]).length) {
       html += '<div class="empty-state"><span class="material-icons-round">history</span><p>Sin evaluaciones aún</p></div>';
     }
     (d.periodResults||[]).forEach(function(pr) {
+      var label = pr.overallScore !== null ? APP.semLabel(pr.overallScore) : null;
       html += '<div style="padding:12px 0;border-bottom:1px solid var(--border)">' +
         '<div class="flex justify-between items-center"><div>' +
         '<div class="font-600 text-sm">' + pr.period.name + '</div>' +
         '<div class="text-xs text-muted">' + APP.fmtDate(pr.period.startDate) + ' → ' + APP.fmtDate(pr.period.endDate) + '</div></div>' +
-        (pr.overallScore !== null ? '<div style="text-align:right"><div style="font-size:22px;font-weight:700;color:var(--primary)">' + APP.fmtScore(pr.overallScore) + '</div><div class="text-xs text-muted">' + (pr.scoreLabel||'') + '</div></div>' : APP.badgeStatus(pr.period.status)) +
+        (label ? '<div style="text-align:right;font-size:16px;font-weight:700">' + label + '</div>' : APP.badgeStatus(pr.period.status)) +
         '</div>' +
         '<div class="progress-wrap mt-8"><div class="progress-fill" style="width:' + pr.completionPct + '%"></div></div>' +
         '<div class="text-xs text-muted mt-4">' + pr.completedCount + '/' + pr.totalCount + ' KPIs completados</div></div>';
@@ -632,6 +707,37 @@ var KPIsView = {
     html += '</div>';
     return html;
   },
+
+  submitPeriodSelf: function(periodId) {
+    var kpiIds = KPIsView._pendingPeriods[periodId] || [];
+    for (var i = 0; i < kpiIds.length; i++) {
+      var v = document.getElementById('sem-val-' + kpiIds[i]);
+      if (!v || v.value === '') {
+        APP.toast('Selecciona tu resultado para todos los KPIs', 'error'); return;
+      }
+    }
+    var btns = document.querySelectorAll('[onclick*="submitPeriodSelf"]');
+    btns.forEach(function(b) { b.disabled = true; b.textContent = 'Enviando...'; });
+    var idx = 0;
+    function next() {
+      if (idx >= kpiIds.length) {
+        APP.toast('✅ Autoevaluación enviada al manager', 'success');
+        APP.data = null; KPIsView.loadTab('self'); return;
+      }
+      var kpiId    = kpiIds[idx++];
+      var score    = document.getElementById('sem-val-' + kpiId).value;
+      var comments = (document.getElementById('sem-comment-' + kpiId)||{}).value || '';
+      APP.api('kpi.reviews.selfSubmit', { kpiDefinitionId: kpiId, periodId: periodId, selfScore: score, selfComments: comments },
+        function(err) {
+          if (err) { APP.toast(err, 'error'); btns.forEach(function(b){b.disabled=false;b.textContent='Enviar autoevaluación →';}); return; }
+          next();
+        }
+      );
+    }
+    next();
+  },
+
+  // ── Manager review ────────────────────────────────────────────
   renderManagerReviews: function(reviews) {
     if (!reviews.length) return '<div class="empty-state"><span class="material-icons-round">task_alt</span><p>¡Sin revisiones pendientes!</p></div>';
     var groups = {}, order = [];
@@ -655,13 +761,15 @@ var KPIsView = {
           empReviews.map(function(r) {
             var comment = r.selfComments ? ' · <em style="color:var(--text-muted)">"' + r.selfComments.substring(0,90) + (r.selfComments.length>90?'…':'') + '"</em>' : '';
             return '<div style="padding:8px 12px;background:var(--bg);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
-              '<div><div class="text-sm font-600">' + r.kpiName + '</div><div class="text-xs" style="color:var(--text-muted)">Auto: <strong>' + APP.fmtScore(r.selfScore) + '</strong>' + comment + '</div></div>' +
+              '<div><div class="text-sm font-600">' + r.kpiName + '</div>' +
+              '<div class="text-xs" style="color:var(--text-muted)">Auto: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + comment + '</div></div>' +
               '<span class="badge badge-warning" style="font-size:10px">En revisión</span></div>';
           }).join('') +
         '</div></div>';
     });
     return html + '</div>';
   },
+
   openEmployeeReview: function(idx) {
     var empName    = KPIsView._reviewOrder[idx];
     var empReviews = KPIsView._reviewGroups[empName];
@@ -671,12 +779,11 @@ var KPIsView = {
       return '<div style="' + sep + '">' +
         '<div class="font-600 text-sm mb-8">' + r.kpiName + '</div>' +
         '<div style="background:var(--bg);border-radius:6px;padding:10px 12px;margin-bottom:12px">' +
-          '<div class="text-xs" style="color:var(--text-muted)">Autocalificación: <strong style="color:var(--primary)">' + APP.fmtScore(r.selfScore) + '</strong>' + (r.target ? ' · Meta: ' + r.target : '') + '</div>' +
+          '<div class="text-xs" style="color:var(--text-muted)">Autoevaluación: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + r.kpiTarget : '') + '</div>' +
           (r.selfComments ? '<div class="text-xs mt-4" style="color:var(--text-muted)">💬 "' + r.selfComments + '"</div>' : '') +
         '</div>' +
-        '<div class="form-row">' +
-          '<div class="form-group"><label>Tu calificación *</label><input type="number" id="mr-score-' + r.id + '" min="0" max="200" step="0.1" placeholder="Ingresa tu score"></div>' +
-          '<div class="form-group"><label>Score final <span class="text-muted text-xs">(vacío = usa tu score)</span></label><input type="number" id="mr-final-' + r.id + '" min="0" max="200" step="0.1"></div>' +
+        '<div class="form-group"><label>Tu evaluación *</label>' +
+          KPIsView._semHtml('mr-' + r.id, '') +
         '</div>' +
         '<div class="form-group"><label>Retroalimentación</label><textarea id="mr-comments-' + r.id + '" rows="2" placeholder="Comentarios para ' + empName + '..."></textarea></div>' +
       '</div>';
@@ -687,10 +794,12 @@ var KPIsView = {
       '<button class="btn btn-primary" onclick="KPIsView.submitAllReviews(' + ids + ',true)"><span class="material-icons-round">check_circle</span>Aprobar todas</button>'
     );
   },
+
   submitAllReviews: function(reviewIds, approved) {
     for (var v = 0; v < reviewIds.length; v++) {
-      if (!(document.getElementById('mr-score-' + reviewIds[v]) || {}).value) {
-        APP.toast('Ingresa tu calificación para todos los KPIs', 'error'); return;
+      var sv = document.getElementById('sem-val-mr-' + reviewIds[v]);
+      if (!sv || sv.value === '') {
+        APP.toast('Selecciona tu evaluación para todos los KPIs', 'error'); return;
       }
     }
     var idx = 0;
@@ -700,29 +809,29 @@ var KPIsView = {
         APP.toast('✅ ' + reviewIds.length + ' evaluación(es) aprobada(s)', 'success');
         KPIsView.loadTab('review'); return;
       }
-      var rid = reviewIds[idx++];
-      var score    = (document.getElementById('mr-score-'    + rid)||{}).value;
+      var rid      = reviewIds[idx++];
+      var score    = document.getElementById('sem-val-mr-' + rid).value;
       var comments = (document.getElementById('mr-comments-' + rid)||{}).value || '';
-      var finalV   = (document.getElementById('mr-final-'    + rid)||{}).value || score;
-      APP.api('kpi.reviews.managerReview', { reviewId: rid, managerScore: score, managerComments: comments, finalScore: finalV, approved: approved },
+      APP.api('kpi.reviews.managerReview', { reviewId: rid, managerScore: score, managerComments: comments, finalScore: score, approved: approved },
         function(err) { if (err) { APP.toast(err, 'error'); return; } next(); });
     }
     next();
   },
+
   renderTeamDashboard: function(d) {
     return '<div class="grid grid-3 mb-20">' +
       '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">people</span></div><div><div class="stat-value">' + d.memberCount + '</div><div class="stat-label">Miembros del equipo</div></div></div>' +
-      '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">analytics</span></div><div><div class="stat-value">' + (d.teamScore ? APP.fmtScore(d.teamScore) : '—') + '</div><div class="stat-label">Score promedio equipo</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">analytics</span></div><div><div class="stat-value" style="font-size:16px">' + (d.teamScore !== null ? APP.semLabel(d.teamScore) : '—') + '</div><div class="stat-label">Resultado del equipo</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">pending</span></div><div><div class="stat-value">' + d.pendingTotal + '</div><div class="stat-label">Revisiones pendientes</div></div></div>' +
       '</div><div class="card"><div class="card-title">Resultados por miembro</div>' +
-      '<div class="table-wrap"><table><thead><tr><th>Empleado</th><th>Último score</th><th>Categoría</th><th>Pendientes</th></tr></thead><tbody>' +
+      '<div class="table-wrap"><table><thead><tr><th>Empleado</th><th>Resultado</th><th>Pendientes</th></tr></thead><tbody>' +
       (d.memberStats||[]).map(function(m) {
         return '<tr><td><div class="td-name"><div class="td-avatar">' + APP.initials(m.fullName) + '</div>' + m.fullName + '</div></td>' +
-          '<td><strong style="color:var(--primary)">' + APP.fmtScore(m.lastScore) + '</strong></td>' +
-          '<td>' + APP.badgeStatus(m.scoreLabel || 'Sin calificar') + '</td>' +
+          '<td><strong>' + APP.semLabel(m.lastScore) + '</strong></td>' +
           '<td>' + (m.pendingReviews > 0 ? '<span class="badge badge-warning">' + m.pendingReviews + ' pendiente(s)</span>' : '✅') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
   },
+
   renderConfig: function(kpis) {
     return '<div class="card"><div class="card-title flex justify-between items-center">KPIs Configurados' +
       '<button class="btn btn-primary btn-sm" onclick="AdminHR.openBatchKPI()"><span class="material-icons-round">playlist_add</span>Agregar por Rol</button></div>' +
@@ -733,34 +842,6 @@ var KPIsView = {
           '<td><strong>' + k.weight + '%</strong></td><td>' + k.target + '</td>' +
           '<td>' + (String(k.isActive)==='true' ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
-  },
-  openSelfAssessment: function(kpiId, periodId) {
-    APP.api('kpi.definitions.list', {}, function(err, kpis) {
-      var kpi = (kpis||[]).filter(function(k){return k.id===kpiId;})[0] || {};
-      var isYesNo = kpi.type === 'Si/No';
-      var min = parseFloat(kpi.minValue)||0, max = parseFloat(kpi.maxValue)||10;
-      var scoreInput = isYesNo
-        ? '<select id="self-score"><option value="1">Sí (1)</option><option value="0">No (0)</option></select>'
-        : '<input type="number" id="self-score" min="' + min + '" max="' + max + '" step="0.1" placeholder="Entre ' + min + ' y ' + max + '">';
-      APP.modal('📊 Autocalificación: ' + (kpi.name||'KPI'),
-        '<div class="kpi-meta mb-16"><span>🎯 Meta: ' + (kpi.target||'—') + '</span><span>⚖️ Peso: ' + (kpi.weight||0) + '%</span><span>📦 ' + (kpi.periodType||'') + '</span></div>' +
-        (kpi.instructions ? '<div class="alert info mb-16">📋 ' + kpi.instructions + '</div>' : '') +
-        '<div class="form-group"><label>Mi calificación (' + min + '–' + max + ')</label>' + scoreInput + '</div>' +
-        '<div class="form-group"><label>Comentarios (opcional)</label><textarea id="self-comments" placeholder="Describe tus logros, retos o contexto..."></textarea></div>',
-        '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
-        '<button class="btn btn-primary" onclick="KPIsView.submitSelf(\'' + kpiId + '\',\'' + periodId + '\')"><span class="material-icons-round">send</span>Enviar al manager</button>'
-      );
-    });
-  },
-  submitSelf: function(kpiId, periodId) {
-    var score = document.getElementById('self-score').value;
-    var comments = document.getElementById('self-comments').value;
-    if (!score) { APP.toast('Ingresa tu calificación', 'error'); return; }
-    APP.api('kpi.reviews.selfSubmit', { kpiDefinitionId: kpiId, periodId: periodId, selfScore: score, selfComments: comments }, function(err) {
-      if (err) { APP.toast(err, 'error'); return; }
-      APP.closeModal(); APP.toast('✅ Autocalificación enviada al manager', 'success');
-      APP.data = null; KPIsView.loadTab('self');
-    });
   }
 };
 
