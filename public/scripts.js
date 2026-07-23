@@ -315,10 +315,10 @@ var DashboardView = {
     if (!d) {
       APP.api('dashboard.myData', {}, function(err, data) {
         if (err) {
-          document.getElementById('dash-pending-list').innerHTML = '<p class="text-muted text-sm">Error: ' + err + '</p>';
-          document.getElementById('dash-birthdays').innerHTML = '<p class="text-muted text-sm">—</p>';
-          document.getElementById('dash-announcements').innerHTML = '<p class="text-muted text-sm">—</p>';
-          APP.toast('Dashboard error: ' + err, 'error');
+          document.getElementById('dash-pending-list').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
+          document.getElementById('dash-birthdays').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
+          document.getElementById('dash-announcements').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
+          APP.toast('Error al cargar el dashboard', 'error');
           return;
         }
         APP.data = data;
@@ -367,7 +367,7 @@ var DashboardView = {
       ? pk.map(function(p) {
           return '<div class="kpi-card pending mt-8"><div class="kpi-name">' + p.kpi.name + '</div>' +
             '<div class="kpi-meta"><span>📅 ' + p.period.name + '</span><span>⚖️ Peso: ' + p.kpi.weight + '%</span></div>' +
-            '<button class="btn btn-primary btn-sm" onclick="KPIsView.openSelfAssessment(\'' + p.kpi.id + '\',\'' + p.period.id + '\')">Autocalificarme</button></div>';
+            '<button class="btn btn-primary btn-sm" onclick="APP.navigate(\'kpis\')">Autocalificarme</button></div>';
         }).join('')
       : '<div class="empty-state"><span class="material-icons-round">task_alt</span><p>¡Todo al día!</p></div>';
   },
@@ -879,13 +879,17 @@ var VacationsView = {
     if (!reqs.length) html += '<div class="empty-state"><span class="material-icons-round">beach_access</span><p>Sin solicitudes aún</p></div>';
     else html += reqs.slice(0,10).map(VacationsView.requestCard).join('');
     html += '</div></div>';
-    html += '<div><div class="card"><div class="card-title">🇲🇽 Feriados México ' + new Date().getFullYear() + '</div>';
-    html += hols.slice(0,16).map(function(h) {
-      return '<div class="flex justify-between items-center" style="padding:6px 0;border-bottom:1px solid var(--border)">' +
-        '<div><div class="text-sm font-600">' + h.name + '</div><div class="text-xs text-muted">' + APP.fmtDate(h.date) + '</div></div>' +
-        '<span class="badge badge-' + (h.type==='Oficial'?'danger':h.type==='Puente'?'warning':'info') + '">' + h.type + '</span></div>';
-    }).join('');
-    html += '</div></div></div>';
+    VacationsView._hols = hols;
+    var _c = VacationsView._country || 'MX';
+    var _countries = {MX:'🇲🇽 México',AR:'🇦🇷 Argentina',BR:'🇧🇷 Brasil',US:'🇺🇸 EE.UU.',JP:'🇯🇵 Japón',CO:'🇨🇴 Colombia',PA:'🇵🇦 Panamá'};
+    html += '<div><div class="card">' +
+      '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center">' +
+      '<span>📅 Feriados ' + new Date().getFullYear() + '</span>' +
+      '<select style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:0.82rem;background:var(--card-bg);color:var(--text)" onchange="VacationsView._setCountry(this.value)">' +
+      Object.keys(_countries).map(function(k){return '<option value="'+k+'"'+(k===_c?' selected':'')+'>'+_countries[k]+'</option>';}).join('') +
+      '</select></div>' +
+      '<div id="hol-list">' + VacationsView._holRows(hols, _c) + '</div>' +
+      '</div></div></div>';
     el.innerHTML = html;
   },
   requestCard: function(r) {
@@ -980,6 +984,20 @@ var VacationsView = {
       if (err) { APP.toast(err, 'error'); return; }
       APP.toast('Solicitud rechazada', 'info'); APP.closeModal();
     });
+  },
+  _hols: [], _country: 'MX',
+  _holRows: function(hols, country) {
+    var rows = hols.filter(function(h){ return h.type === country; });
+    if (!rows.length) return '<div class="empty-state"><span class="material-icons-round">event_busy</span><p>Sin feriados registrados</p></div>';
+    return rows.map(function(h) {
+      return '<div class="flex justify-between items-center" style="padding:6px 0;border-bottom:1px solid var(--border)">' +
+        '<div><div class="text-sm font-600">' + h.name + '</div><div class="text-xs text-muted">' + APP.fmtDate(h.date) + '</div></div></div>';
+    }).join('');
+  },
+  _setCountry: function(c) {
+    VacationsView._country = c;
+    var el = document.getElementById('hol-list');
+    if (el) el.innerHTML = VacationsView._holRows(VacationsView._hols || [], c);
   }
 };
 
@@ -1145,16 +1163,14 @@ var AdminHR = {
     if (!reviews.length) return '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">Sin resultados</td></tr>';
     return reviews.map(function(r) {
       var statusBadge = r.status==='Completado'?'<span class="badge badge-success">Completado</span>':r.status==='En Revisión'?'<span class="badge badge-warning">En Revisión</span>':'<span class="badge badge-gray">Borrador</span>';
-      var sc = parseFloat(r.finalScore);
-      var scoreColor = sc>=9?'var(--success)':sc>=7?'var(--primary)':sc>=5?'var(--warning)':'var(--danger)';
       return '<tr data-period="'+r.periodId+'" data-status="'+r.status+'">' +
         '<td><div class="td-name"><div class="td-avatar">'+APP.initials(r.employeeName)+'</div>'+r.employeeName+'</div></td>' +
         '<td class="text-sm text-muted">'+r.department+'</td>' +
         '<td><strong>'+r.kpiName+'</strong><br><span class="text-xs text-muted">'+r.kpiCategory+' · '+r.kpiWeight+'%</span></td>' +
         '<td class="text-sm">'+r.periodName+'</td>' +
-        '<td class="text-sm">'+(r.selfScore!==''&&r.selfScore!==undefined?r.selfScore:'—')+'</td>' +
-        '<td class="text-sm">'+(r.managerScore!==''&&r.managerScore!==undefined?r.managerScore:'—')+'</td>' +
-        '<td>'+(r.finalScore!==''&&r.finalScore!==undefined?'<strong style="color:'+scoreColor+'">'+r.finalScore+'</strong>':'—')+'</td>' +
+        '<td class="text-sm">'+(r.selfScore!==''&&r.selfScore!==undefined?APP.semLabel(r.selfScore):'—')+'</td>' +
+        '<td class="text-sm">'+(r.managerScore!==''&&r.managerScore!==undefined?APP.semLabel(r.managerScore):'—')+'</td>' +
+        '<td class="text-sm">'+(r.finalScore!==''&&r.finalScore!==undefined?'<strong>'+APP.semLabel(r.finalScore)+'</strong>':'—')+'</td>' +
         '<td>'+statusBadge+'</td></tr>';
     }).join('');
   },
@@ -1289,10 +1305,10 @@ var AdminHR = {
       html+='<div style="margin-bottom:20px"><div class="flex justify-between items-center mb-8"><span class="font-600 text-sm">'+(roleNames[rId]||rId||'Sin rol')+'</span>' +
         '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:'+wCol+';font-weight:600">Peso total: '+tw+'%</span>' +
         '<button class="btn btn-outline btn-sm" onclick="AdminHR.openBatchKPI(\''+rId+'\')"><span class="material-icons-round" style="font-size:14px">add</span>Agregar</button></div></div>' +
-        '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Período</th><th>Peso</th><th>Meta</th><th>Estado</th><th></th></tr></thead><tbody>' +
+        '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Período</th><th>Peso</th><th>Meta</th><th>Estado</th><th></th></tr></thead><tbody>' +
         rKpis.map(function(k){
           return '<tr><td><strong>'+k.name+'</strong>'+(k.category?'<br><span class="text-xs text-muted">'+k.category+'</span>':'')+
-            '</td><td>'+k.type+'</td><td>'+k.periodType+'</td><td><strong>'+k.weight+'%</strong></td><td>'+(k.target||'—')+'</td>' +
+            '</td><td>'+k.periodType+'</td><td><strong>'+k.weight+'%</strong></td><td>'+(k.target||'—')+'</td>' +
             '<td>'+(String(k.isActive)==='true'?'<span class="badge badge-success">Activo</span>':'<span class="badge badge-gray">Inactivo</span>')+'</td>' +
             '<td><button class="btn btn-outline btn-sm" onclick="AdminHR.openEditKPI(\''+k.id+'\')">Editar</button></td></tr>';
         }).join('')+'</tbody></table></div></div>';
@@ -1327,15 +1343,12 @@ var AdminHR = {
       '<div class="form-group"><label>Nombre *</label><input id="kf-name" value="'+(v.name||'')+'" placeholder="Cuota mensual de ventas"></div>' +
       '<div class="form-group"><label>Categoría</label><input id="kf-cat" value="'+(v.category||'')+'" placeholder="Ventas, Productividad..."></div>' +
       '</div><div class="form-row">' +
-      '<div class="form-group"><label>Tipo</label>'+sel('kf-type',[{value:'Numérico',label:'Numérico'},{value:'Porcentaje',label:'Porcentaje'},{value:'Si/No',label:'Sí/No'},{value:'Escala 1-10',label:'Escala 1-10'}],v.type||'Numérico')+'</div>' +
       '<div class="form-group"><label>Período</label>'+sel('kf-period',[{value:'Mensual',label:'Mensual'},{value:'Bimestral',label:'Bimestral'},{value:'Semestral',label:'Semestral'}],v.periodType||'Mensual')+'</div>' +
-      '</div><div class="form-row">' +
       '<div class="form-group"><label>Peso (%) *</label><input type="number" id="kf-weight" min="1" max="100" value="'+(v.weight||20)+'"></div>' +
-      '<div class="form-group"><label>Meta</label><input id="kf-target" value="'+(v.target||'')+'" placeholder="100, 90%, Sí..."></div>' +
       '</div><div class="form-row">' +
-      '<div class="form-group"><label>Valor mínimo</label><input type="number" id="kf-min" value="'+(v.minValue||0)+'"></div>' +
-      '<div class="form-group"><label>Valor máximo</label><input type="number" id="kf-max" value="'+(v.maxValue||10)+'"></div>' +
-      '</div><div class="form-group"><label>Aplica al rol</label>'+sel('kf-role',roleOpts,v.roleId||'')+'</div>' +
+      '<div class="form-group"><label>Meta</label><input id="kf-target" value="'+(v.target||'')+'" placeholder="Entregar 100% de pedidos, Tasa 90%..."></div>' +
+      '<div class="form-group"><label>Aplica al rol</label>'+sel('kf-role',roleOpts,v.roleId||'')+'</div>' +
+      '</div>' +
       '<div class="form-group"><label>Instrucciones para el empleado</label><textarea id="kf-inst" placeholder="Cómo medir este KPI...">'+(v.instructions||'')+'</textarea></div>' +
       '<div class="form-group"><label>Meses en que aplica</label>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="kf-month-all"'+(active.length===12?' checked':'')+' style="width:auto;margin:0" onchange="AdminHR._toggleAllMonths(this.checked)"><strong style="font-size:12px">Todos</strong></label></div>' +
@@ -1352,12 +1365,9 @@ var AdminHR = {
     var data = {
       name:(document.getElementById('kf-name')||{value:''}).value.trim(),
       category:(document.getElementById('kf-cat')||{value:''}).value.trim(),
-      type:(document.getElementById('kf-type')||{value:''}).value,
       periodType:(document.getElementById('kf-period')||{value:''}).value,
       weight:(document.getElementById('kf-weight')||{value:''}).value,
       target:(document.getElementById('kf-target')||{value:''}).value.trim(),
-      minValue:(document.getElementById('kf-min')||{value:''}).value,
-      maxValue:(document.getElementById('kf-max')||{value:''}).value,
       roleId:(document.getElementById('kf-role')||{value:''}).value,
       activeMonths:activeMonths,
       instructions:(document.getElementById('kf-inst')||{value:''}).value.trim(),
@@ -1381,16 +1391,16 @@ var AdminHR = {
       var roleOpts=AdminHR._buildRoleOpts(roles,true);
       var roleSel='<select id="bk-role" onchange="AdminHR.updateBatchRoleInfo()" style="width:100%">'+roleOpts.map(function(o){return '<option value="'+o.value+'"'+(o.value===(preRole||'')?'  selected':'')+'>'+o.label+'</option>';}).join('')+'</select>';
       var s='style="padding:5px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:100%"';
-      AdminHR._batchRowStyle=s; AdminHR._batchTypeOpts='<option>Numérico</option><option>Porcentaje</option><option>Si/No</option><option>Escala 1-10</option>';
+      AdminHR._batchRowStyle=s;
       AdminHR._batchPeriodOpts='<option>Mensual</option><option>Bimestral</option><option>Semestral</option>';
       var body='<div class="form-group" style="margin-bottom:12px"><label>Rol al que aplican los KPIs</label>'+roleSel+'</div>' +
         '<div id="bk-role-info" style="margin-bottom:14px"></div>' +
         '<div class="flex justify-between items-center mb-8"><span class="font-600 text-sm">Nuevos KPIs</span>' +
         '<button class="btn btn-outline btn-sm" onclick="AdminHR.addBatchRow()"><span class="material-icons-round">add</span>Agregar fila</button></div>' +
         '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse"><thead>' +
-        '<tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:4px 6px;min-width:150px">Nombre *</th>' +
-        '<th style="text-align:left;padding:4px 6px;min-width:105px">Tipo</th><th style="text-align:left;padding:4px 6px;min-width:95px">Período</th>' +
-        '<th style="text-align:left;padding:4px 6px;min-width:65px">Peso %</th><th style="text-align:left;padding:4px 6px;min-width:80px">Meta</th>' +
+        '<tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:4px 6px;min-width:180px">Nombre *</th>' +
+        '<th style="text-align:left;padding:4px 6px;min-width:110px">Período</th>' +
+        '<th style="text-align:left;padding:4px 6px;min-width:65px">Peso %</th><th style="text-align:left;padding:4px 6px;min-width:100px">Meta</th>' +
         '<th style="width:30px"></th></tr></thead><tbody id="bk-rows"></tbody></table></div>' +
         '<div id="bk-weight-info" style="margin-top:10px;font-size:12px"></div>';
       APP.modal('Agregar KPIs por Rol', body,
@@ -1402,10 +1412,9 @@ var AdminHR = {
   },
   addBatchRow: function() {
     var tbody=document.getElementById('bk-rows'); if(!tbody) return;
-    var s=AdminHR._batchRowStyle||''; var to=AdminHR._batchTypeOpts||'<option>Numérico</option>'; var po=AdminHR._batchPeriodOpts||'<option>Mensual</option>';
+    var s=AdminHR._batchRowStyle||''; var po=AdminHR._batchPeriodOpts||'<option>Mensual</option>';
     var tr=document.createElement('tr'); tr.style.borderBottom='1px solid var(--border)';
     tr.innerHTML='<td style="padding:4px 4px"><input class="bk-name" placeholder="Nombre del KPI" '+s+' oninput="AdminHR.updateBatchWeightTotal()"></td>' +
-      '<td style="padding:4px 4px"><select class="bk-type" '+s+'>'+to+'</select></td>' +
       '<td style="padding:4px 4px"><select class="bk-period" '+s+'>'+po+'</select></td>' +
       '<td style="padding:4px 4px"><input type="number" class="bk-weight" min="1" max="100" value="20" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchWeightTotal()"></td>' +
       '<td style="padding:4px 4px"><input class="bk-target" placeholder="Meta" '+s+'></td>' +
@@ -1441,7 +1450,7 @@ var AdminHR = {
     var roleId=roleEl.value; var toSave=[];
     document.querySelectorAll('#bk-rows tr').forEach(function(tr) {
       var name=(tr.querySelector('.bk-name')||{value:''}).value.trim(); if(!name) return;
-      toSave.push({ name:name, type:(tr.querySelector('.bk-type')||{value:'Numérico'}).value, periodType:(tr.querySelector('.bk-period')||{value:'Mensual'}).value,
+      toSave.push({ name:name, periodType:(tr.querySelector('.bk-period')||{value:'Mensual'}).value,
         weight:(tr.querySelector('.bk-weight')||{value:'20'}).value, target:(tr.querySelector('.bk-target')||{value:''}).value.trim(), roleId:roleId, isActive:true });
     });
     if (!toSave.length) { APP.toast('Agrega al menos un KPI con nombre','error'); return; }
