@@ -80,6 +80,9 @@ var SHELL = `
         <div class="nav-item" onclick="AdminHR.openRolesAdmin()">
           <span class="material-icons-round">badge</span><span>Configurar Roles</span>
         </div>
+        <div class="nav-item" onclick="AdminHR.openPositionsAdmin()">
+          <span class="material-icons-round">work</span><span>Configurar Puestos</span>
+        </div>
         <div class="nav-item" onclick="AdminHR.openAnnouncementsAdmin()">
           <span class="material-icons-round">campaign</span><span>Comunicados</span>
         </div>
