@@ -881,13 +881,15 @@ var VacationsView = {
     html += '</div></div>';
     VacationsView._hols = hols;
     var _c = VacationsView._country || 'MX';
-    var _countries = {MX:'🇲🇽 México',AR:'🇦🇷 Argentina',BR:'🇧🇷 Brasil',US:'🇺🇸 EE.UU.',JP:'🇯🇵 Japón',CO:'🇨🇴 Colombia',PA:'🇵🇦 Panamá'};
+    var _countryChips = {MX:'🇲🇽 MX',AR:'🇦🇷 AR',BR:'🇧🇷 BR',US:'🇺🇸 US',JP:'🇯🇵 JP',CO:'🇨🇴 CO',PA:'🇵🇦 PA'};
     html += '<div><div class="card">' +
-      '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center">' +
-      '<span>📅 Feriados ' + new Date().getFullYear() + '</span>' +
-      '<select style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:0.82rem;background:var(--card-bg);color:var(--text)" onchange="VacationsView._setCountry(this.value)">' +
-      Object.keys(_countries).map(function(k){return '<option value="'+k+'"'+(k===_c?' selected':'')+'>'+_countries[k]+'</option>';}).join('') +
-      '</select></div>' +
+      '<div class="card-title">📅 Feriados ' + new Date().getFullYear() + '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' +
+      Object.keys(_countryChips).map(function(k) {
+        var on = k === _c;
+        return '<button id="hol-chip-'+k+'" onclick="VacationsView._setCountry(\''+k+'\')" style="padding:5px 13px;border-radius:20px;border:2px solid '+(on?'var(--primary)':'var(--border)')+';background:'+(on?'var(--primary)':'transparent')+';color:'+(on?'#fff':'var(--text)')+';font-size:0.8rem;font-weight:'+(on?'700':'400')+';cursor:pointer;transition:all .15s">'+_countryChips[k]+'</button>';
+      }).join('') +
+      '</div>' +
       '<div id="hol-list">' + VacationsView._holRows(hols, _c) + '</div>' +
       '</div></div></div>';
     el.innerHTML = html;
@@ -989,13 +991,36 @@ var VacationsView = {
   _holRows: function(hols, country) {
     var rows = hols.filter(function(h){ return h.type === country; });
     if (!rows.length) return '<div class="empty-state"><span class="material-icons-round">event_busy</span><p>Sin feriados registrados</p></div>';
+    var today = new Date(); today.setHours(0,0,0,0);
     return rows.map(function(h) {
-      return '<div class="flex justify-between items-center" style="padding:6px 0;border-bottom:1px solid var(--border)">' +
-        '<div><div class="text-sm font-600">' + h.name + '</div><div class="text-xs text-muted">' + APP.fmtDate(h.date) + '</div></div></div>';
+      var hDate  = new Date(h.date + 'T00:00:00');
+      var diff   = Math.round((hDate - today) / 86400000);
+      var label, color;
+      if (diff === 0)    { label = '🎉 Hoy';         color = 'var(--success)'; }
+      else if (diff < 0) { label = 'Pasado';          color = 'var(--text-muted)'; }
+      else if (diff <= 7){ label = 'En ' + diff + 'd'; color = 'var(--warning)'; }
+      else               { label = 'En ' + diff + 'd'; color = 'var(--primary)'; }
+      return '<div class="flex justify-between items-center" style="padding:10px 0;border-bottom:1px solid var(--border)">' +
+        '<div>' +
+          '<div style="font-size:1rem;font-weight:600;line-height:1.2">' + h.name + '</div>' +
+          '<div style="font-size:0.88rem;color:var(--text-muted);margin-top:3px">' + APP.fmtDate(h.date) + '</div>' +
+        '</div>' +
+        '<span style="font-size:0.8rem;font-weight:700;color:' + color + ';white-space:nowrap;margin-left:8px">' + label + '</span>' +
+        '</div>';
     }).join('');
   },
   _setCountry: function(c) {
     VacationsView._country = c;
+    var chips = {MX:1,AR:1,BR:1,US:1,JP:1,CO:1,PA:1};
+    Object.keys(chips).forEach(function(k) {
+      var btn = document.getElementById('hol-chip-' + k);
+      if (!btn) return;
+      var on = k === c;
+      btn.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
+      btn.style.background  = on ? 'var(--primary)' : 'transparent';
+      btn.style.color       = on ? '#fff' : 'var(--text)';
+      btn.style.fontWeight  = on ? '700' : '400';
+    });
     var el = document.getElementById('hol-list');
     if (el) el.innerHTML = VacationsView._holRows(VacationsView._hols || [], c);
   }
