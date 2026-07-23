@@ -1160,32 +1160,37 @@ var AdminHR = {
 
   // ── KPI ADMIN ──────────────────────────────────────────────
   openKPIAdmin: function(initialTab) {
-    var res = {}, pending = 6;
-    function done(key, val) { res[key]=val||[]; if(--pending===0){ AdminHR._cachedRoles=res.roles; AdminHR._cachedPositions=res.positions; AdminHR._renderKPIAdmin(res.kpis,res.periods,res.schedules,res.positions,res.report,initialTab||'defs'); } }
+    var tabAliases = { periods: 'evaluaciones', schedules: 'evaluaciones', defs: 'kpis' };
+    var tab = tabAliases[initialTab] || initialTab || 'kpis';
+    var res = {}, pending = 5;
+    function done(key, val) { res[key]=val||[]; if(--pending===0){ AdminHR._cachedPositions=res.positions; AdminHR._renderKPIAdmin(res.kpis,res.periods,res.schedules,res.positions,res.report,tab); } }
     APP.api('kpi.definitions.list', {}, function(e,d){ done('kpis',d); });
     APP.api('kpi.periods.list',     {}, function(e,d){ done('periods',d); });
     APP.api('kpi.schedules.list',   {}, function(e,d){ done('schedules',d); });
-    APP.api('roles.list',           {}, function(e,d){ done('roles',d); });
     APP.api('positions.list',       {}, function(e,d){ done('positions',d); });
     APP.api('kpi.reports.overview', {}, function(e,d){ done('report',d); });
   },
   _renderKPIAdmin: function(kpis, periods, schedules, positions, report, activeTab) {
-    var tabs = ['defs','periods','schedules','reports'];
-    var labels = {defs:'📊 Definiciones',periods:'📅 Períodos',schedules:'⏰ Programaciones',reports:'📈 Reportes'};
+    var tabs = ['kpis','evaluaciones','reports'];
+    var labels = {kpis:'📊 KPIs',evaluaciones:'📅 Evaluaciones',reports:'📈 Reportes'};
     var tabBar = '<div class="tabs" style="margin-bottom:16px">' +
       tabs.map(function(t){ return '<div class="tab'+(t===activeTab?' active':'')+'" onclick="AdminHR.showKPITab(\''+t+'\',this)">'+labels[t]+'</div>'; }).join('') + '</div>';
+    AdminHR._cyclePositions = positions;
+    AdminHR._cycleKpis = kpis;
+    AdminHR._cycleSchedules = schedules;
     APP.modal('⚙️ Administración de KPIs',
       tabBar +
-      '<div id="kadmin-defs"'      + (activeTab!=='defs'      ?' style="display:none"':'') + '>' + AdminHR._kpiDefsTable(kpis, positions)              + '</div>' +
-      '<div id="kadmin-periods"'   + (activeTab!=='periods'   ?' style="display:none"':'') + '>' + AdminHR._periodsTable(periods)                      + '</div>' +
-      '<div id="kadmin-schedules"' + (activeTab!=='schedules' ?' style="display:none"':'') + '>' + AdminHR._schedulesTable(schedules, kpis, positions)  + '</div>' +
-      '<div id="kadmin-reports"'   + (activeTab!=='reports'   ?' style="display:none"':'') + '>' + AdminHR._reportsTab(report, periods)                 + '</div>'
+      '<div id="kadmin-kpis"'         + (activeTab!=='kpis'         ?' style="display:none"':'') + '>' + AdminHR._kpiDefsTable(kpis, positions)                          + '</div>' +
+      '<div id="kadmin-evaluaciones"' + (activeTab!=='evaluaciones' ?' style="display:none"':'') + '>' + AdminHR._evaluacionesTab(periods, schedules, kpis, positions)    + '</div>' +
+      '<div id="kadmin-reports"'      + (activeTab!=='reports'      ?' style="display:none"':'') + '>' + AdminHR._reportsTab(report, periods)                             + '</div>'
     );
+    if (activeTab === 'evaluaciones') AdminHR._updateLaunchPreview();
   },
   showKPITab: function(tab, el) {
     document.querySelectorAll('#app-modal .tab').forEach(function(t){t.classList.remove('active');});
     el.classList.add('active');
-    ['defs','periods','schedules','reports'].forEach(function(t){ var e2=document.getElementById('kadmin-'+t); if(e2) e2.style.display=t===tab?'block':'none'; });
+    ['kpis','evaluaciones','reports'].forEach(function(t){ var e2=document.getElementById('kadmin-'+t); if(e2) e2.style.display=t===tab?'block':'none'; });
+    if (tab === 'evaluaciones') AdminHR._updateLaunchPreview();
   },
 
   // ── REPORTS TAB ────────────────────────────────────────────
@@ -1237,57 +1242,103 @@ var AdminHR = {
     });
   },
 
-  // ── PERIODS ────────────────────────────────────────────────
-  _periodsTable: function(periods) {
-    return '<div class="flex justify-between items-center mb-12">' +
-      '<span class="font-600">'+periods.length+' períodos</span>' +
-      '<button class="btn btn-primary btn-sm" onclick="AdminHR.openNewPeriod()"><span class="material-icons-round">add</span>Nuevo Período</button></div>' +
-      '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Fechas</th><th>Límite autocalif.</th><th>Estado</th><th></th></tr></thead><tbody>' +
-      (periods.length ? periods.map(function(p) {
-        var actions = '';
-        if (p.status==='borrador') actions='<button class="btn btn-primary btn-sm" onclick="AdminHR.openPeriod(\''+p.id+'\')">Abrir</button>';
-        else if (p.status==='activo') actions=
-          '<button class="btn btn-outline btn-sm" onclick="AdminHR.openExtendPeriod(\''+p.id+'\',\''+(p.endDate||'')+'\',\''+(p.selfAssessmentDeadline||'')+'\',\''+(p.managerReviewDeadline||'')+'\')">Prorrogar</button> ' +
-          '<button class="btn btn-outline btn-sm" onclick="AdminHR.closePeriod(\''+p.id+'\')">Cerrar</button>';
-        return '<tr><td><strong>'+p.name+'</strong></td><td>'+p.periodType+'</td>' +
-          '<td>'+APP.fmtDate(p.startDate)+' → '+APP.fmtDate(p.endDate)+'</td>' +
-          '<td>'+(p.selfAssessmentDeadline?APP.fmtDate(p.selfAssessmentDeadline):'—')+'</td>' +
-          '<td>'+APP.badgeStatus(p.status)+'</td><td style="white-space:nowrap">'+actions+'</td></tr>';
-      }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin períodos creados</td></tr>') +
-      '</tbody></table></div>';
+  // ── EVALUACIONES TAB (Q3 + Q4) ─────────────────────────────
+  _evaluacionesTab: function(periods, schedules, kpis, positions) {
+    var posOpts = '<option value="">— Todos los puestos —</option>' +
+      (positions||[]).map(function(p){ return '<option value="'+p.id+'">'+p.name+'</option>'; }).join('');
+    var launcher =
+      '<div style="background:var(--bg);border:2px solid var(--primary);border-radius:10px;padding:16px 20px;margin-bottom:24px">' +
+        '<div class="font-600 mb-12" style="color:var(--primary)"><span class="material-icons-round" style="font-size:16px;vertical-align:middle;margin-right:4px">bolt</span>Lanzar ciclo de evaluación</div>' +
+        '<div class="form-row" style="margin-bottom:10px">' +
+          '<div class="form-group" style="margin-bottom:0"><label style="font-size:12px">Frecuencia</label>' +
+          '<select id="lp-type" onchange="AdminHR._updateLaunchPreview()" style="padding:7px 10px">' +
+          '<option>Mensual</option><option>Bimestral</option><option>Semestral</option></select></div>' +
+          '<div class="form-group" style="margin-bottom:0"><label style="font-size:12px">Puesto (opcional)</label>' +
+          '<select id="lp-pos" onchange="AdminHR._updateLaunchPreview()" style="padding:7px 10px">'+posOpts+'</select></div>' +
+        '</div>' +
+        '<div id="lp-preview" style="margin:10px 0 14px;padding:10px 12px;background:var(--surface);border-radius:6px;font-size:13px"></div>' +
+        '<button class="btn btn-primary" onclick="AdminHR.launchCycle()" id="lp-btn">' +
+          '<span class="material-icons-round">bolt</span>Lanzar ahora</button>' +
+      '</div>';
+
+    var activePeriods = periods.filter(function(p){ return p.status==='activo'; });
+    var otherPeriods  = periods.filter(function(p){ return p.status!=='activo'; });
+    var allOrdered = activePeriods.concat(otherPeriods);
+    var periodRows = !allOrdered.length
+      ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sin períodos creados aún</td></tr>'
+      : allOrdered.map(function(p) {
+          var actions = '';
+          if (p.status==='borrador') actions='<button class="btn btn-primary btn-sm" onclick="AdminHR.openPeriod(\''+p.id+'\')">Abrir</button>';
+          else if (p.status==='activo') actions=
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.openExtendPeriod(\''+p.id+'\',\''+(p.endDate||'')+'\',\''+(p.selfAssessmentDeadline||'')+'\',\''+(p.managerReviewDeadline||'')+'\')">Prorrogar</button> ' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.closePeriod(\''+p.id+'\')">Cerrar</button>';
+          return '<tr><td><strong>'+p.name+'</strong></td><td>'+p.periodType+'</td>' +
+            '<td class="text-sm">'+APP.fmtDate(p.startDate)+' → '+APP.fmtDate(p.endDate)+'</td>' +
+            '<td>'+APP.badgeStatus(p.status)+'</td><td style="white-space:nowrap">'+actions+'</td></tr>';
+        }).join('');
+    var periodsSection =
+      '<div class="font-600 mb-8" style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Historial de períodos</div>' +
+      '<div class="table-wrap mb-24"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Fechas</th><th>Estado</th><th></th></tr></thead><tbody>'+periodRows+'</tbody></table></div>';
+
+    var schedulesSection =
+      '<div class="font-600 mb-8" style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Programaciones automáticas</div>' +
+      AdminHR._schedulesTable(schedules, kpis, positions);
+
+    return launcher + periodsSection + schedulesSection;
   },
-  openNewPeriod: function() {
-    AdminHR._withRoles(function(roles) {
-      var today = new Date().toISOString().split('T')[0];
-      var roleSel = '<select id="pf-role"><option value="">Todos los roles</option>' +
-        roles.map(function(r){ return '<option value="'+r.id+'">'+r.name+'</option>'; }).join('') + '</select>';
-      APP.modal('📅 Nuevo Período de Evaluación',
-        '<div class="form-group"><label>Nombre *</label><input id="pf-name" placeholder="Evaluación Julio 2026"></div>' +
-        '<div class="form-row"><div class="form-group"><label>Tipo</label><select id="pf-type"><option>Mensual</option><option>Bimestral</option><option>Semestral</option></select></div>' +
-        '<div class="form-group"><label>Rol (opcional)</label>'+roleSel+'</div></div>' +
-        '<div class="form-row"><div class="form-group"><label>Fecha inicio</label><input type="date" id="pf-start" value="'+today+'"></div>' +
-        '<div class="form-group"><label>Fecha fin</label><input type="date" id="pf-end"></div></div>' +
-        '<div class="form-row"><div class="form-group"><label>Límite autocalificación</label><input type="date" id="pf-self-dl"></div>' +
-        '<div class="form-group"><label>Límite revisión manager</label><input type="date" id="pf-mgr-dl"></div></div>',
-        '<button class="btn btn-outline" onclick="AdminHR.openKPIAdmin()">← Volver</button>' +
-        '<button class="btn btn-primary" onclick="AdminHR.savePeriod()"><span class="material-icons-round">save</span>Crear Período</button>');
-    });
+  _calcLaunchDates: function(type) {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var end = new Date(today);
+    if (type==='Mensual')    { end.setMonth(end.getMonth()+1); end.setDate(0); }
+    else if (type==='Bimestral') { end.setMonth(end.getMonth()+2); end.setDate(0); }
+    else                         { end.setMonth(end.getMonth()+6); end.setDate(0); }
+    var selfDl = new Date(today); selfDl.setDate(selfDl.getDate()+20);
+    var mgrDl  = new Date(today); mgrDl.setDate(mgrDl.getDate()+28);
+    var fmt = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    return { start:fmt(today), end:fmt(end), selfDl:fmt(selfDl), mgrDl:fmt(mgrDl) };
   },
-  savePeriod: function() {
+  _updateLaunchPreview: function() {
+    var typeEl = document.getElementById('lp-type');
+    var posEl  = document.getElementById('lp-pos');
+    var prev   = document.getElementById('lp-preview');
+    if (!typeEl || !prev) return;
+    var type = typeEl.value;
+    var posId = posEl ? posEl.value : '';
+    var posName = '';
+    if (posId && posEl) { var opt = posEl.options[posEl.selectedIndex]; posName = opt ? opt.text : ''; }
+    var MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var now = new Date();
+    var name = 'Evaluación ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear() + (posName && posName.indexOf('Todos')===-1 ? ' — ' + posName : '');
+    var d = AdminHR._calcLaunchDates(type);
+    var fmtShort = function(s){ var p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+    prev.innerHTML =
+      '<div style="font-weight:600;margin-bottom:4px">📋 '+name+'</div>' +
+      '<div style="color:var(--text-muted);font-size:12px">' +
+        '📅 '+fmtShort(d.start)+' → '+fmtShort(d.end) +
+        '&nbsp;&nbsp;·&nbsp;&nbsp;⏱ Autocalif.: '+fmtShort(d.selfDl) +
+        '&nbsp;&nbsp;·&nbsp;&nbsp;👔 Manager: '+fmtShort(d.mgrDl) +
+      '</div>';
+    prev._launchData = { name:name, type:type, positionId:posId, dates:d };
+  },
+  launchCycle: function() {
+    var prev = document.getElementById('lp-preview');
+    if (!prev || !prev._launchData) { APP.toast('Carga la pestaña de Evaluaciones primero','error'); return; }
+    var ld = prev._launchData;
+    var btn = document.getElementById('lp-btn');
+    if (btn) { btn.disabled=true; btn.textContent='Lanzando...'; }
     var data = {
-      name: (document.getElementById('pf-name')||{value:''}).value.trim(),
-      periodType: (document.getElementById('pf-type')||{value:''}).value,
-      roleId: (document.getElementById('pf-role')||{value:''}).value,
-      startDate: (document.getElementById('pf-start')||{value:''}).value,
-      endDate: (document.getElementById('pf-end')||{value:''}).value,
-      selfAssessmentDeadline: (document.getElementById('pf-self-dl')||{value:''}).value,
-      managerReviewDeadline: (document.getElementById('pf-mgr-dl')||{value:''}).value,
+      name: ld.name, periodType: ld.type, positionId: ld.positionId,
+      startDate: ld.dates.start, endDate: ld.dates.end,
+      selfAssessmentDeadline: ld.dates.selfDl, managerReviewDeadline: ld.dates.mgrDl,
       status: 'borrador'
     };
-    if (!data.name||!data.startDate||!data.endDate) { APP.toast('Nombre y fechas son obligatorios','error'); return; }
-    APP.api('kpi.periods.create', data, function(err) {
-      if (err) { APP.toast(err,'error'); return; }
-      APP.toast('✅ Período creado','success'); AdminHR.openKPIAdmin();
+    APP.api('kpi.periods.create', data, function(err, period) {
+      if (err) { APP.toast(err,'error'); if(btn){btn.disabled=false;btn.innerHTML='<span class="material-icons-round">bolt</span>Lanzar ahora';} return; }
+      APP.api('kpi.periods.open', { periodId: period.id }, function(err2) {
+        if (err2) { APP.toast('Período creado pero no abierto: '+err2,'warning'); }
+        else { APP.toast('✅ '+ld.name+' lanzada — empleados notificados','success'); }
+        AdminHR.openKPIAdmin('evaluaciones');
+      });
     });
   },
   openPeriod: function(id) {
