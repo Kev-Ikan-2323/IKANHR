@@ -1085,7 +1085,7 @@ var AdminHR = {
     };
     var roleOpts = [{value:'',label:'— Selecciona un rol —'}].concat(roles.map(function(r){return{value:r.id,label:r.name};}));
     var mgrOpts  = [{value:'',label:'— Sin manager directo —'}].concat((managers||[]).map(function(m){return{value:m.id||m.employeeId,label:m.fullName||((m.firstName||'')+' '+(m.lastName||''))};}));
-    var deptOpts    = ['Dirección','RRHH','Ventas','Tecnología','Finanzas','Marketing','Operaciones','Legal'].map(function(d){return{value:d,label:d};});
+    var deptOpts    = ['Dirección','Sales','Sales Operations','Operations','INT OPS'].map(function(d){return{value:d,label:d};});
     var typeOpts    = ['Planta','Contrato','Por Proyecto','Temporal'].map(function(t){return{value:t,label:t};});
     var countryOpts = [{value:'MX',label:'🇲🇽 México'},{value:'AR',label:'🇦🇷 Argentina'},{value:'BR',label:'🇧🇷 Brasil'},{value:'US',label:'🇺🇸 EE.UU.'},{value:'JP',label:'🇯🇵 Japón'},{value:'CO',label:'🇨🇴 Colombia'},{value:'PA',label:'🇵🇦 Panamá'}];
     return '<div class="form-row">' +
