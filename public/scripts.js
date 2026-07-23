@@ -854,11 +854,14 @@ var VacationsView = {
     VacationsView.loadAll();
   },
   loadAll: function() {
-    var done = 0, bal, reqs, hols;
-    function check() { done++; if (done === 3) VacationsView.render(bal, reqs, hols); }
+    var done = 0, bal, reqs, holsCur = [], holsNxt = [];
+    var yr = new Date().getFullYear();
+    function mergeAndRender() { VacationsView.render(bal, reqs, holsCur.concat(holsNxt)); }
+    function check() { done++; if (done === 4) mergeAndRender(); }
     APP.api('vacations.balance',    { employeeId: APP.user.id }, function(e,d){ bal=d; check(); });
     APP.api('vacations.myRequests', { employeeId: APP.user.id }, function(e,d){ reqs=d||[]; check(); });
-    APP.api('vacations.holidays',   { year: new Date().getFullYear() }, function(e,d){ hols=d||[]; check(); });
+    APP.api('vacations.holidays',   { year: yr   }, function(e,d){ holsCur=d||[]; check(); });
+    APP.api('vacations.holidays',   { year: yr+1 }, function(e,d){ holsNxt=d||[]; check(); });
   },
   render: function(bal, reqs, hols) {
     var el = document.getElementById('vac-content'); if (!el) return;
@@ -992,14 +995,29 @@ var VacationsView = {
     var rows = hols.filter(function(h){ return h.type === country; });
     if (!rows.length) return '<div class="empty-state"><span class="material-icons-round">event_busy</span><p>Sin feriados registrados</p></div>';
     var today = new Date(); today.setHours(0,0,0,0);
-    return rows.map(function(h) {
-      var hDate  = new Date(h.date + 'T00:00:00');
-      var diff   = Math.round((hDate - today) / 86400000);
+
+    var upcoming = [], past = [];
+    rows.forEach(function(h) {
+      (new Date(h.date + 'T00:00:00') >= today ? upcoming : past).push(h);
+    });
+    upcoming.sort(function(a, b){ return a.date.localeCompare(b.date); });
+
+    // Past holidays that already have an upcoming version (same name) get dropped
+    var upNames = upcoming.map(function(h){ return h.name.toLowerCase(); });
+    past = past.filter(function(h){ return upNames.indexOf(h.name.toLowerCase()) === -1; });
+
+    // Project the remaining past holidays to next year
+    past = past.map(function(h) {
+      var ny = String(parseInt(h.date.split('-')[0]) + 1);
+      return { name: h.name, date: ny + h.date.slice(4), type: h.type };
+    }).sort(function(a, b){ return a.date.localeCompare(b.date); });
+
+    return upcoming.concat(past).map(function(h) {
+      var diff  = Math.round((new Date(h.date + 'T00:00:00') - today) / 86400000);
       var label, color;
-      if (diff === 0)    { label = '🎉 Hoy';         color = 'var(--success)'; }
-      else if (diff < 0) { label = 'Pasado';          color = 'var(--text-muted)'; }
-      else if (diff <= 7){ label = 'En ' + diff + 'd'; color = 'var(--warning)'; }
-      else               { label = 'En ' + diff + 'd'; color = 'var(--primary)'; }
+      if (diff === 0)     { label = '🎉 Hoy';            color = 'var(--success)'; }
+      else if (diff <= 7) { label = 'En ' + diff + 'd';  color = 'var(--warning)'; }
+      else                { label = 'En ' + diff + 'd';  color = 'var(--primary)'; }
       return '<div class="flex justify-between items-center" style="padding:10px 0;border-bottom:1px solid var(--border)">' +
         '<div>' +
           '<div style="font-size:1rem;font-weight:600;line-height:1.2">' + h.name + '</div>' +
