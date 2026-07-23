@@ -1042,8 +1042,9 @@ var AdminHR = {
     };
     var roleOpts = [{value:'',label:'— Selecciona un rol —'}].concat(roles.map(function(r){return{value:r.id,label:r.name};}));
     var mgrOpts  = [{value:'',label:'— Sin manager directo —'}].concat((managers||[]).map(function(m){return{value:m.id||m.employeeId,label:m.fullName||((m.firstName||'')+' '+(m.lastName||''))};}));
-    var deptOpts = ['Dirección','RRHH','Ventas','Tecnología','Finanzas','Marketing','Operaciones','Legal'].map(function(d){return{value:d,label:d};});
-    var typeOpts = ['Planta','Contrato','Por Proyecto','Temporal'].map(function(t){return{value:t,label:t};});
+    var deptOpts    = ['Dirección','RRHH','Ventas','Tecnología','Finanzas','Marketing','Operaciones','Legal'].map(function(d){return{value:d,label:d};});
+    var typeOpts    = ['Planta','Contrato','Por Proyecto','Temporal'].map(function(t){return{value:t,label:t};});
+    var countryOpts = [{value:'MX',label:'🇲🇽 México'},{value:'AR',label:'🇦🇷 Argentina'},{value:'BR',label:'🇧🇷 Brasil'},{value:'US',label:'🇺🇸 EE.UU.'},{value:'JP',label:'🇯🇵 Japón'},{value:'CO',label:'🇨🇴 Colombia'},{value:'PA',label:'🇵🇦 Panamá'}];
     return '<div class="form-row">' +
       '<div class="form-group"><label>Nombre *</label><input id="ef-first" placeholder="Carlos" value="' + (v.firstName||'') + '"></div>' +
       '<div class="form-group"><label>Apellido *</label><input id="ef-last" placeholder="Martínez" value="' + (v.lastName||'') + '"></div>' +
@@ -1061,6 +1062,8 @@ var AdminHR = {
       '<div class="form-group"><label>Manager directo</label>' + sel('ef-mgr', mgrOpts, v.managerId) + '</div>' +
       '</div><div class="form-row">' +
       '<div class="form-group"><label>Tipo de empleo</label>' + sel('ef-type', typeOpts, v.contractType||'Planta') + '</div>' +
+      '<div class="form-group"><label>País</label>' + sel('ef-country', countryOpts, v.country||'MX') + '</div>' +
+      '</div><div class="form-row">' +
       '<div class="form-group"><label>Status</label>' + sel('ef-status', [{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}], v.status||'activo') + '</div>' +
       '</div>' +
       '<div class="form-group"><label>Notas internas</label><textarea id="ef-notes" placeholder="Notas...">' + (v.notes||'') + '</textarea></div>' +
@@ -1080,8 +1083,9 @@ var AdminHR = {
       birthDate: (document.getElementById('ef-bday') ||{value:''}).value,
       roleId:    (document.getElementById('ef-role') ||{value:''}).value,
       managerId: (document.getElementById('ef-mgr')  ||{value:''}).value,
-      contractType:(document.getElementById('ef-type')||{value:''}).value,
-      status:    (document.getElementById('ef-status')||{value:''}).value,
+      contractType:(document.getElementById('ef-type')   ||{value:''}).value,
+      country:   (document.getElementById('ef-country') ||{value:'MX'}).value,
+      status:    (document.getElementById('ef-status')  ||{value:''}).value,
       notes:     (document.getElementById('ef-notes')||{value:''}).value,
       canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked)
     };

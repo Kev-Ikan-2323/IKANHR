@@ -20,7 +20,8 @@ export var VacationsModule = {
 
     var emp       = await DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
     var managerId = emp ? emp.managerId : ''
-    var workDays  = await this.calculateWorkingDays(data.startDate, data.endDate)
+    var country   = (emp && emp.country) ? emp.country : (user.country || 'MX')
+    var workDays  = await this.calculateWorkingDays(data.startDate, data.endDate, country)
 
     var balance = await _getOrCreateBalance(employeeId)
     if (workDays > (parseInt(balance.daysRemaining) || 0)) {
@@ -240,13 +241,13 @@ export var VacationsModule = {
     }
   },
 
-  async calculateWorkingDays(startDate, endDate) {
+  async calculateWorkingDays(startDate, endDate, country) {
     var start    = new Date(startDate)
     var end      = new Date(endDate)
-    var holidays = await _getHolidayDates(start.getFullYear())
+    var holidays = await _getHolidayDates(start.getFullYear(), country)
 
     if (end.getFullYear() !== start.getFullYear()) {
-      var nextHolidays = await _getHolidayDates(end.getFullYear())
+      var nextHolidays = await _getHolidayDates(end.getFullYear(), country)
       nextHolidays.forEach(function(d) { if (holidays.indexOf(d) === -1) holidays.push(d) })
     }
 
@@ -314,10 +315,11 @@ export var VacationsModule = {
   },
 
   async isWorkingDay(dateStr, user) {
-    var date = new Date(dateStr)
-    var dow  = date.getDay()
+    var date     = new Date(dateStr)
+    var dow      = date.getDay()
     if (dow === 0 || dow === 6) return false
-    var holidays = await _getHolidayDates(date.getFullYear())
+    var country  = user ? (user.country || 'MX') : 'MX'
+    var holidays = await _getHolidayDates(date.getFullYear(), country)
     return holidays.indexOf(dateStr) === -1
   },
 
@@ -437,12 +439,13 @@ async function _getOrCreateBalance(employeeId) {
   })
 }
 
-async function _getHolidayDates(year) {
+async function _getHolidayDates(year, country) {
   var holidays = await DB.getAll(CONFIG.SHEETS.HOLIDAYS)
   return holidays
     .filter(function(h) {
       if (h.status === 'inactivo') return false
       if (!h.date) return false
+      if (country && h.type && h.type !== country) return false
       var hYear = h.date.split('-')[0]
       return String(hYear) === String(year) || h.isRecurring === 'true' || h.isRecurring === true
     })

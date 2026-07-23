@@ -100,7 +100,7 @@ async function dispatch(action, data, user) {
     'vacations.holidays':         function() { return VacationsModule.getHolidays(data.year, user) },
     'vacations.addHoliday':       function() { return VacationsModule.addHoliday(data, user) },
     'vacations.removeHoliday':    function() { return VacationsModule.removeHoliday(data.id, user) },
-    'vacations.workingDays':      function() { return VacationsModule.calculateWorkingDays(data.startDate, data.endDate) },
+    'vacations.workingDays':      function() { return VacationsModule.calculateWorkingDays(data.startDate, data.endDate, user.country || 'MX') },
     'vacations.isWorkingDay':     function() { return VacationsModule.isWorkingDay(data.date, user) },
     'vacations.calendarMonth':    function() { return VacationsModule.getCalendarMonth(data.year, data.month, user) },
     'vacations.upcomingAbsences': function() { return VacationsModule.getUpcomingAbsences(data.days, user) },
