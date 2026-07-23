@@ -15,6 +15,7 @@ import { DashboardModule }    from '../../modules/dashboard.js'
 import { RolesModule }        from '../../modules/roles.js'
 import { PositionsModule }    from '../../modules/positions.js'
 import { ConfigModule }       from '../../modules/config.js'
+import { MailService }        from '../../lib/email.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
 
 export default async function handler(req, res) {
@@ -129,6 +130,28 @@ async function dispatch(action, data, user) {
     'config.get':    function() { return ConfigModule.get(data.key, user) },
     'config.set':    function() { return ConfigModule.set(data.key, data.value, user) },
     'config.getAll': function() { return ConfigModule.getAll(user) },
+
+    // ── EMAIL ──────────────────────────────────────────────────
+    'email.getEnabled': function() { return ConfigModule.get('emailEnabled', user) },
+    'email.setEnabled': function() { return ConfigModule.set('emailEnabled', String(data.enabled), user) },
+    'email.test':       async function() {
+      if (!user.email) throw new Error('No tienes email registrado en tu perfil.')
+      await MailService.send({
+        to:       user.email,
+        subject:  'Test de correo — IKAN HR',
+        htmlBody: '<div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">' +
+                  '<div style="background:#1a56db;border-radius:8px;padding:16px 20px;margin-bottom:24px">' +
+                    '<span style="color:#fff;font-weight:700;font-size:18px">IKAN HR Platform</span>' +
+                  '</div>' +
+                  '<h2 style="color:#0f172a;margin-bottom:8px">✅ Correo de prueba</h2>' +
+                  '<p style="color:#334155">Hola <strong>' + (user.fullName || user.email) + '</strong>,</p>' +
+                  '<p style="color:#334155">Este es un correo de prueba enviado desde el panel de administración. Si lo recibes correctamente, el sistema de notificaciones por correo está funcionando.</p>' +
+                  '<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">' +
+                  '<p style="color:#94a3b8;font-size:12px">IKAN HR Platform · Correo automático, no responder.</p>' +
+                  '</div>'
+      })
+      return { ok: true, sentTo: user.email }
+    },
 
     // ── ROLES ──────────────────────────────────────────────────
     'roles.list':        function() { return RolesModule.list(user) },

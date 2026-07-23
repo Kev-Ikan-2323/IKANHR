@@ -89,13 +89,16 @@ var SHELL = `
         <div class="nav-item" onclick="APP.navigate('vacations');setTimeout(function(){VacationsView.loadTeamRequests()},600)">
           <span class="material-icons-round">event_available</span><span>Aprobaciones</span>
         </div>
+        <div class="nav-item" onclick="AdminHR.openSystemConfig()">
+          <span class="material-icons-round">settings</span><span>Configuración</span>
+        </div>
       </div>
     </div>
   </nav>
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v2.8</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v2.9</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>

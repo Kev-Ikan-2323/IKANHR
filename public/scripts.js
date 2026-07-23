@@ -1862,6 +1862,76 @@ var AdminHR = {
       if(err){APP.toast(err,'error');return;}
       APP.toast('Comunicado archivado','info'); AdminHR.openAnnouncementsAdmin();
     });
+  },
+
+  openSystemConfig: function() {
+    APP.api('email.getEnabled', {}, function(err, val) {
+      var enabled = (val !== 'false');
+      var bgColor = enabled ? 'var(--primary)' : '#94a3b8';
+      var knobTransform = enabled ? 'translateX(20px)' : 'translateX(0)';
+      var checked = enabled ? ' checked' : '';
+      var labelText = enabled ? 'Activo' : 'Inactivo';
+      var emailAddr = APP.user.email || '—';
+      var html =
+        '<div style="padding:4px 0">' +
+        '<div class="card mb-12" style="padding:16px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px">' +
+            '<div>' +
+              '<div style="font-weight:600;margin-bottom:4px">Notificaciones por correo</div>' +
+              '<div style="font-size:13px;color:var(--text-muted)">Activa o desactiva todos los correos del sistema</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">' +
+              '<span id="cfg-email-label" style="font-size:13px">' + labelText + '</span>' +
+              '<label style="position:relative;display:inline-block;width:46px;height:26px;cursor:pointer">' +
+                '<input type="checkbox" id="cfg-email-cb"' + checked + ' style="opacity:0;width:0;height:0;position:absolute" onchange="AdminHR.saveEmailEnabled(this.checked)">' +
+                '<span id="cfg-toggle-bg" style="position:absolute;inset:0;background:' + bgColor + ';border-radius:26px;transition:background .2s">' +
+                  '<span id="cfg-toggle-knob" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:transform .2s;transform:' + knobTransform + '"></span>' +
+                '</span>' +
+              '</label>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="card" style="padding:16px">' +
+          '<div style="font-weight:600;margin-bottom:4px">Correo de prueba</div>' +
+          '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Se enviará a <strong>' + emailAddr + '</strong></div>' +
+          '<button class="btn btn-outline" id="cfg-test-btn" onclick="AdminHR.sendTestEmail()">' +
+            '<span class="material-icons-round">send</span>Enviar correo de prueba' +
+          '</button>' +
+          '<div id="cfg-test-result" style="margin-top:8px;font-size:13px"></div>' +
+        '</div>' +
+        '</div>';
+      APP.modal('Configuración del sistema', html,
+        '<button class="btn btn-primary" onclick="APP.closeModal()">Cerrar</button>');
+    });
+  },
+
+  saveEmailEnabled: function(enabled) {
+    APP.api('email.setEnabled', { enabled: enabled }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      var label = document.getElementById('cfg-email-label');
+      var bg    = document.getElementById('cfg-toggle-bg');
+      var knob  = document.getElementById('cfg-toggle-knob');
+      if (label) label.textContent = enabled ? 'Activo' : 'Inactivo';
+      if (bg)    bg.style.background = enabled ? 'var(--primary)' : '#94a3b8';
+      if (knob)  knob.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)';
+      APP.toast(enabled ? 'Correos activados' : 'Correos desactivados', 'success');
+    });
+  },
+
+  sendTestEmail: function() {
+    var btn    = document.getElementById('cfg-test-btn');
+    var result = document.getElementById('cfg-test-result');
+    if (btn)    btn.disabled = true;
+    if (result) result.textContent = 'Enviando...';
+    APP.api('email.test', {}, function(err, data) {
+      if (btn) btn.disabled = false;
+      var el = document.getElementById('cfg-test-result');
+      if (err) {
+        if (el) el.innerHTML = '<span style="color:var(--danger)">Error: ' + err + '</span>';
+        return;
+      }
+      if (el) el.innerHTML = '<span style="color:var(--success)">✅ Enviado a ' + ((data && data.sentTo) || APP.user.email) + '</span>';
+    });
   }
 };
 
