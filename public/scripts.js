@@ -1900,28 +1900,162 @@ var BirthdaysView = {
 var TeamView = {
   load: function() {
     var el = document.getElementById('team-content'); if (!el) return;
-    if (!(APP.user.isManager||APP.user.isAdmin||APP.user.isHR)) {
-      el.innerHTML = '<div class="empty-state"><span class="material-icons-round">group_off</span><p>No tienes reportes directos</p></div>'; return;
-    }
     el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
-    APP.api('employees.directReports', { managerId: APP.user.id }, function(err, reports) {
+    APP.api('teams.list', {}, function(err, teams) {
       if (err) { el.innerHTML = '<div class="empty-state"><p>' + err + '</p></div>'; return; }
-      if (!reports || !reports.length) {
-        el.innerHTML = '<div class="empty-state"><span class="material-icons-round">group</span><p>No tienes reportes directos</p></div>'; return;
-      }
-      el.innerHTML =
-        '<div class="card mb-16" style="padding:12px 16px">' +
-          '<span class="material-icons-round" style="color:var(--primary);vertical-align:middle;margin-right:6px">people</span>' +
-          '<strong>' + reports.length + '</strong> reporte(s) directo(s)' +
-        '</div>' +
-        '<div class="emp-grid">' + reports.map(function(m) {
-          var fullName = (m.firstName||'') + ' ' + (m.lastName||'');
-          return '<div class="emp-card" onclick="EmployeesView.showDetail(\'' + m.id + '\')">' +
-            '<div class="emp-avatar">' + APP.initials(fullName) + '</div>' +
-            '<div class="emp-name">' + fullName + '</div>' +
-            '<div class="emp-title">' + (m.jobTitle||'—') + '</div>' +
-            '<div class="emp-dept text-muted text-sm">' + (m.department||'') + '</div></div>';
+      teams = (teams||[]).filter(function(t){ return t.status !== 'inactivo'; });
+      var canManage = APP.user.isAdmin || APP.user.isHR;
+      var html = '<div class="flex justify-between items-center mb-16">' +
+        '<span class="font-600">' + teams.length + ' equipo(s)</span>' +
+        (canManage ? '<button class="btn btn-primary btn-sm" onclick="TeamView.openNewTeam()"><span class="material-icons-round">add</span>Nuevo equipo</button>' : '') +
+        '</div>';
+      if (!teams.length) {
+        html += '<div class="empty-state"><span class="material-icons-round">group</span><p>No hay equipos creados aún.' + (canManage ? '<br><button class="btn btn-primary mt-12" onclick="TeamView.openNewTeam()">+ Crear primer equipo</button>' : '') + '</p></div>';
+      } else {
+        html += '<div class="emp-grid">' + teams.map(function(t) {
+          var isMyTeam = APP.user.ledTeams.indexOf(t.id) > -1 || APP.user.coledTeams.indexOf(t.id) > -1;
+          return '<div class="emp-card" onclick="TeamView.openDetail(\'' + t.id + '\')" style="cursor:pointer">' +
+            '<div class="emp-avatar" style="background:var(--primary)">' +
+              '<span class="material-icons-round" style="font-size:22px;color:#fff">group</span>' +
+            '</div>' +
+            '<div class="emp-name">' + t.name + (isMyTeam ? ' <span style="font-size:10px;background:var(--primary);color:#fff;padding:1px 6px;border-radius:10px;vertical-align:middle">Mi equipo</span>' : '') + '</div>' +
+            '<div class="emp-title text-muted text-sm">' + (t.leaderName || 'Sin líder') + '</div>' +
+            '<div class="emp-dept text-muted text-sm">' + (t.memberCount || 0) + ' miembro(s)</div>' +
+          '</div>';
         }).join('') + '</div>';
+      }
+      el.innerHTML = html;
+    });
+  },
+
+  openDetail: function(id) {
+    APP.api('teams.get', { id: id }, function(err, team) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.api('teams.members', { teamId: id }, function(err2, members) {
+        if (err2) { APP.toast(err2, 'error'); return; }
+        var canManage = APP.user.isAdmin || APP.user.isHR ||
+          APP.user.ledTeams.indexOf(id) > -1 || APP.user.coledTeams.indexOf(id) > -1;
+        var memberCards = (members||[]).map(function(m) {
+          var badge = m.isLeader ? '<span style="font-size:10px;background:var(--primary);color:#fff;padding:1px 6px;border-radius:10px">Líder</span>' :
+                      m.isCoLeader ? '<span style="font-size:10px;background:var(--warning);color:#fff;padding:1px 6px;border-radius:10px">Co-Líder</span>' : '';
+          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+            '<div class="emp-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">' + APP.initials(m.fullName) + '</div>' +
+            '<div style="flex:1"><div class="font-600 text-sm">' + m.fullName + ' ' + badge + '</div>' +
+            '<div class="text-xs text-muted">' + (m.jobTitle||'—') + ' · ' + (m.department||'—') + '</div></div>' +
+            (canManage ? '<button onclick="TeamView.removeMember(\'' + id + '\',\'' + m.id + '\',\'' + m.fullName.replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px 6px" title="Quitar del equipo"><span class="material-icons-round" style="font-size:16px">person_remove</span></button>' : '') +
+          '</div>';
+        }).join('');
+        var body =
+          (team.description ? '<p class="text-sm text-muted mb-12">' + team.description + '</p>' : '') +
+          '<div style="margin-bottom:16px">' + (memberCards || '<p class="text-muted text-sm">Sin miembros aún.</p>') + '</div>' +
+          (canManage ? '<button class="btn btn-outline btn-sm" onclick="TeamView.openAddMember(\'' + id + '\')"><span class="material-icons-round">person_add</span>Agregar miembro</button>' : '');
+        var footer =
+          '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>' +
+          (canManage ? '<button class="btn btn-primary" onclick="TeamView.openEditTeam(\'' + id + '\')"><span class="material-icons-round">edit</span>Editar equipo</button>' : '');
+        APP.modal('🤝 ' + team.name, body, footer);
+      });
+    });
+  },
+
+  openNewTeam: function() {
+    AdminHR._withPositions(function() {
+      APP.api('employees.list', {}, function(err, emps) {
+        var active = (emps||[]).filter(function(e){ return e.status==='activo'||!e.status; });
+        APP.modal('➕ Nuevo Equipo', TeamView._teamForm(null, active),
+          '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
+          '<button class="btn btn-primary" onclick="TeamView.saveTeam(null)"><span class="material-icons-round">save</span>Crear equipo</button>');
+      });
+    });
+  },
+
+  openEditTeam: function(id) {
+    APP.api('teams.get', { id: id }, function(err, team) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.api('employees.list', {}, function(err2, emps) {
+        var active = (emps||[]).filter(function(e){ return e.status==='activo'||!e.status; });
+        APP.modal('✏️ Editar: ' + team.name, TeamView._teamForm(team, active),
+          '<button class="btn btn-outline" onclick="TeamView.openDetail(\'' + id + '\')">← Volver</button>' +
+          '<button class="btn btn-primary" onclick="TeamView.saveTeam(\'' + id + '\')"><span class="material-icons-round">save</span>Guardar</button>');
+      });
+    });
+  },
+
+  _teamForm: function(team, employees) {
+    var v = team || {};
+    var empOpts = [{value:'',label:'— Sin asignar —'}].concat(employees.map(function(e){
+      return { value: e.id, label: (e.firstName||'') + ' ' + (e.lastName||'') };
+    }));
+    var sel = function(id, opts, val) {
+      return '<select id="' + id + '">' + opts.map(function(o){
+        return '<option value="' + o.value + '"' + (o.value === (val||'') ? ' selected' : '') + '>' + o.label + '</option>';
+      }).join('') + '</select>';
+    };
+    return '<div class="form-group"><label>Nombre del equipo *</label><input id="tf-name" value="' + (v.name||'') + '" placeholder="Ej: Equipo de Ventas LATAM"></div>' +
+      '<div class="form-group"><label>Descripción</label><input id="tf-desc" value="' + (v.description||'') + '" placeholder="Objetivo o descripción del equipo"></div>' +
+      '<div class="form-row">' +
+        '<div class="form-group"><label>Líder</label>' + sel('tf-leader', empOpts, v.leaderId||'') + '</div>' +
+        '<div class="form-group"><label>Co-Líder</label>' + sel('tf-coleader', empOpts, v.coLeaderId||'') + '</div>' +
+      '</div>' +
+      (team ? '<div class="form-group" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="tf-active" style="width:auto"' + (v.status!=='inactivo'?' checked':'') + '><label for="tf-active" style="margin:0">Equipo activo</label></div>' : '');
+  },
+
+  saveTeam: function(id) {
+    var name = (document.getElementById('tf-name')||{value:''}).value.trim();
+    if (!name) { APP.toast('El nombre del equipo es obligatorio', 'error'); return; }
+    var data = {
+      name: name,
+      description: (document.getElementById('tf-desc')||{value:''}).value.trim(),
+      leaderId:   (document.getElementById('tf-leader')||{value:''}).value,
+      coLeaderId: (document.getElementById('tf-coleader')||{value:''}).value
+    };
+    if (id) {
+      data.id = id;
+      var activeEl = document.getElementById('tf-active');
+      data.status = (!activeEl || activeEl.checked) ? 'activo' : 'inactivo';
+    }
+    APP.api(id ? 'teams.update' : 'teams.create', data, function(err, team) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast(id ? '✅ Equipo actualizado' : '✅ Equipo creado', 'success');
+      APP.closeModal();
+      TeamView.load();
+      if (id) setTimeout(function(){ TeamView.openDetail(id); }, 400);
+    });
+  },
+
+  openAddMember: function(teamId) {
+    APP.api('employees.list', {}, function(err, emps) {
+      APP.api('teams.members', { teamId: teamId }, function(err2, current) {
+        var currentIds = (current||[]).map(function(m){ return m.id; });
+        var available = (emps||[]).filter(function(e){
+          return (e.status==='activo'||!e.status) && currentIds.indexOf(e.id) === -1;
+        });
+        if (!available.length) { APP.toast('Todos los empleados activos ya son miembros de este equipo', 'info'); return; }
+        var sel = '<select id="add-member-sel" style="width:100%">' +
+          available.map(function(e){ return '<option value="' + e.id + '">' + (e.firstName||'') + ' ' + (e.lastName||'') + ' (' + (e.department||'—') + ')</option>'; }).join('') + '</select>';
+        APP.modal('👤 Agregar miembro',
+          '<div class="form-group"><label>Empleado</label>' + sel + '</div>',
+          '<button class="btn btn-outline" onclick="TeamView.openDetail(\'' + teamId + '\')">← Volver</button>' +
+          '<button class="btn btn-primary" onclick="TeamView.addMember(\'' + teamId + '\')"><span class="material-icons-round">person_add</span>Agregar</button>');
+      });
+    });
+  },
+
+  addMember: function(teamId) {
+    var empId = (document.getElementById('add-member-sel')||{value:''}).value;
+    if (!empId) return;
+    APP.api('teams.addMember', { teamId: teamId, employeeId: empId }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ Miembro agregado', 'success');
+      TeamView.openDetail(teamId);
+    });
+  },
+
+  removeMember: function(teamId, empId, empName) {
+    if (!confirm('¿Quitar a ' + empName + ' del equipo?')) return;
+    APP.api('teams.removeMember', { teamId: teamId, employeeId: empId }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ Miembro quitado', 'success');
+      TeamView.openDetail(teamId);
     });
   }
 };
