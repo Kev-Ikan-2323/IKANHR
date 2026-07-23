@@ -1461,6 +1461,7 @@ var AdminHR = {
       '<div class="form-group"><label>Meta</label><input id="kf-target" value="'+(v.target||'')+'" placeholder="Entregar 100% de pedidos, Tasa 90%..."></div>' +
       '<div class="form-group"><label>Aplica al puesto</label>'+sel('kf-pos',posOpts,v.positionId||'')+'</div>' +
       '</div>' +
+      '<div class="form-group"><label>Descripción</label><textarea id="kf-desc" rows="2" placeholder="Breve descripción del KPI y cómo se mide...">'+(v.description||'')+'</textarea></div>' +
       '<div class="form-group"><label>Instrucciones para el empleado</label><textarea id="kf-inst" placeholder="Cómo medir este KPI...">'+(v.instructions||'')+'</textarea></div>' +
       '<div class="form-group"><label>Meses en que aplica</label>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="kf-month-all"'+(active.length===12?' checked':'')+' style="width:auto;margin:0" onchange="AdminHR._toggleAllMonths(this.checked)"><strong style="font-size:12px">Todos</strong></label></div>' +
@@ -1477,6 +1478,7 @@ var AdminHR = {
     var data = {
       name:(document.getElementById('kf-name')||{value:''}).value.trim(),
       category:(document.getElementById('kf-cat')||{value:''}).value.trim(),
+      description:(document.getElementById('kf-desc')||{value:''}).value.trim(),
       periodType:(document.getElementById('kf-period')||{value:''}).value,
       weight:(document.getElementById('kf-weight')||{value:''}).value,
       target:(document.getElementById('kf-target')||{value:''}).value.trim(),
