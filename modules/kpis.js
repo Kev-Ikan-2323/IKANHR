@@ -14,7 +14,7 @@ export var KPIModule = {
     params = params || {}
     var all = await DB.getAll(CONFIG.SHEETS.KPI_DEFINITIONS)
 
-    if (params.roleId)     all = all.filter(function(k) { return k.roleId === params.roleId })
+    if (params.positionId) all = all.filter(function(k) { return k.positionId === params.positionId })
     if (params.periodType) all = all.filter(function(k) { return k.periodType === params.periodType })
     if (params.category)   all = all.filter(function(k) { return k.category === params.category })
     if (params.isActive !== undefined) {
@@ -53,7 +53,7 @@ export var KPIModule = {
 
     if (params.status)     all = all.filter(function(p) { return p.status === params.status })
     if (params.periodType) all = all.filter(function(p) { return p.periodType === params.periodType })
-    if (params.roleId)     all = all.filter(function(p) { return !p.roleId || p.roleId === params.roleId })
+    if (params.positionId) all = all.filter(function(p) { return !p.positionId || p.positionId === params.positionId })
 
     return all.map(_enrichPeriod)
   },
@@ -260,10 +260,10 @@ export var KPIModule = {
 
     var periods = await DB.query(CONFIG.SHEETS.KPI_PERIODS, { status: 'activo' })
     var applicable = periods.filter(function(p) {
-      return !p.roleId || p.roleId === emp.roleId
+      return !p.positionId || p.positionId === emp.positionId
     })
 
-    var kpis = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { roleId: emp.roleId, isActive: true })
+    var kpis = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { positionId: emp.positionId, isActive: true })
 
     var pending = []
     for (var i = 0; i < applicable.length; i++) {
@@ -317,7 +317,7 @@ export var KPIModule = {
     var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
     if (!emp) throw new Error('Empleado no encontrado.')
 
-    var kpis    = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { roleId: emp.roleId })
+    var kpis    = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { positionId: emp.positionId })
     var periods = await DB.getAll(CONFIG.SHEETS.KPI_PERIODS)
     var reviews = await DB.query(CONFIG.SHEETS.KPI_REVIEWS, { employeeId: employeeId })
 
@@ -396,8 +396,8 @@ export var KPIModule = {
 
     if (params.periodId) reviews = reviews.filter(function(r) { return r.periodId === params.periodId })
     if (params.status)   reviews = reviews.filter(function(r) { return r.status === params.status })
-    if (params.roleId) {
-      var empIds = employees.filter(function(e) { return e.roleId === params.roleId }).map(function(e) { return e.id })
+    if (params.positionId) {
+      var empIds = employees.filter(function(e) { return e.positionId === params.positionId }).map(function(e) { return e.id })
       reviews = reviews.filter(function(r) { return empIds.indexOf(r.employeeId) > -1 })
     }
 
@@ -520,22 +520,20 @@ export var KPIModule = {
 
 async function _validateDefinition(data) {
   if (!data.name)       throw new Error('El nombre del KPI es requerido.')
-  if (!data.roleId)     throw new Error('El rol es requerido.')
-  if (!data.type)       throw new Error('El tipo de KPI es requerido.')
   if (!data.periodType) throw new Error('El tipo de período es requerido.')
   if (data.weight === undefined || data.weight === '') throw new Error('El peso es requerido.')
 
-  var validTypes   = Object.values(CONFIG.KPI_TYPES)
   var validPeriods = Object.values(CONFIG.KPI_PERIODS)
-  if (validTypes.indexOf(data.type) === -1)      throw new Error('Tipo inválido: ' + data.type)
   if (validPeriods.indexOf(data.periodType) === -1) throw new Error('Período inválido: ' + data.periodType)
 
-  var existing = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { roleId: data.roleId, isActive: true })
-  var totalWeight = existing
-    .filter(function(k) { return k.id !== data.id })
-    .reduce(function(sum, k) { return sum + (parseFloat(k.weight) || 0) }, 0)
-  if (totalWeight + parseFloat(data.weight) > 100) {
-    throw new Error('La suma de pesos para este rol supera el 100%. Peso disponible: ' + (100 - totalWeight) + '%')
+  if (data.positionId) {
+    var existing = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { positionId: data.positionId, isActive: true })
+    var totalWeight = existing
+      .filter(function(k) { return k.id !== data.id })
+      .reduce(function(sum, k) { return sum + (parseFloat(k.weight) || 0) }, 0)
+    if (totalWeight + parseFloat(data.weight) > 100) {
+      throw new Error('La suma de pesos para este puesto supera el 100%. Peso disponible: ' + (100 - totalWeight) + '%')
+    }
   }
 }
 
@@ -558,8 +556,8 @@ function _validateReviewData(data) {
 }
 
 async function _enrichDefinition(kpi) {
-  var role = kpi.roleId ? await DB.getById(CONFIG.SHEETS.ROLES, kpi.roleId) : null
-  kpi.roleName = role ? role.name : ''
+  var pos = kpi.positionId ? await DB.getById(CONFIG.SHEETS.POSITIONS, kpi.positionId) : null
+  kpi.positionName = pos ? pos.name : ''
   return kpi
 }
 
@@ -616,8 +614,8 @@ function _calcTrend(periodResults) {
 
 async function _generateReviewDrafts(period) {
   var employees = await DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' })
-  if (period.roleId) {
-    employees = employees.filter(function(e) { return e.roleId === period.roleId })
+  if (period.positionId) {
+    employees = employees.filter(function(e) { return e.positionId === period.positionId })
   }
 
   var allKpis = await DB.getAll(CONFIG.SHEETS.KPI_DEFINITIONS)
@@ -627,7 +625,7 @@ async function _generateReviewDrafts(period) {
 
   for (var i = 0; i < employees.length; i++) {
     var emp = employees[i]
-    var empKpis = kpis.filter(function(k) { return !k.roleId || k.roleId === emp.roleId })
+    var empKpis = kpis.filter(function(k) { return !k.positionId || k.positionId === emp.positionId })
     for (var j = 0; j < empKpis.length; j++) {
       var kpi = empKpis[j]
       await DB.insert(CONFIG.SHEETS.KPI_REVIEWS, {
@@ -686,8 +684,8 @@ async function _notifyEmployeeReviewComplete(employeeId, periodId) {
 async function _notifyPeriodOpen(period) {
   try {
     var employees = await DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' })
-    if (period.roleId) {
-      employees = employees.filter(function(e) { return e.roleId === period.roleId })
+    if (period.positionId) {
+      employees = employees.filter(function(e) { return e.positionId === period.positionId })
     }
     for (var i = 0; i < employees.length; i++) {
       var emp = employees[i]

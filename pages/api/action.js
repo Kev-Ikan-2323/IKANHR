@@ -13,6 +13,7 @@ import { AnnouncementsModule } from '../../modules/announcements.js'
 import { OrgChartModule }     from '../../modules/orgchart.js'
 import { DashboardModule }    from '../../modules/dashboard.js'
 import { RolesModule }        from '../../modules/roles.js'
+import { PositionsModule }    from '../../modules/positions.js'
 import { ConfigModule }       from '../../modules/config.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
 
@@ -130,10 +131,14 @@ async function dispatch(action, data, user) {
     'config.getAll': function() { return ConfigModule.getAll(user) },
 
     // ── ROLES ──────────────────────────────────────────────────
-    'roles.list':   function() { return RolesModule.list(user) },
-    'roles.create': function() { return RolesModule.create(data, user) },
-    'roles.update': function() { return RolesModule.update(data.id, data, user) },
-    'roles.remove': function() { return RolesModule.remove(data.id, user) },
+    'roles.list':        function() { return RolesModule.list(user) },
+    'roles.create':      function() { return RolesModule.create(data, user) },
+    'roles.update':      function() { return RolesModule.update(data.id, data, user) },
+    'roles.remove':      function() { return RolesModule.remove(data.id, user) },
+    'positions.list':    function() { return PositionsModule.list(user) },
+    'positions.create':  function() { return PositionsModule.create(data, user) },
+    'positions.update':  function() { return PositionsModule.update(data.id, data, user) },
+    'positions.remove':  function() { return PositionsModule.remove(data.id, user) },
 
     // ── KPI SCHEDULES ──────────────────────────────────────────
     'kpi.schedules.list':   function() { return KPISchedulesModule.list(user) },

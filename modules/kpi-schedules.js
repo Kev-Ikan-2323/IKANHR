@@ -16,7 +16,7 @@ export var KPISchedulesModule = {
     if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere rol admin o hr.')
     return DB.insert(CONFIG.SHEETS.KPI_SCHEDULES, {
       name:               data.name,
-      roleId:             data.roleId || '',
+      positionId:         data.positionId || '',
       department:         data.department || '',
       periodType:         data.periodType || 'Mensual',
       dayOfMonth:         parseInt(data.dayOfMonth) || 1,
@@ -33,7 +33,7 @@ export var KPISchedulesModule = {
     if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere rol admin o hr.')
     var changes = {
       name:               data.name,
-      roleId:             data.roleId || '',
+      positionId:         data.positionId || '',
       department:         data.department || '',
       periodType:         data.periodType || 'Mensual',
       dayOfMonth:         parseInt(data.dayOfMonth) || 1,
@@ -125,7 +125,7 @@ async function _activateSchedule(schedule, today) {
 
   var period = await DB.insert(CONFIG.SHEETS.KPI_PERIODS, {
     name:                   periodName,
-    roleId:                 schedule.roleId || '',
+    positionId:             schedule.positionId || '',
     periodType:             schedule.periodType,
     startDate:              startDate,
     endDate:                endDate,
@@ -147,7 +147,7 @@ async function _activateSchedule(schedule, today) {
     kpiIds = allKpis
       .filter(function(k) {
         return String(k.isActive) === 'true' &&
-               (!k.roleId || !schedule.roleId || k.roleId === schedule.roleId)
+               (!k.positionId || !schedule.positionId || k.positionId === schedule.positionId)
       })
       .map(function(k) { return k.id })
   }
@@ -180,8 +180,8 @@ async function _activateSchedule(schedule, today) {
 async function _getTargetEmployees(schedule) {
   var all = await DB.getAll(CONFIG.SHEETS.EMPLOYEES)
   var activos = all.filter(function(e) { return e.status === 'activo' })
-  if (schedule.roleId) {
-    return activos.filter(function(e) { return e.roleId === schedule.roleId })
+  if (schedule.positionId) {
+    return activos.filter(function(e) { return e.positionId === schedule.positionId })
   }
   if (schedule.department) {
     return activos.filter(function(e) { return e.department === schedule.department })
