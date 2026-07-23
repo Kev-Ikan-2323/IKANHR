@@ -1088,7 +1088,7 @@ var AdminHR = {
     var roleOpts    = [{value:'',label:'— Selecciona un rol —'}].concat(roles.map(function(r){return{value:r.id,label:r.name};}));
     var mgrOpts     = [{value:'',label:'— Sin manager directo —'}].concat((managers||[]).map(function(m){return{value:m.id||m.employeeId,label:m.fullName||((m.firstName||'')+' '+(m.lastName||''))};}));
     var posOpts     = [{value:'',label:'— Sin puesto específico —'}].concat((positions||[]).map(function(p){return{value:p.id,label:p.name};}));
-    var deptOpts    = ['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH'].map(function(d){return{value:d,label:d};});
+    var deptOpts    = ['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH','Marketing'].map(function(d){return{value:d,label:d};});
     var typeOpts    = ['Planta','Contrato','Por Proyecto','Temporal'].map(function(t){return{value:t,label:t};});
     var countryOpts = [{value:'MX',label:'🇲🇽 México'},{value:'AR',label:'🇦🇷 Argentina'},{value:'BR',label:'🇧🇷 Brasil'},{value:'US',label:'🇺🇸 EE.UU.'},{value:'JP',label:'🇯🇵 Japón'},{value:'CO',label:'🇨🇴 Colombia'},{value:'PA',label:'🇵🇦 Panamá'}];
     return '<div class="form-row">' +
@@ -1744,7 +1744,7 @@ var AdminHR = {
     APP.api('positions.list',{},function(err,positions){
       if(err){APP.toast(err,'error');return;}
       AdminHR._cachedPositions=positions||[];
-      var deptOpts=['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH'];
+      var deptOpts=['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH','Marketing'];
       var rows=(positions||[]).map(function(p){
         var isActive=p.status!=='inactivo';
         return '<tr><td><strong>'+p.name+'</strong>'+(p.description?'<br><span class="text-xs text-muted">'+p.description+'</span>':'')+'</td>' +
@@ -1767,7 +1767,7 @@ var AdminHR = {
   _positionForm: function(pos) {
     var v=pos||{};
     var sel=function(id,opts,val){ return '<select id="'+id+'">'+opts.map(function(o){return '<option value="'+o.value+'"'+(String(o.value)===String(val)?' selected':'')+'>'+o.label+'</option>';}).join('')+'</select>'; };
-    var deptOpts=[{value:'',label:'— Sin departamento —'}].concat(['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH'].map(function(d){return{value:d,label:d};}));
+    var deptOpts=[{value:'',label:'— Sin departamento —'}].concat(['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH','Marketing'].map(function(d){return{value:d,label:d};}));
     return '<div class="form-group"><label>Nombre del puesto *</label><input id="pf-name" value="'+(v.name||'')+'" placeholder="Ej: Ejecutivo de Ventas, Analista de Operaciones..."></div>' +
       '<div class="form-group"><label>Departamento</label>'+sel('pf-dept',deptOpts,v.department||'')+'</div>' +
       '<div class="form-group"><label>Descripción</label><input id="pf-desc" value="'+(v.description||'')+'" placeholder="Breve descripción del puesto"></div>' +
