@@ -359,7 +359,7 @@ export var VacationsModule = {
     for (var i = 0; i < employees.length; i++) {
       var emp      = employees[i]
       var entitled = _calcVacationEntitlement(emp.hireDate)
-      var existing = await DB.query(CONFIG.SHEETS.VACATION_BALANCE, { employeeId: emp.id, year: String(year) })
+      var existing = await DB.query(CONFIG.SHEETS.VACATION_BALANCE, { employeeId: emp.id, year: year })
 
       if (existing.length > 0) {
         await DB.update(CONFIG.SHEETS.VACATION_BALANCE, existing[0].id, {
@@ -423,7 +423,7 @@ async function _getOrCreateBalance(employeeId) {
   var year = new Date().getFullYear()
   var existing = await DB.query(CONFIG.SHEETS.VACATION_BALANCE, {
     employeeId: employeeId,
-    year:       String(year)
+    year:       year
   })
   if (existing.length > 0) return existing[0]
 
