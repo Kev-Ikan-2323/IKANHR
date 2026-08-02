@@ -136,6 +136,8 @@ async function dispatch(action, data, user) {
     'email.setEnabled': function() { return ConfigModule.set('emailEnabled', String(data.enabled), user) },
     'email.test':       async function() {
       if (!user.email) throw new Error('No tienes email registrado en tu perfil.')
+      var enabled = await ConfigModule.get('emailEnabled', user)
+      if (enabled === 'false') throw new Error('Los correos están desactivados. Actívalos primero desde Configuración.')
       await MailService.send({
         to:       user.email,
         subject:  'Test de correo — IKAN HR',
