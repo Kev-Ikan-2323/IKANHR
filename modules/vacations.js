@@ -50,6 +50,7 @@ export var VacationsModule = {
     })
 
     if (managerId) await _notifyManagerRequest(managerId, emp, request)
+    _notifyHRTeam(emp, request)
 
     return request
   },
@@ -525,6 +526,39 @@ async function _notifyManagerApproval(managerId, request) {
                 '<p>Ingresa a HR Platform para aprobar o rechazar.</p>'
     })
   } catch (e) { console.error('Notificación error:', e.message) }
+}
+
+async function _notifyHRTeam(emp, request) {
+  try {
+    var allRoles = await DB.getAll(CONFIG.SHEETS.ROLES)
+    var hrRoleIds = allRoles.filter(function(r) {
+      try {
+        var perms = typeof r.permissions === 'string' ? JSON.parse(r.permissions) : (r.permissions || [])
+        return perms.indexOf('hr') > -1 || perms.indexOf('admin') > -1
+      } catch (e) { return false }
+    }).map(function(r) { return r.id })
+
+    var allEmps = await DB.getAll(CONFIG.SHEETS.EMPLOYEES)
+    var hrEmps = allEmps.filter(function(e) {
+      return e.status === 'activo' && e.email && hrRoleIds.indexOf(e.roleId) > -1 && e.id !== emp.id
+    })
+
+    for (var i = 0; i < hrEmps.length; i++) {
+      var hr = hrEmps[i]
+      await MailService.send({
+        to:       hr.email,
+        subject:  '[HR Platform] Nueva solicitud de vacaciones — ' + emp.firstName + ' ' + emp.lastName,
+        htmlBody: '<p>Hola ' + hr.firstName + ',</p>' +
+                  '<p><strong>' + emp.firstName + ' ' + emp.lastName + '</strong>' +
+                  (emp.department ? ' (' + emp.department + ')' : '') +
+                  ' ha solicitado vacaciones:</p>' +
+                  '<ul><li>Del: <strong>' + request.startDate + '</strong></li>' +
+                  '<li>Al: <strong>' + request.endDate + '</strong></li>' +
+                  '<li>Días hábiles: <strong>' + request.workingDays + '</strong></li></ul>' +
+                  '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+      })
+    }
+  } catch (e) { console.error('HR team notification error:', e.message) }
 }
 
 async function _notifyManagerRequest(managerId, emp, request) {

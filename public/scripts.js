@@ -80,6 +80,7 @@ var ClientCache = (function() {
         delete _store[a];
       });
     },
+    flush: function() { _store = {}; },
     warm: function(preload) {
       if (preload.employees)      { this.set('employees.directory', {}, preload.employees); this.set('employees.list', {}, preload.employees); }
       if (preload.teams)           this.set('teams.list', {}, preload.teams);
@@ -95,9 +96,11 @@ var ClientCache = (function() {
 var APP = {
   user: null,
   data: null,
+  impersonateId: null,
 
   api: function(action, data, cb) {
     data = data || {};
+    if (APP.impersonateId) data._impersonateAs = APP.impersonateId;
     var cached = ClientCache.get(action, data);
     if (cached !== null) { setTimeout(function() { cb(null, cached); }, 0); return; }
     ClientCache.invalidate(action);
@@ -204,14 +207,10 @@ var APP = {
       var li = (u.lastName && u.lastName[0]) ? u.lastName[0] : '';
       initEl.textContent = (fi + li).toUpperCase();
     }
-    if (u.isAdmin || u.isHR) {
-      var sec = document.getElementById('admin-section');
-      if (sec) sec.style.display = 'block';
-    }
-    if (u.isManager && u.canApproveVacations && !u.isAdmin && !u.isHR) {
-      var approverSec = document.getElementById('approver-section');
-      if (approverSec) approverSec.style.display = 'block';
-    }
+    var sec = document.getElementById('admin-section');
+    if (sec) sec.style.display = (u.isAdmin || u.isHR) ? 'block' : 'none';
+    var approverSec = document.getElementById('approver-section');
+    if (approverSec) approverSec.style.display = (u.isManager && u.canApproveVacations && !u.isAdmin && !u.isHR) ? 'block' : 'none';
   },
 
   renderLoginScreen: function() {
@@ -1422,7 +1421,10 @@ var AdminHR = {
           return '<tr><td><strong>'+k.name+'</strong>'+(k.category?'<br><span class="text-xs text-muted">'+k.category+'</span>':'')+
             '</td><td>'+k.periodType+'</td><td><strong>'+k.weight+'%</strong></td><td>'+(k.target||'—')+'</td>' +
             '<td>'+(String(k.isActive)==='true'?'<span class="badge badge-success">Activo</span>':'<span class="badge badge-gray">Inactivo</span>')+'</td>' +
-            '<td><button class="btn btn-outline btn-sm" onclick="AdminHR.openEditKPI(\''+k.id+'\')">Editar</button></td></tr>';
+            '<td style="white-space:nowrap">' +
+              '<button class="btn btn-outline btn-sm" onclick="AdminHR.openEditKPI(\''+k.id+'\')" style="margin-right:4px">Editar</button>' +
+              '<button class="btn btn-outline btn-sm" onclick="AdminHR.deleteKPI(\''+k.id+'\',\''+k.name.replace(/'/g,"\\'")+'\''+')" style="color:var(--danger)">Eliminar</button>' +
+            '</td></tr>';
         }).join('')+'</tbody></table></div></div>';
     });
     return html;
@@ -1932,6 +1934,92 @@ var AdminHR = {
       }
       if (el) el.innerHTML = '<span style="color:var(--success)">✅ Enviado a ' + ((data && data.sentTo) || APP.user.email) + '</span>';
     });
+  },
+
+  deleteKPI: function(id, name) {
+    if (!confirm('¿Eliminar el KPI "' + name + '"? Esta acción no se puede deshacer.')) return;
+    APP.api('kpi.definitions.delete', { id: id }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ KPI eliminado', 'success');
+      AdminHR.openKPIAdmin('defs');
+    });
+  }
+};
+
+// ── DEBUG VIEW (admin impersonation) ─────────────────────────
+var DebugView = {
+  _realUser: null,
+
+  open: function() {
+    if (!APP.user || !APP.user.isAdmin) { APP.toast('Solo admin puede usar Debug', 'error'); return; }
+    APP.api('employees.list', {}, function(err, emps) {
+      if (err) { APP.toast(err, 'error'); return; }
+      emps = (emps || []).filter(function(e) { return e.status === 'activo'; });
+      var rows = emps.map(function(e) {
+        var safeName = (e.firstName + ' ' + e.lastName).replace(/'/g, "\\'");
+        return '<div class="debug-row" data-name="' + safeName.toLowerCase() + '" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
+          '<div>' +
+            '<div style="font-weight:500">' + e.firstName + ' ' + e.lastName + '</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">' + (e.department || '') + (e.roleName ? ' · ' + e.roleName : '') + '</div>' +
+          '</div>' +
+          '<button class="btn btn-outline btn-sm" onclick="DebugView.activate(\'' + e.id + '\')">Ver como este usuario</button>' +
+        '</div>';
+      }).join('');
+      var html =
+        '<div style="padding:8px 12px;background:#fef3c7;border-radius:6px;font-size:13px;margin-bottom:12px;color:#92400e">' +
+          '⚠️ Selecciona un empleado para ver la plataforma desde su perspectiva.' +
+        '</div>' +
+        '<input type="text" placeholder="Buscar empleado..." oninput="DebugView._filter(this.value)" style="width:100%;margin-bottom:10px">' +
+        '<div style="max-height:380px;overflow-y:auto" id="debug-emp-list">' + rows + '</div>';
+      APP.modal('🔍 Debug — Ver como usuario', html,
+        '<button class="btn btn-primary" onclick="APP.closeModal()">Cancelar</button>');
+    });
+  },
+
+  _filter: function(q) {
+    q = (q || '').toLowerCase();
+    document.querySelectorAll('.debug-row').forEach(function(row) {
+      row.style.display = !q || (row.dataset.name || '').indexOf(q) > -1 ? '' : 'none';
+    });
+  },
+
+  activate: function(empId) {
+    APP.api('admin.viewAsUser', { employeeId: empId }, function(err, viewUser) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.closeModal();
+      DebugView._realUser = Object.assign({}, APP.user);
+      APP.impersonateId = empId;
+      APP.user = viewUser;
+      ClientCache.flush();
+      APP.renderSidebar();
+      DebugView._showBanner(viewUser.fullName || viewUser.email);
+      APP.navigate('dashboard');
+    });
+  },
+
+  deactivate: function() {
+    if (!DebugView._realUser) return;
+    APP.user = DebugView._realUser;
+    APP.impersonateId = null;
+    DebugView._realUser = null;
+    ClientCache.flush();
+    var banner = document.getElementById('debug-banner');
+    if (banner) banner.remove();
+    APP.renderSidebar();
+    APP.navigate('dashboard');
+  },
+
+  _showBanner: function(name) {
+    var old = document.getElementById('debug-banner');
+    if (old) old.remove();
+    var content = document.getElementById('content');
+    if (!content) return;
+    var banner = document.createElement('div');
+    banner.id = 'debug-banner';
+    banner.style.cssText = 'background:#dc2626;color:#fff;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:500;border-radius:8px;margin-bottom:16px';
+    banner.innerHTML = '🔍 Modo debug — Viendo como: <strong style="margin:0 6px">' + name + '</strong>' +
+      '<button onclick="DebugView.deactivate()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:3px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:auto">Salir del modo debug</button>';
+    content.prepend(banner);
   }
 };
 

@@ -3,7 +3,8 @@
 // Body: { action: string, data: object }
 // ============================================================
 
-import { requireLogin } from '../../lib/auth.js'
+import { requireLogin, CONFIG } from '../../lib/auth.js'
+import { DB } from '../../lib/db.js'
 import { EmployeeModule }     from '../../modules/employees.js'
 import { KPIModule }          from '../../modules/kpis.js'
 import { VacationsModule }    from '../../modules/vacations.js'
@@ -27,6 +28,15 @@ export default async function handler(req, res) {
     var data   = body.data || {}
 
     var user = await requireLogin(req, res)
+
+    // Admin debug impersonation: if _impersonateAs is in data and caller is admin, swap user context
+    var impersonateId = data._impersonateAs
+    if (impersonateId) delete data._impersonateAs
+    if (impersonateId && user.isAdmin) {
+      var impUser = await _buildImpersonatedUser(impersonateId)
+      if (impUser) user = impUser
+    }
+
     var result = await dispatch(action, data, user)
     return res.json({ ok: true, data: result })
   } catch (e) {
@@ -131,6 +141,12 @@ async function dispatch(action, data, user) {
     'config.set':    function() { return ConfigModule.set(data.key, data.value, user) },
     'config.getAll': function() { return ConfigModule.getAll(user) },
 
+    // ── ADMIN DEBUG ────────────────────────────────────────────
+    'admin.viewAsUser': async function() {
+      if (!user.isAdmin) throw new Error('Solo admin puede usar esta función.')
+      return _buildImpersonatedUser(data.employeeId)
+    },
+
     // ── EMAIL ──────────────────────────────────────────────────
     'email.getEnabled': function() { return ConfigModule.get('emailEnabled', user) },
     'email.setEnabled': function() { return ConfigModule.set('emailEnabled', String(data.enabled), user) },
@@ -175,4 +191,41 @@ async function dispatch(action, data, user) {
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)
   return routes[action]()
+}
+
+async function _buildImpersonatedUser(empId) {
+  if (!empId) return null
+  var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, empId)
+  if (!emp) return null
+  var role = emp.roleId ? await DB.getById(CONFIG.SHEETS.ROLES, emp.roleId) : null
+  var perms = []
+  if (role && role.permissions) {
+    try {
+      perms = typeof role.permissions === 'string' ? JSON.parse(role.permissions) : (role.permissions || [])
+    } catch (e) {}
+  }
+  var ledTeams   = await DB.getBy(CONFIG.SHEETS.TEAMS, 'leaderId', emp.id)
+  var coledTeams = await DB.getBy(CONFIG.SHEETS.TEAMS, 'coLeaderId', emp.id)
+  return {
+    id:                  emp.id,
+    email:               emp.email,
+    firstName:           emp.firstName,
+    lastName:            emp.lastName,
+    fullName:            (emp.firstName || '') + ' ' + (emp.lastName || ''),
+    roleId:              emp.roleId,
+    roleName:            role ? role.name : '',
+    teamId:              emp.teamId,
+    managerId:           emp.managerId,
+    department:          emp.department,
+    permissions:         perms,
+    isAdmin:             perms.indexOf('admin') > -1,
+    isHR:                perms.indexOf('hr') > -1,
+    isManager:           perms.indexOf('manager') > -1 || ledTeams.length > 0 || coledTeams.length > 0,
+    ledTeams:            ledTeams.map(function(t) { return t.id }),
+    coledTeams:          coledTeams.map(function(t) { return t.id }),
+    canApproveVacations: emp.canApproveVacations === undefined || emp.canApproveVacations === ''
+      ? true : String(emp.canApproveVacations) === 'true',
+    country:             emp.country || 'MX',
+    _isImpersonated:     true
+  }
 }
