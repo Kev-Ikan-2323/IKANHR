@@ -188,6 +188,20 @@ var APP = {
     if (fns[view]) fns[view]();
   },
 
+  updateApprovalBadge: function() {
+    var u = APP.user;
+    if (!u || (!u.isAdmin && !u.isHR && !u.isManager)) return;
+    APP.api('vacations.teamRequests', {}, function(err, data) {
+      var count = err ? 0 : (data || []).length;
+      ['nav-vac-badge-admin', 'nav-vac-badge-approver'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = count > 0 ? String(count) : '';
+        el.style.display = count > 0 ? 'inline-flex' : 'none';
+      });
+    });
+  },
+
   renderHeader: function() {
     var alerts = APP.data && APP.data.alerts ? APP.data.alerts.length : 0;
     var dot = document.getElementById('notif-dot');
@@ -369,6 +383,8 @@ var DashboardView = {
             '<button class="btn btn-primary btn-sm" onclick="APP.navigate(\'kpis\')">Autocalificarme</button></div>';
         }).join('')
       : '<div class="empty-state"><span class="material-icons-round">task_alt</span><p>¡Todo al día!</p></div>';
+
+    APP.updateApprovalBadge();
   },
 
   bdayItem: function(b) {
@@ -972,6 +988,8 @@ var VacationsView = {
       if (err) { APP.toast(err, 'error'); return; }
       var msg = (data && data.status === 'Pendiente Manager') ? '✅ Revisado por RH · pendiente aprobación del manager' : '✅ Vacaciones aprobadas';
       APP.toast(msg, 'success'); APP.closeModal();
+      VacationsView.loadTeamRequests();
+      APP.updateApprovalBadge();
     });
   },
   rejectReq: function(id) {
@@ -987,6 +1005,8 @@ var VacationsView = {
     APP.api('vacations.reject', { id: id, notes: notes }, function(err) {
       if (err) { APP.toast(err, 'error'); return; }
       APP.toast('Solicitud rechazada', 'info'); APP.closeModal();
+      VacationsView.loadTeamRequests();
+      APP.updateApprovalBadge();
     });
   },
   _hols: [], _country: 'MX',

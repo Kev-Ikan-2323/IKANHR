@@ -61,6 +61,7 @@ var SHELL = `
         <div class="nav-label">Aprobaciones</div>
         <div class="nav-item" onclick="APP.navigate('vacations');setTimeout(function(){VacationsView.loadTeamRequests()},600)">
           <span class="material-icons-round">event_available</span><span>Aprobaciones</span>
+          <span class="nav-badge" id="nav-vac-badge-approver" style="display:none"></span>
         </div>
       </div>
     </div>
@@ -88,6 +89,7 @@ var SHELL = `
         </div>
         <div class="nav-item" onclick="APP.navigate('vacations');setTimeout(function(){VacationsView.loadTeamRequests()},600)">
           <span class="material-icons-round">event_available</span><span>Aprobaciones</span>
+          <span class="nav-badge" id="nav-vac-badge-admin" style="display:none"></span>
         </div>
         <div class="nav-item" onclick="AdminHR.openSystemConfig()">
           <span class="material-icons-round">settings</span><span>Configuración</span>
