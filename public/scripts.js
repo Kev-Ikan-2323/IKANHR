@@ -1952,7 +1952,8 @@ var AdminHR = {
         if (el) el.innerHTML = '<span style="color:var(--danger)">Error: ' + err + '</span>';
         return;
       }
-      if (el) el.innerHTML = '<span style="color:var(--success)">✅ Enviado a ' + ((data && data.sentTo) || APP.user.email) + '</span>';
+      var msgId = data && data.messageId ? ' <span style="color:var(--text-muted);font-size:11px">(id: ' + data.messageId + ')</span>' : '';
+      if (el) el.innerHTML = '<span style="color:var(--success)">✅ Enviado a ' + ((data && data.sentTo) || APP.user.email) + '</span>' + msgId;
     });
   },
 

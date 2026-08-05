@@ -154,7 +154,7 @@ async function dispatch(action, data, user) {
       if (!user.email) throw new Error('No tienes email registrado en tu perfil.')
       var enabled = await ConfigModule.get('emailEnabled', user)
       if (enabled === 'false') throw new Error('Los correos están desactivados. Actívalos primero desde Configuración.')
-      await MailService.send({
+      var sent = await MailService.send({
         to:       user.email,
         subject:  'Test de correo — IKAN HR',
         htmlBody: '<div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">' +
@@ -168,7 +168,7 @@ async function dispatch(action, data, user) {
                   '<p style="color:#94a3b8;font-size:12px">IKAN HR Platform · Correo automático, no responder.</p>' +
                   '</div>'
       })
-      return { ok: true, sentTo: user.email }
+      return { ok: true, sentTo: user.email, messageId: sent && sent.id }
     },
 
     // ── ROLES ──────────────────────────────────────────────────
