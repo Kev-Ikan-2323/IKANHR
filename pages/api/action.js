@@ -170,6 +170,10 @@ async function dispatch(action, data, user) {
       })
       return { ok: true, sentTo: user.email, messageId: sent && sent.id }
     },
+    'email.testScenario':  async function() {
+      if (!user.isAdmin && !user.isHR) throw new Error('Solo admin o HR puede usar esta función.')
+      return _sendTestScenario(data.scenario, user)
+    },
 
     // ── ROLES ──────────────────────────────────────────────────
     'roles.list':        function() { return RolesModule.list(user) },
@@ -191,6 +195,90 @@ async function dispatch(action, data, user) {
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)
   return routes[action]()
+}
+
+async function _sendTestScenario(scenario, user) {
+  if (!user.email) throw new Error('No tienes email registrado en tu perfil.')
+  var name    = (user.firstName || 'Empleado') + ' ' + (user.lastName || 'Test')
+  var today   = new Date().toISOString().split('T')[0]
+  var nextWk  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+
+  var scenarios = {
+    'vacation_request_manager': {
+      subject:  '[HR Platform] Solicitud de vacaciones — ' + name,
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p><strong>' + name + '</strong> ha solicitado vacaciones:</p>' +
+                '<ul><li>Del: <strong>' + today + '</strong></li>' +
+                '<li>Al: <strong>' + nextWk + '</strong></li>' +
+                '<li>Días hábiles: <strong>5</strong></li></ul>' +
+                '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+    },
+    'vacation_request_hr': {
+      subject:  '[HR Platform] Nueva solicitud de vacaciones — ' + name,
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p><strong>' + name + '</strong> (Departamento ejemplo) ha solicitado vacaciones:</p>' +
+                '<ul><li>Del: <strong>' + today + '</strong></li>' +
+                '<li>Al: <strong>' + nextWk + '</strong></li>' +
+                '<li>Días hábiles: <strong>5</strong></li></ul>' +
+                '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+    },
+    'vacation_approved': {
+      subject:  '[HR Platform] Tu solicitud de vacaciones fue aprobada',
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p>Tu solicitud de vacaciones del <strong>' + today + '</strong> al <strong>' + nextWk + '</strong> fue: <strong>Aprobada</strong></p>' +
+                '<p>Puedes ver el detalle en tu perfil de HR Platform.</p>'
+    },
+    'vacation_rejected': {
+      subject:  '[HR Platform] Tu solicitud de vacaciones fue rechazada',
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p>Tu solicitud de vacaciones del <strong>' + today + '</strong> al <strong>' + nextWk + '</strong> fue: <strong>Rechazada</strong></p>' +
+                '<p>Comentario: No hay cobertura suficiente en el equipo durante esas fechas.</p>' +
+                '<p>Puedes ver el detalle en tu perfil de HR Platform.</p>'
+    },
+    'kpi_self_submit': {
+      subject:  '[HR Platform] Autocalificación lista para revisar - ' + name,
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p><strong>' + name + '</strong> ha completado su autocalificación para el período <strong>Q3 2025 (prueba)</strong>.</p>' +
+                '<p>Por favor revisa y aprueba la evaluación en la plataforma HR.</p>'
+    },
+    'kpi_review_complete': {
+      subject:  '[HR Platform] Tu evaluación de KPIs fue aprobada - Q3 2025 (prueba)',
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p>Tu evaluación de KPIs para el período <strong>Q3 2025 (prueba)</strong> ha sido revisada y aprobada por tu manager.</p>' +
+                '<p>Puedes ver tus resultados en tu dashboard de HR Platform.</p>'
+    },
+    'kpi_period_open': {
+      subject:  '[HR Platform] Nuevo período de evaluación: Q3 2025 (prueba)',
+      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
+                '<p>Se ha abierto el período de evaluación <strong>Q3 2025 (prueba)</strong>.</p>' +
+                '<p>Fecha límite autocalificación: <strong>' + nextWk + '</strong></p>' +
+                '<p>Ingresa a HR Platform para completar tu autocalificación.</p>'
+    },
+    'birthday_greeting': {
+      subject:  '¡Feliz cumpleaños, ' + user.firstName + '!',
+      htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
+                '<h2 style="color:#1a73e8;">¡Feliz cumpleaños! 🎉</h2>' +
+                '<p>Hola <strong>' + user.firstName + '</strong>,</p>' +
+                '<p>Todo el equipo te desea un excelente día y un año lleno de éxitos.</p>' +
+                '<p>¡Gracias por ser parte de nuestro equipo!</p>' +
+                '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
+                '</div>'
+    },
+    'birthday_notification': {
+      subject:  '🎂 Hoy es el cumpleaños de ' + name,
+      htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
+                '<h2 style="color:#1a73e8;">🎂 ¡Cumpleaños en el equipo!</h2>' +
+                '<p>Hola <strong>' + user.firstName + '</strong>,</p>' +
+                '<p>Hoy es el cumpleaños de <strong>' + name + '</strong>. ¡Únete a felicitarle!</p>' +
+                '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
+                '</div>'
+    }
+  }
+
+  if (!scenarios[scenario]) throw new Error('Escenario no reconocido: ' + scenario)
+  var s    = scenarios[scenario]
+  var sent = await MailService.send({ to: user.email, subject: s.subject, htmlBody: s.htmlBody })
+  return { ok: true, sentTo: user.email, scenario: scenario, messageId: sent && sent.id }
 }
 
 async function _buildImpersonatedUser(empId) {

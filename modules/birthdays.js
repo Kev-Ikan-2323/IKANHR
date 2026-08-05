@@ -123,24 +123,53 @@ export var BirthdaysModule = {
       return parts[1] === todayMM && parts[2] === todayDD
     })
 
+    var others = employees.filter(function(e) {
+      return e.email && celebrants.every(function(c) { return c.id !== e.id })
+    })
+
     var sent = []
     for (var i = 0; i < celebrants.length; i++) {
       var emp = celebrants[i]
-      try {
-        await MailService.send({
-          to:       emp.email,
-          subject:  '¡Feliz cumpleaños, ' + emp.firstName + '!',
-          htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
-                    '<h2 style="color:#1a73e8;">¡Feliz cumpleaños! 🎉</h2>' +
-                    '<p>Hola <strong>' + emp.firstName + '</strong>,</p>' +
-                    '<p>Todo el equipo te desea un excelente día y un año lleno de éxitos.</p>' +
-                    '<p>¡Gracias por ser parte de nuestro equipo!</p>' +
-                    '<br><p style="color:#5f6368;font-size:12px;">— HR Platform</p>' +
-                    '</div>'
-        })
-        sent.push((emp.firstName || '') + ' ' + (emp.lastName || ''))
-      } catch (e) {
-        console.error('Error greeting ' + emp.firstName + ':', e.message)
+      var empFullName = (emp.firstName || '') + ' ' + (emp.lastName || '')
+
+      // Greeting to the birthday person
+      if (emp.email) {
+        try {
+          await MailService.send({
+            to:       emp.email,
+            subject:  '¡Feliz cumpleaños, ' + emp.firstName + '!',
+            htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
+                      '<h2 style="color:#1a73e8;">¡Feliz cumpleaños! 🎉</h2>' +
+                      '<p>Hola <strong>' + emp.firstName + '</strong>,</p>' +
+                      '<p>Todo el equipo te desea un excelente día y un año lleno de éxitos.</p>' +
+                      '<p>¡Gracias por ser parte de nuestro equipo!</p>' +
+                      '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
+                      '</div>'
+          })
+          sent.push(empFullName)
+        } catch (e) {
+          console.error('Error greeting ' + emp.firstName + ':', e.message)
+        }
+      }
+
+      // Notification to all other active employees
+      for (var j = 0; j < others.length; j++) {
+        var other = others[j]
+        try {
+          await MailService.send({
+            to:       other.email,
+            subject:  '🎂 Hoy es el cumpleaños de ' + empFullName,
+            htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
+                      '<h2 style="color:#1a73e8;">🎂 ¡Cumpleaños en el equipo!</h2>' +
+                      '<p>Hola <strong>' + (other.firstName || '') + '</strong>,</p>' +
+                      '<p>Hoy es el cumpleaños de <strong>' + empFullName + '</strong>.</p>' +
+                      '<p>¡Únete a felicitarle!</p>' +
+                      '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
+                      '</div>'
+          })
+        } catch (e) {
+          console.error('Error notifying ' + other.firstName + ' about birthday of ' + emp.firstName + ':', e.message)
+        }
       }
     }
     console.log('Birthday greetings sent:', sent.join(', '))

@@ -1912,13 +1912,36 @@ var AdminHR = {
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="card" style="padding:16px">' +
-          '<div style="font-weight:600;margin-bottom:4px">Correo de prueba</div>' +
+        '<div class="card mb-12" style="padding:16px">' +
+          '<div style="font-weight:600;margin-bottom:4px">Correo de prueba general</div>' +
           '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Se enviará a <strong>' + emailAddr + '</strong></div>' +
           '<button class="btn btn-outline" id="cfg-test-btn" onclick="AdminHR.sendTestEmail()">' +
             '<span class="material-icons-round">send</span>Enviar correo de prueba' +
           '</button>' +
           '<div id="cfg-test-result" style="margin-top:8px;font-size:13px"></div>' +
+        '</div>' +
+        '<div class="card" style="padding:16px">' +
+          '<div style="font-weight:600;margin-bottom:4px">Probar escenarios de correo</div>' +
+          '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Todos se envían a <strong>' + emailAddr + '</strong></div>' +
+          '<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Vacaciones</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'vacation_request_manager\',this)">Solicitud (como manager)</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'vacation_request_hr\',this)">Solicitud (como RRHH)</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'vacation_approved\',this)">Aprobada</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'vacation_rejected\',this)">Rechazada</button>' +
+          '</div>' +
+          '<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">KPIs</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'kpi_self_submit\',this)">Autocalificación enviada</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'kpi_review_complete\',this)">Revisión completada</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'kpi_period_open\',this)">Período abierto</button>' +
+          '</div>' +
+          '<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Cumpleaños</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'birthday_greeting\',this)">Felicitación (al cumpleañero)</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'birthday_notification\',this)">Aviso de cumpleaños (a todos)</button>' +
+          '</div>' +
+          '<div id="cfg-scenario-result" style="font-size:13px;margin-top:4px"></div>' +
         '</div>' +
         '</div>';
       APP.modal('Configuración del sistema', html,
@@ -1953,6 +1976,21 @@ var AdminHR = {
       }
       var msgId = data && data.messageId ? ' <span style="color:var(--text-muted);font-size:11px">(id: ' + data.messageId + ')</span>' : '';
       if (el) el.innerHTML = '<span style="color:var(--success)">✅ Enviado a ' + ((data && data.sentTo) || APP.user.email) + '</span>' + msgId;
+    });
+  },
+
+  sendTestScenario: function(scenario, btn) {
+    var result = document.getElementById('cfg-scenario-result');
+    if (btn) btn.disabled = true;
+    if (result) result.textContent = 'Enviando...';
+    APP.api('email.testScenario', { scenario: scenario }, function(err, data) {
+      if (btn) btn.disabled = false;
+      var el = document.getElementById('cfg-scenario-result');
+      if (err) {
+        if (el) el.innerHTML = '<span style="color:var(--danger)">Error: ' + err + '</span>';
+        return;
+      }
+      if (el) el.innerHTML = '<span style="color:var(--success)">✅ Enviado a ' + ((data && data.sentTo) || APP.user.email) + '</span>';
     });
   },
 
