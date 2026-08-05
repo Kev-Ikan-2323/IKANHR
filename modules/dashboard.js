@@ -27,7 +27,7 @@ export var DashboardModule = {
     var pendingVacReq   = allMyRequests.filter(function(r) {
       return r.status === CONFIG.STATUS.PENDING
     })
-    var birthdays       = await BirthdaysModule.getUpcoming(14, user)
+    var birthdays       = await BirthdaysModule.getUpcoming(30, user)
     var anniversaryInfo = await EmployeeModule.getAnniversaryInfo(user.id, user)
     var announcements   = await AnnouncementsModule.list({ limit: 5 }, user)
     var pendingKPIs     = await KPIModule.myPendingSelfAssessments(user)
