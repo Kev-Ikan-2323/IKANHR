@@ -266,25 +266,6 @@ textarea { resize: vertical; min-height: 80px; }
 .kpi-row-name { font-weight: 700; font-size: 14px; margin-bottom: 3px; }
 .kpi-row-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
 
-/* ── Admin element codes (solo admins/HR ven esto) ── */
-body.show-codes [data-code] { position: relative !important; }
-body.show-codes [data-code]::after {
-  content: attr(data-code);
-  position: absolute;
-  top: 0; right: 0;
-  background: #e55f00;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
-  font-family: 'Courier New', monospace;
-  padding: 0 5px;
-  line-height: 16px;
-  border-radius: 0 4px 0 4px;
-  z-index: 9990;
-  pointer-events: none;
-  white-space: nowrap;
-  opacity: .9;
-}
 
 @media (max-width: 768px) {
   :root { --sidebar-w: 60px; }
