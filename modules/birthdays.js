@@ -5,6 +5,7 @@
 import { DB } from '../lib/db.js'
 import { CONFIG } from '../lib/auth.js'
 import { MailService } from '../lib/email.js'
+import { buildEmail } from '../lib/email-template.js'
 
 export var BirthdaysModule = {
 
@@ -94,15 +95,16 @@ export var BirthdaysModule = {
 
     try {
       await MailService.send({
-        to:       emp.email,
-        subject:  '¡Feliz cumpleaños, ' + emp.firstName + '!',
-        htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
-                  '<h2 style="color:#1a73e8;">¡Feliz cumpleaños! 🎉</h2>' +
-                  '<p>Hola <strong>' + emp.firstName + '</strong>,</p>' +
-                  '<p>Todo el equipo te desea un excelente día y un año lleno de éxitos.</p>' +
-                  '<p>¡Gracias por ser parte de nuestro equipo!</p>' +
-                  '<br><p style="color:#5f6368;font-size:12px;">— HR Platform</p>' +
-                  '</div>'
+        to:      emp.email,
+        subject: '🎂 ¡Feliz cumpleaños, ' + emp.firstName + '!',
+        htmlBody: buildEmail({
+          icon:  '🎂',
+          title: '¡Feliz cumpleaños, ' + emp.firstName + '!',
+          bodyHTML:
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + emp.firstName + '</strong>,</p>' +
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Todo el equipo de IKAN te desea un día increíble lleno de alegría y muchos motivos para celebrar. 🎉</p>' +
+            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">¡Gracias por ser parte de nuestro equipo!</p>'
+        })
       })
       return { ok: true, sentTo: emp.email }
     } catch (e) {
@@ -136,15 +138,16 @@ export var BirthdaysModule = {
       if (emp.email) {
         try {
           await MailService.send({
-            to:       emp.email,
-            subject:  '¡Feliz cumpleaños, ' + emp.firstName + '!',
-            htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
-                      '<h2 style="color:#1a73e8;">¡Feliz cumpleaños! 🎉</h2>' +
-                      '<p>Hola <strong>' + emp.firstName + '</strong>,</p>' +
-                      '<p>Todo el equipo te desea un excelente día y un año lleno de éxitos.</p>' +
-                      '<p>¡Gracias por ser parte de nuestro equipo!</p>' +
-                      '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
-                      '</div>'
+            to:      emp.email,
+            subject: '🎂 ¡Feliz cumpleaños, ' + emp.firstName + '!',
+            htmlBody: buildEmail({
+              icon:  '🎂',
+              title: '¡Feliz cumpleaños, ' + emp.firstName + '!',
+              bodyHTML:
+                '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + emp.firstName + '</strong>,</p>' +
+                '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Todo el equipo de IKAN te desea un día increíble lleno de alegría y muchos motivos para celebrar. 🎉</p>' +
+                '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">¡Gracias por ser parte de nuestro equipo!</p>'
+            })
           })
           sent.push(empFullName)
         } catch (e) {
@@ -157,15 +160,15 @@ export var BirthdaysModule = {
         var other = others[j]
         try {
           await MailService.send({
-            to:       other.email,
-            subject:  '🎂 Hoy es el cumpleaños de ' + empFullName,
-            htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
-                      '<h2 style="color:#1a73e8;">🎂 ¡Cumpleaños en el equipo!</h2>' +
-                      '<p>Hola <strong>' + (other.firstName || '') + '</strong>,</p>' +
-                      '<p>Hoy es el cumpleaños de <strong>' + empFullName + '</strong>.</p>' +
-                      '<p>¡Únete a felicitarle!</p>' +
-                      '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
-                      '</div>'
+            to:      other.email,
+            subject: '🎉 Hoy es el cumpleaños de ' + empFullName,
+            htmlBody: buildEmail({
+              icon:  '🎉',
+              title: '¡Cumpleaños en el equipo!',
+              bodyHTML:
+                '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + (other.firstName || '') + '</strong>,</p>' +
+                '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hoy es el cumpleaños de <strong style="color:#1E293B">' + empFullName + '</strong>. ¡Únete a felicitarle!</p>'
+            })
           })
         } catch (e) {
           console.error('Error notifying ' + other.firstName + ' about birthday of ' + emp.firstName + ':', e.message)

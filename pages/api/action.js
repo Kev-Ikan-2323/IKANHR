@@ -17,6 +17,7 @@ import { RolesModule }        from '../../modules/roles.js'
 import { PositionsModule }    from '../../modules/positions.js'
 import { ConfigModule }       from '../../modules/config.js'
 import { MailService }        from '../../lib/email.js'
+import { buildEmail }        from '../../lib/email-template.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
 
 export default async function handler(req, res) {
@@ -155,18 +156,19 @@ async function dispatch(action, data, user) {
       var enabled = await ConfigModule.get('emailEnabled', user)
       if (enabled === 'false') throw new Error('Los correos están desactivados. Actívalos primero desde Configuración.')
       var sent = await MailService.send({
-        to:       user.email,
-        subject:  'Test de correo — IKAN HR',
-        htmlBody: '<div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">' +
-                  '<div style="background:#1a56db;border-radius:8px;padding:16px 20px;margin-bottom:24px">' +
-                    '<span style="color:#fff;font-weight:700;font-size:18px">IKAN HR Platform</span>' +
-                  '</div>' +
-                  '<h2 style="color:#0f172a;margin-bottom:8px">✅ Correo de prueba</h2>' +
-                  '<p style="color:#334155">Hola <strong>' + (user.fullName || user.email) + '</strong>,</p>' +
-                  '<p style="color:#334155">Este es un correo de prueba enviado desde el panel de administración. Si lo recibes correctamente, el sistema de notificaciones por correo está funcionando.</p>' +
-                  '<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">' +
-                  '<p style="color:#94a3b8;font-size:12px">IKAN HR Platform · Correo automático, no responder.</p>' +
-                  '</div>'
+        to:      user.email,
+        subject: 'Test de correo — IKAN HR',
+        htmlBody: buildEmail({
+          icon:  '✅',
+          title: 'Correo de prueba',
+          bodyHTML:
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + (user.firstName || user.email) + '</strong>,</p>' +
+            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Este es un correo de prueba enviado desde el panel de administración. Si lo estás leyendo, el sistema de notificaciones está funcionando correctamente.</p>',
+          details: [
+            { label: 'Enviado a',  value: user.email },
+            { label: 'Estado',     value: '✅ Entregado', highlight: '#16A34A' }
+          ]
+        })
       })
       return { ok: true, sentTo: user.email, messageId: sent && sent.id }
     },
@@ -199,79 +201,92 @@ async function dispatch(action, data, user) {
 
 async function _sendTestScenario(scenario, user) {
   if (!user.email) throw new Error('No tienes email registrado en tu perfil.')
-  var name    = (user.firstName || 'Empleado') + ' ' + (user.lastName || 'Test')
-  var today   = new Date().toISOString().split('T')[0]
-  var nextWk  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+  var name   = (user.firstName || 'Empleado') + ' ' + (user.lastName || 'Test')
+  var today  = new Date().toISOString().split('T')[0]
+  var nextWk = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+  var fn     = user.firstName || 'Usuario'
 
   var scenarios = {
     'vacation_request_manager': {
-      subject:  '[HR Platform] Solicitud de vacaciones — ' + name,
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p><strong>' + name + '</strong> ha solicitado vacaciones:</p>' +
-                '<ul><li>Del: <strong>' + today + '</strong></li>' +
-                '<li>Al: <strong>' + nextWk + '</strong></li>' +
-                '<li>Días hábiles: <strong>5</strong></li></ul>' +
-                '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+      subject:  '[IKAN HR] Solicitud de vacaciones — ' + name,
+      htmlBody: buildEmail({
+        icon: '📋', title: 'Solicitud de vacaciones pendiente',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu colaborador <strong style="color:#1E293B">' + name + '</strong> ha enviado una solicitud de vacaciones que requiere tu aprobación.</p>',
+        details: [{ label:'Empleado', value: name }, { label:'Fecha inicio', value: today }, { label:'Fecha fin', value: nextWk }, { label:'Días hábiles', value:'5' }]
+      })
     },
     'vacation_request_hr': {
-      subject:  '[HR Platform] Nueva solicitud de vacaciones — ' + name,
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p><strong>' + name + '</strong> (Departamento ejemplo) ha solicitado vacaciones:</p>' +
-                '<ul><li>Del: <strong>' + today + '</strong></li>' +
-                '<li>Al: <strong>' + nextWk + '</strong></li>' +
-                '<li>Días hábiles: <strong>5</strong></li></ul>' +
-                '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+      subject:  '[IKAN HR] Nueva solicitud de vacaciones — ' + name,
+      htmlBody: buildEmail({
+        icon: '🏖️', title: 'Nueva solicitud de vacaciones',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6"><strong style="color:#1E293B">' + name + '</strong> <span style="color:#94A3B8">· Departamento Ejemplo</span> ha solicitado vacaciones y está pendiente de aprobación.</p>',
+        details: [{ label:'Empleado', value: name }, { label:'Fecha inicio', value: today }, { label:'Fecha fin', value: nextWk }, { label:'Días hábiles', value:'5' }]
+      })
     },
     'vacation_approved': {
-      subject:  '[HR Platform] Tu solicitud de vacaciones fue aprobada',
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p>Tu solicitud de vacaciones del <strong>' + today + '</strong> al <strong>' + nextWk + '</strong> fue: <strong>Aprobada</strong></p>' +
-                '<p>Puedes ver el detalle en tu perfil de HR Platform.</p>'
+      subject:  '[IKAN HR] Tu solicitud de vacaciones fue aprobada ✅',
+      htmlBody: buildEmail({
+        icon: '✅', title: '¡Tu solicitud fue aprobada!',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu solicitud de vacaciones ha sido <strong style="color:#16A34A">aprobada</strong>. ¡Disfruta tu tiempo libre!</p>',
+        details: [{ label:'Fecha inicio', value: today }, { label:'Fecha fin', value: nextWk }, { label:'Días hábiles', value:'5' }, { label:'Estado', value:'✅ Aprobada', highlight:'#16A34A' }]
+      })
     },
     'vacation_rejected': {
-      subject:  '[HR Platform] Tu solicitud de vacaciones fue rechazada',
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p>Tu solicitud de vacaciones del <strong>' + today + '</strong> al <strong>' + nextWk + '</strong> fue: <strong>Rechazada</strong></p>' +
-                '<p>Comentario: No hay cobertura suficiente en el equipo durante esas fechas.</p>' +
-                '<p>Puedes ver el detalle en tu perfil de HR Platform.</p>'
+      subject:  '[IKAN HR] Tu solicitud de vacaciones fue rechazada',
+      htmlBody: buildEmail({
+        icon: '❌', title: 'Tu solicitud fue rechazada',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Tu solicitud de vacaciones <strong style="color:#DC2626">no fue aprobada</strong> en esta ocasión.</p>' +
+                  '<div style="background:#FEF2F2;border-left:4px solid #DC2626;padding:12px 16px;border-radius:0 6px 6px 0"><span style="color:#991B1B;font-size:13px"><strong>Comentario:</strong> No hay cobertura suficiente en el equipo durante esas fechas.</span></div>',
+        details: [{ label:'Fecha inicio', value: today }, { label:'Fecha fin', value: nextWk }, { label:'Días hábiles', value:'5' }, { label:'Estado', value:'❌ Rechazada', highlight:'#DC2626' }]
+      })
     },
     'kpi_self_submit': {
-      subject:  '[HR Platform] Autocalificación lista para revisar - ' + name,
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p><strong>' + name + '</strong> ha completado su autocalificación para el período <strong>Q3 2025 (prueba)</strong>.</p>' +
-                '<p>Por favor revisa y aprueba la evaluación en la plataforma HR.</p>'
+      subject:  '[IKAN HR] Autocalificación lista para revisar — ' + name,
+      htmlBody: buildEmail({
+        icon: '📊', title: 'Autocalificación lista para revisar',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6"><strong style="color:#1E293B">' + name + '</strong> ha completado su autocalificación. Ingresa a la plataforma para revisarla y aprobarla.</p>',
+        details: [{ label:'Empleado', value: name }, { label:'Período', value:'Q3 2025 (prueba)' }]
+      })
     },
     'kpi_review_complete': {
-      subject:  '[HR Platform] Tu evaluación de KPIs fue aprobada - Q3 2025 (prueba)',
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p>Tu evaluación de KPIs para el período <strong>Q3 2025 (prueba)</strong> ha sido revisada y aprobada por tu manager.</p>' +
-                '<p>Puedes ver tus resultados en tu dashboard de HR Platform.</p>'
+      subject:  '[IKAN HR] Tu evaluación de KPIs fue aprobada — Q3 2025 (prueba)',
+      htmlBody: buildEmail({
+        icon: '🎯', title: 'Tu evaluación de KPIs fue aprobada',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu manager ha revisado y <strong style="color:#16A34A">aprobado</strong> tu evaluación de KPIs. Puedes ver tus resultados en tu dashboard.</p>',
+        details: [{ label:'Período', value:'Q3 2025 (prueba)' }, { label:'Estado', value:'✅ Aprobada', highlight:'#16A34A' }]
+      })
     },
     'kpi_period_open': {
-      subject:  '[HR Platform] Nuevo período de evaluación: Q3 2025 (prueba)',
-      htmlBody: '<p>Hola ' + user.firstName + ',</p>' +
-                '<p>Se ha abierto el período de evaluación <strong>Q3 2025 (prueba)</strong>.</p>' +
-                '<p>Fecha límite autocalificación: <strong>' + nextWk + '</strong></p>' +
-                '<p>Ingresa a HR Platform para completar tu autocalificación.</p>'
+      subject:  '[IKAN HR] Nuevo período de evaluación: Q3 2025 (prueba)',
+      htmlBody: buildEmail({
+        icon: '📅', title: 'Nuevo período de evaluación disponible',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Se ha abierto un nuevo período de evaluación de KPIs. Ingresa a la plataforma para completar tu autocalificación antes de la fecha límite.</p>',
+        details: [{ label:'Período', value:'Q3 2025 (prueba)' }, { label:'Fecha límite', value: nextWk }]
+      })
     },
     'birthday_greeting': {
-      subject:  '¡Feliz cumpleaños, ' + user.firstName + '!',
-      htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
-                '<h2 style="color:#1a73e8;">¡Feliz cumpleaños! 🎉</h2>' +
-                '<p>Hola <strong>' + user.firstName + '</strong>,</p>' +
-                '<p>Todo el equipo te desea un excelente día y un año lleno de éxitos.</p>' +
-                '<p>¡Gracias por ser parte de nuestro equipo!</p>' +
-                '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
-                '</div>'
+      subject:  '🎂 ¡Feliz cumpleaños, ' + fn + '!',
+      htmlBody: buildEmail({
+        icon: '🎂', title: '¡Feliz cumpleaños, ' + fn + '!',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Todo el equipo de IKAN te desea un día increíble lleno de alegría y muchos motivos para celebrar. 🎉</p>' +
+                  '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">¡Gracias por ser parte de nuestro equipo!</p>'
+      })
     },
     'birthday_notification': {
-      subject:  '🎂 Hoy es el cumpleaños de ' + name,
-      htmlBody: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">' +
-                '<h2 style="color:#1a73e8;">🎂 ¡Cumpleaños en el equipo!</h2>' +
-                '<p>Hola <strong>' + user.firstName + '</strong>,</p>' +
-                '<p>Hoy es el cumpleaños de <strong>' + name + '</strong>. ¡Únete a felicitarle!</p>' +
-                '<br><p style="color:#5f6368;font-size:12px;">— IKAN HR</p>' +
-                '</div>'
+      subject:  '🎉 Hoy es el cumpleaños de ' + name,
+      htmlBody: buildEmail({
+        icon: '🎉', title: '¡Cumpleaños en el equipo!',
+        bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+                  '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hoy es el cumpleaños de <strong style="color:#1E293B">' + name + '</strong>. ¡Únete a felicitarle!</p>'
+      })
     }
   }
 

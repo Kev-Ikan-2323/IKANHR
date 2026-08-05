@@ -6,6 +6,7 @@
 import { DB } from '../lib/db.js'
 import { CONFIG, isManagerOf } from '../lib/auth.js'
 import { MailService } from '../lib/email.js'
+import { buildEmail } from '../lib/email-template.js'
 
 export var VacationsModule = {
 
@@ -516,14 +517,21 @@ async function _notifyManagerApproval(managerId, request) {
     var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, request.employeeId)
     if (!mgr || !emp) return
     await MailService.send({
-      to:       mgr.email,
-      subject:  '[HR Platform] Aprobación requerida — Vacaciones de ' + emp.firstName + ' ' + emp.lastName,
-      htmlBody: '<p>Hola ' + mgr.firstName + ',</p>' +
-                '<p>RH ha revisado y aprobado la solicitud de vacaciones de <strong>' + emp.firstName + ' ' + emp.lastName + '</strong>. Ahora requiere tu autorización final:</p>' +
-                '<ul><li>Del: <strong>' + request.startDate + '</strong></li>' +
-                '<li>Al: <strong>' + request.endDate + '</strong></li>' +
-                '<li>Días hábiles: <strong>' + request.workingDays + '</strong></li></ul>' +
-                '<p>Ingresa a HR Platform para aprobar o rechazar.</p>'
+      to:      mgr.email,
+      subject: '[IKAN HR] Aprobación requerida — Vacaciones de ' + emp.firstName + ' ' + emp.lastName,
+      htmlBody: buildEmail({
+        icon:  '📋',
+        title: 'Aprobación requerida',
+        bodyHTML:
+          '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + mgr.firstName + '</strong>,</p>' +
+          '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">RH ha revisado la solicitud de vacaciones de <strong style="color:#1E293B">' + emp.firstName + ' ' + emp.lastName + '</strong>. Ahora requiere tu autorización final.</p>',
+        details: [
+          { label: 'Empleado',      value: emp.firstName + ' ' + emp.lastName },
+          { label: 'Fecha inicio',  value: request.startDate },
+          { label: 'Fecha fin',     value: request.endDate },
+          { label: 'Días hábiles',  value: String(request.workingDays) }
+        ]
+      })
     })
   } catch (e) { console.error('Notificación error:', e.message) }
 }
@@ -546,16 +554,23 @@ async function _notifyHRTeam(emp, request) {
     for (var i = 0; i < hrEmps.length; i++) {
       var hr = hrEmps[i]
       await MailService.send({
-        to:       hr.email,
-        subject:  '[HR Platform] Nueva solicitud de vacaciones — ' + emp.firstName + ' ' + emp.lastName,
-        htmlBody: '<p>Hola ' + hr.firstName + ',</p>' +
-                  '<p><strong>' + emp.firstName + ' ' + emp.lastName + '</strong>' +
-                  (emp.department ? ' (' + emp.department + ')' : '') +
-                  ' ha solicitado vacaciones:</p>' +
-                  '<ul><li>Del: <strong>' + request.startDate + '</strong></li>' +
-                  '<li>Al: <strong>' + request.endDate + '</strong></li>' +
-                  '<li>Días hábiles: <strong>' + request.workingDays + '</strong></li></ul>' +
-                  '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+        to:      hr.email,
+        subject: '[IKAN HR] Nueva solicitud de vacaciones — ' + emp.firstName + ' ' + emp.lastName,
+        htmlBody: buildEmail({
+          icon:  '🏖️',
+          title: 'Nueva solicitud de vacaciones',
+          bodyHTML:
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + hr.firstName + '</strong>,</p>' +
+            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6"><strong style="color:#1E293B">' + emp.firstName + ' ' + emp.lastName + '</strong>' +
+            (emp.department ? ' <span style="color:#94A3B8">· ' + emp.department + '</span>' : '') +
+            ' ha solicitado vacaciones y está pendiente de aprobación.</p>',
+          details: [
+            { label: 'Empleado',      value: emp.firstName + ' ' + emp.lastName },
+            { label: 'Fecha inicio',  value: request.startDate },
+            { label: 'Fecha fin',     value: request.endDate },
+            { label: 'Días hábiles',  value: String(request.workingDays) }
+          ]
+        })
       })
     }
   } catch (e) { console.error('HR team notification error:', e.message) }
@@ -566,14 +581,21 @@ async function _notifyManagerRequest(managerId, emp, request) {
     var mgr = await DB.getById(CONFIG.SHEETS.EMPLOYEES, managerId)
     if (!mgr) return
     await MailService.send({
-      to:       mgr.email,
-      subject:  '[HR Platform] Solicitud de vacaciones — ' + emp.firstName + ' ' + emp.lastName,
-      htmlBody: '<p>Hola ' + mgr.firstName + ',</p>' +
-                '<p><strong>' + emp.firstName + ' ' + emp.lastName + '</strong> ha solicitado vacaciones:</p>' +
-                '<ul><li>Del: <strong>' + request.startDate + '</strong></li>' +
-                '<li>Al: <strong>' + request.endDate + '</strong></li>' +
-                '<li>Días hábiles: <strong>' + request.workingDays + '</strong></li></ul>' +
-                '<p>Ingresa a HR Platform para aprobar o rechazar la solicitud.</p>'
+      to:      mgr.email,
+      subject: '[IKAN HR] Solicitud de vacaciones — ' + emp.firstName + ' ' + emp.lastName,
+      htmlBody: buildEmail({
+        icon:  '📋',
+        title: 'Solicitud de vacaciones pendiente',
+        bodyHTML:
+          '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + mgr.firstName + '</strong>,</p>' +
+          '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu colaborador <strong style="color:#1E293B">' + emp.firstName + ' ' + emp.lastName + '</strong> ha enviado una solicitud de vacaciones que requiere tu aprobación.</p>',
+        details: [
+          { label: 'Empleado',      value: emp.firstName + ' ' + emp.lastName },
+          { label: 'Fecha inicio',  value: request.startDate },
+          { label: 'Fecha fin',     value: request.endDate },
+          { label: 'Días hábiles',  value: String(request.workingDays) }
+        ]
+      })
     })
   } catch (e) { console.error('Notificación error:', e.message) }
 }
@@ -582,14 +604,31 @@ async function _notifyEmployeeDecision(employeeId, request, approved, notes) {
   try {
     var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
     if (!emp) return
-    var status = approved ? 'Aprobada' : 'Rechazada'
+    var notesBlock = notes
+      ? '<div style="margin:16px 0;background:' + (approved ? '#F0FDF4' : '#FEF2F2') + ';border-left:4px solid ' + (approved ? '#16A34A' : '#DC2626') + ';padding:12px 16px;border-radius:0 6px 6px 0">' +
+        '<span style="color:' + (approved ? '#166534' : '#991B1B') + ';font-size:13px;line-height:1.5"><strong>Comentario:</strong> ' + notes + '</span>' +
+        '</div>'
+      : ''
     await MailService.send({
-      to:       emp.email,
-      subject:  '[HR Platform] Tu solicitud de vacaciones fue ' + (approved ? 'aprobada' : 'rechazada'),
-      htmlBody: '<p>Hola ' + emp.firstName + ',</p>' +
-                '<p>Tu solicitud de vacaciones del <strong>' + request.startDate + '</strong> al <strong>' + request.endDate + '</strong> fue: <strong>' + status + '</strong></p>' +
-                (notes ? '<p>Comentario: ' + notes + '</p>' : '') +
-                '<p>Puedes ver el detalle en tu perfil de HR Platform.</p>'
+      to:      emp.email,
+      subject: '[IKAN HR] Tu solicitud de vacaciones fue ' + (approved ? 'aprobada ✅' : 'rechazada'),
+      htmlBody: buildEmail({
+        icon:  approved ? '✅' : '❌',
+        title: approved ? '¡Tu solicitud fue aprobada!' : 'Tu solicitud fue rechazada',
+        bodyHTML:
+          '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + emp.firstName + '</strong>,</p>' +
+          '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">' +
+          (approved
+            ? 'Tu solicitud de vacaciones ha sido <strong style="color:#16A34A">aprobada</strong>. ¡Disfruta tu tiempo libre!'
+            : 'Tu solicitud de vacaciones <strong style="color:#DC2626">no fue aprobada</strong> en esta ocasión.') +
+          '</p>' + notesBlock,
+        details: [
+          { label: 'Fecha inicio',  value: request.startDate },
+          { label: 'Fecha fin',     value: request.endDate },
+          { label: 'Días hábiles',  value: String(request.workingDays) },
+          { label: 'Estado', value: approved ? '✅ Aprobada' : '❌ Rechazada', highlight: approved ? '#16A34A' : '#DC2626' }
+        ]
+      })
     })
   } catch (e) { console.error('Notificación error:', e.message) }
 }

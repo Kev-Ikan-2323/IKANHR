@@ -5,6 +5,7 @@
 import { DB } from '../lib/db.js'
 import { CONFIG, isManagerOf } from '../lib/auth.js'
 import { MailService } from '../lib/email.js'
+import { buildEmail } from '../lib/email-template.js'
 
 export var KPIModule = {
 
@@ -652,11 +653,19 @@ async function _notifyManagerForReview(managerId, employeeId, periodId) {
     if (!mgr || !emp || !period) return
 
     await MailService.send({
-      to:       mgr.email,
-      subject:  '[HR Platform] Autocalificación lista para revisar - ' + emp.firstName + ' ' + emp.lastName,
-      htmlBody: '<p>Hola ' + mgr.firstName + ',</p>' +
-                '<p><strong>' + emp.firstName + ' ' + emp.lastName + '</strong> ha completado su autocalificación para el período <strong>' + period.name + '</strong>.</p>' +
-                '<p>Por favor revisa y aprueba la evaluación en la plataforma HR.</p>'
+      to:      mgr.email,
+      subject: '[IKAN HR] Autocalificación lista para revisar — ' + emp.firstName + ' ' + emp.lastName,
+      htmlBody: buildEmail({
+        icon:  '📊',
+        title: 'Autocalificación lista para revisar',
+        bodyHTML:
+          '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + mgr.firstName + '</strong>,</p>' +
+          '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6"><strong style="color:#1E293B">' + emp.firstName + ' ' + emp.lastName + '</strong> ha completado su autocalificación. Ingresa a la plataforma para revisarla y aprobarla.</p>',
+        details: [
+          { label: 'Empleado', value: emp.firstName + ' ' + emp.lastName },
+          { label: 'Período',  value: period.name }
+        ]
+      })
     })
   } catch (e) {
     console.error('Error enviando notificación:', e.message)
@@ -670,11 +679,19 @@ async function _notifyEmployeeReviewComplete(employeeId, periodId) {
     if (!emp || !period) return
 
     await MailService.send({
-      to:       emp.email,
-      subject:  '[HR Platform] Tu evaluación de KPIs fue aprobada - ' + period.name,
-      htmlBody: '<p>Hola ' + emp.firstName + ',</p>' +
-                '<p>Tu evaluación de KPIs para el período <strong>' + period.name + '</strong> ha sido revisada y aprobada por tu manager.</p>' +
-                '<p>Puedes ver tus resultados en tu dashboard de HR Platform.</p>'
+      to:      emp.email,
+      subject: '[IKAN HR] Tu evaluación de KPIs fue aprobada — ' + period.name,
+      htmlBody: buildEmail({
+        icon:  '🎯',
+        title: 'Tu evaluación de KPIs fue aprobada',
+        bodyHTML:
+          '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + emp.firstName + '</strong>,</p>' +
+          '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu manager ha revisado y <strong style="color:#16A34A">aprobado</strong> tu evaluación de KPIs. Puedes ver tus resultados en tu dashboard.</p>',
+        details: [
+          { label: 'Período', value: period.name },
+          { label: 'Estado',  value: '✅ Aprobada', highlight: '#16A34A' }
+        ]
+      })
     })
   } catch (e) {
     console.error('Error enviando notificación:', e.message)
@@ -690,12 +707,19 @@ async function _notifyPeriodOpen(period) {
     for (var i = 0; i < employees.length; i++) {
       var emp = employees[i]
       await MailService.send({
-        to:       emp.email,
-        subject:  '[HR Platform] Nuevo período de evaluación: ' + period.name,
-        htmlBody: '<p>Hola ' + emp.firstName + ',</p>' +
-                  '<p>Se ha abierto el período de evaluación <strong>' + period.name + '</strong>.</p>' +
-                  '<p>Fecha límite autocalificación: <strong>' + (period.selfAssessmentDeadline || period.endDate) + '</strong></p>' +
-                  '<p>Ingresa a HR Platform para completar tu autocalificación.</p>'
+        to:      emp.email,
+        subject: '[IKAN HR] Nuevo período de evaluación: ' + period.name,
+        htmlBody: buildEmail({
+          icon:  '📅',
+          title: 'Nuevo período de evaluación disponible',
+          bodyHTML:
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + emp.firstName + '</strong>,</p>' +
+            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Se ha abierto un nuevo período de evaluación de KPIs. Ingresa a la plataforma para completar tu autocalificación antes de la fecha límite.</p>',
+          details: [
+            { label: 'Período',         value: period.name },
+            { label: 'Fecha límite',    value: period.selfAssessmentDeadline || period.endDate }
+          ]
+        })
       })
     }
   } catch (e) {
