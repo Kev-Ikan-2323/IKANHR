@@ -235,7 +235,7 @@ export var VacationsModule = {
     return {
       employeeId:    empId,
       year:          balance.year,
-      daysEntitled:  parseInt(balance.daysEntitled)  || 12,
+      daysEntitled:  balance.daysEntitled != null ? parseInt(balance.daysEntitled) : 12,
       daysUsed:      parseInt(balance.daysUsed)      || 0,
       daysPending:   parseInt(balance.daysPending)   || 0,
       daysRemaining: parseInt(balance.daysRemaining) || 0,
