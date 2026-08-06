@@ -891,6 +891,7 @@ var VacationsView = {
     html += '<div class="flex gap-12 mb-20">' +
       '<button class="btn btn-primary" onclick="VacationsView.openRequest()"><span class="material-icons-round">add</span>Solicitar Vacaciones</button>' +
       (APP.user.isAdmin||APP.user.isHR||(APP.user.isManager&&APP.user.canApproveVacations) ? '<button class="btn btn-outline" onclick="VacationsView.loadTeamRequests()"><span class="material-icons-round">group</span>Ver equipo</button>' : '') +
+      (APP.user.isAdmin||APP.user.isHR ? '<button class="btn btn-outline" onclick="VacationsView.recalcBalances()"><span class="material-icons-round">sync</span>Recalcular balances</button>' : '') +
       '</div>';
     html += '<div class="grid grid-2 gap-16"><div><div class="card"><div class="card-title">Mis Solicitudes</div>';
     if (!reqs.length) html += '<div class="empty-state"><span class="material-icons-round">beach_access</span><p>Sin solicitudes aún</p></div>';
@@ -962,6 +963,15 @@ var VacationsView = {
     APP.api('vacations.cancel', { id: id }, function(err) {
       if (err) { APP.toast(err, 'error'); return; }
       APP.toast('Solicitud cancelada', 'success'); VacationsView.load();
+    });
+  },
+  recalcBalances: function() {
+    if (!confirm('¿Recalcular los balances de vacaciones de todos los empleados? Esto actualizará los días según su antigüedad.')) return;
+    APP.api('vacations.recalcBalances', {}, function(err, result) {
+      if (err) { APP.toast(err, 'error'); return; }
+      var msg = '✅ Balances recalculados: ' + (result && result.updated || 0) + ' empleados actualizados.';
+      APP.toast(msg, 'success');
+      VacationsView.load();
     });
   },
   loadTeamRequests: function() {
