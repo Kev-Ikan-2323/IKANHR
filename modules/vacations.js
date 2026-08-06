@@ -7,6 +7,7 @@ import { DB } from '../lib/db.js'
 import { CONFIG, isManagerOf } from '../lib/auth.js'
 import { MailService } from '../lib/email.js'
 import { buildEmail } from '../lib/email-template.js'
+import { approveUrl } from '../lib/email-token.js'
 
 export var VacationsModule = {
 
@@ -530,6 +531,9 @@ async function _notifyManagerApproval(managerId, request) {
           { label: 'Fecha inicio',  value: request.startDate },
           { label: 'Fecha fin',     value: request.endDate },
           { label: 'Días hábiles',  value: String(request.workingDays) }
+        ],
+        actions: [
+          { label: '✅ Aprobar vacaciones', url: approveUrl(request.id, mgr.id) }
         ]
       })
     })
@@ -569,6 +573,9 @@ async function _notifyHRTeam(emp, request) {
             { label: 'Fecha inicio',  value: request.startDate },
             { label: 'Fecha fin',     value: request.endDate },
             { label: 'Días hábiles',  value: String(request.workingDays) }
+          ],
+          actions: [
+            { label: '✅ Aprobar solicitud', url: approveUrl(request.id, hr.id) }
           ]
         })
       })
