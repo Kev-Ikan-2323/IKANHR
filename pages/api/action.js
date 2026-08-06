@@ -287,6 +287,22 @@ async function _sendTestScenario(scenario, user) {
         bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
                   '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hoy es el cumpleaños de <strong style="color:#1E293B">' + name + '</strong>. ¡Únete a felicitarle!</p>'
       })
+    },
+    'announcement': {
+      subject:  '📢 Comunicado: Recordatorio de políticas de la empresa (prueba)',
+      htmlBody: buildEmail({
+        icon: '📢', title: 'Recordatorio de políticas de la empresa',
+        bodyHTML:
+          '<p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
+          '<div style="color:#334155;font-size:15px;line-height:1.7;border-top:1px solid #E2E8F0;padding-top:16px">' +
+          '<p>Este es un ejemplo de comunicado enviado a todos los empleados. Aquí iría el contenido del comunicado, que puede incluir <strong>texto en negritas</strong>, listas, y cualquier información relevante para el equipo.</p>' +
+          '<p>Recuerda revisar el portal de IKAN HR para más detalles.</p>' +
+          '</div>',
+        details: [
+          { label: 'Publicado por', value: name },
+          { label: 'Fecha', value: new Date().toLocaleDateString('es-MX', { day:'numeric', month:'long', year:'numeric' }) }
+        ]
+      })
     }
   }
 
