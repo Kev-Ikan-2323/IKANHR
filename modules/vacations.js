@@ -463,7 +463,7 @@ function _calcVacationEntitlement(hireDate) {
   if (!hireDate) return 12
   var years = Math.floor((new Date() - new Date(hireDate)) / (365.25 * 86400000))
   var table = CONFIG.VACATION_DAYS
-  if (years < 1) return table[1]
+  if (years < 1) return 0
   if (years >= 6) return 20 + Math.floor((years - 5) / 5) * 2
   return table[Math.min(years, 5)] || table[1]
 }
