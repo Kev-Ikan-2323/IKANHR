@@ -45,8 +45,8 @@ export var PositionsModule = {
 
     var kpis = await DB.getBy(CONFIG.SHEETS.KPI_DEFINITIONS, 'positionId', id)
     var activeKpis = kpis.filter(function(k) { return String(k.isActive) !== 'false' })
-    if (activeKpis.length > 0) {
-      throw new Error('No se puede eliminar: ' + activeKpis.length + ' KPI(s) están asociados a este puesto. Elimínalos primero desde "Configurar KPIs".')
+    for (var i = 0; i < activeKpis.length; i++) {
+      await DB.update(CONFIG.SHEETS.KPI_DEFINITIONS, activeKpis[i].id, { isActive: false })
     }
 
     var client = createClient(
@@ -55,6 +55,6 @@ export var PositionsModule = {
     )
     var { error } = await client.from('positions').delete().eq('id', id)
     if (error) throw new Error('Error eliminando puesto: ' + error.message)
-    return { ok: true }
+    return { ok: true, kpisRemoved: activeKpis.length }
   }
 }

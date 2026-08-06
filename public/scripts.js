@@ -1840,10 +1840,12 @@ var AdminHR = {
     });
   },
   deletePosition: function(id, name) {
-    if (!confirm('¿Eliminar el puesto "'+name+'"? Solo se puede si ningún empleado activo lo tiene asignado.')) return;
-    APP.api('positions.remove',{id:id},function(err){
+    if (!confirm('⚠️ ¿Eliminar el puesto "'+name+'"?\n\nTodos los KPIs asociados a este puesto también serán eliminados.\nEsta acción no se puede deshacer.')) return;
+    APP.api('positions.remove',{id:id},function(err,res){
       if(err){APP.toast(err,'error');return;}
-      AdminHR._cachedPositions=null; APP.toast('✅ Puesto eliminado','success'); AdminHR.openPositionsAdmin();
+      AdminHR._cachedPositions=null;
+      var msg = res&&res.kpisRemoved ? '✅ Puesto eliminado ('+res.kpisRemoved+' KPI(s) eliminados)' : '✅ Puesto eliminado';
+      APP.toast(msg,'success'); AdminHR.openPositionsAdmin();
     });
   },
 
