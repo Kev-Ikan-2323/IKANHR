@@ -15,13 +15,13 @@ export var KPIModule = {
     params = params || {}
     var all = await DB.getAll(CONFIG.SHEETS.KPI_DEFINITIONS)
 
+    // Default: exclude inactive (soft-deleted) unless caller explicitly passes isActive=false
+    var requestedActive = params.isActive !== undefined ? String(params.isActive) === 'true' : true
+    all = all.filter(function(k) { return String(k.isActive) === String(requestedActive) })
+
     if (params.positionId) all = all.filter(function(k) { return k.positionId === params.positionId })
     if (params.periodType) all = all.filter(function(k) { return k.periodType === params.periodType })
     if (params.category)   all = all.filter(function(k) { return k.category === params.category })
-    if (params.isActive !== undefined) {
-      var active = String(params.isActive) === 'true'
-      all = all.filter(function(k) { return String(k.isActive) === String(active) })
-    }
 
     return Promise.all(all.map(_enrichDefinition))
   },
