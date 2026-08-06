@@ -43,6 +43,12 @@ export var PositionsModule = {
       throw new Error('No se puede eliminar: ' + active.length + ' empleado(s) activo(s) tienen este puesto.')
     }
 
+    var kpis = await DB.getBy(CONFIG.SHEETS.KPI_DEFINITIONS, 'positionId', id)
+    var activeKpis = kpis.filter(function(k) { return String(k.isActive) !== 'false' })
+    if (activeKpis.length > 0) {
+      throw new Error('No se puede eliminar: ' + activeKpis.length + ' KPI(s) están asociados a este puesto. Elimínalos primero desde "Configurar KPIs".')
+    }
+
     var client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
