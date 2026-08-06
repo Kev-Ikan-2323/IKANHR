@@ -80,13 +80,14 @@ export var EmployeeModule = {
   async update(id, changes, user) {
     if (user.id !== id) {
       if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere uno de los roles: admin, hr')
-    } else {
-      // Employee can only edit non-sensitive fields
+    } else if (!user.isAdmin && !user.isHR) {
+      // Regular employee editing their own profile — restricted fields only
       var allowed = ['phone', 'personalEmail', 'address', 'emergencyContact', 'emergencyPhone', 'photoUrl']
       var filtered = {}
       allowed.forEach(function(k) { if (changes[k] !== undefined) filtered[k] = changes[k] })
       changes = filtered
     }
+    // Admin/HR editing their own record — all fields allowed
 
     if (changes.hireDate) {
       changes.vacationDaysPerYear = _calcVacationDays(changes.hireDate)
