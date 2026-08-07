@@ -318,9 +318,24 @@ export var KPIModule = {
     var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
     if (!emp) throw new Error('Empleado no encontrado.')
 
+    // kpis for display (count in stat card)
     var kpis    = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { positionId: emp.positionId })
     var periods = await DB.getAll(CONFIG.SHEETS.KPI_PERIODS)
     var reviews = await DB.query(CONFIG.SHEETS.KPI_REVIEWS, { employeeId: employeeId })
+
+    // Build a lookup of KPI definitions by ID from the actual reviews so the score
+    // calculation works even when the employee's positionId doesn't match (e.g. after
+    // a position change or deletion).
+    var kpiLookup = {}
+    kpis.forEach(function(k) { kpiLookup[k.id] = k })
+    var reviewKpiIds = []
+    reviews.forEach(function(r) {
+      if (r.kpiDefinitionId && !kpiLookup[r.kpiDefinitionId]) reviewKpiIds.push(r.kpiDefinitionId)
+    })
+    if (reviewKpiIds.length > 0) {
+      var extra = await Promise.all(reviewKpiIds.map(function(id) { return DB.getById(CONFIG.SHEETS.KPI_DEFINITIONS, id) }))
+      extra.forEach(function(k) { if (k) kpiLookup[k.id] = k })
+    }
 
     var byPeriod = {}
     reviews.forEach(function(r) {
@@ -337,7 +352,7 @@ export var KPIModule = {
       var totalWeight = 0, weightedSum = 0
 
       completed.forEach(function(r) {
-        var kpi = kpis.find(function(k) { return k.id === r.kpiDefinitionId })
+        var kpi = kpiLookup[r.kpiDefinitionId]
         var weight = kpi ? (parseFloat(kpi.weight) || 0) : 0
         totalWeight += weight
         weightedSum += (parseFloat(r.finalScore) || 0) * weight
