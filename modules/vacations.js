@@ -398,17 +398,9 @@ async function _validateRequest(data, employeeId) {
   if (start < today) throw new Error('No puedes solicitar vacaciones para fechas pasadas.')
   if (end < start)   throw new Error('La fecha de fin debe ser posterior a la de inicio.')
 
-  var calDays = Math.ceil((end - start) / 86400000) + 1
-  if (calDays < 7) {
-    throw new Error('El mínimo para solicitar vacaciones es 1 semana (7 días calendario). Días seleccionados: ' + calDays + '.')
-  }
-
-  // Minimum advance notice (from config or default 3)
-  var configRows = await DB.getBy(CONFIG.SHEETS.CONFIG, 'key', 'vacation_request_days')
-  var minDays = parseInt((configRows.length > 0 ? configRows[0].value : '') || '3')
   var diffDays = Math.ceil((start - today) / 86400000)
-  if (diffDays < minDays) {
-    throw new Error('Las vacaciones deben solicitarse con al menos ' + minDays + ' días de anticipación.')
+  if (diffDays < 7) {
+    throw new Error('Las vacaciones deben solicitarse con al menos 7 días de anticipación (1 semana). Días restantes: ' + diffDays + '.')
   }
 
   var existing = await DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { employeeId: employeeId })
