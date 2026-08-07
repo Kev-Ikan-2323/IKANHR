@@ -345,7 +345,10 @@ var DashboardView = {
     var vac = d.vacation || {};
     var bal = vac.balance || {};
     document.getElementById('dash-vac-days').textContent = bal.daysRemaining || 0;
-    document.getElementById('dash-kpi-score').textContent = d.kpi && d.kpi.avgScore != null ? APP.semLabel(d.kpi.avgScore) : '—';
+    var kpiScoreEl = document.getElementById('dash-kpi-score');
+    var hasKpiScore = d.kpi && d.kpi.avgScore != null;
+    kpiScoreEl.textContent = hasKpiScore ? APP.semLabel(d.kpi.avgScore) : '—';
+    kpiScoreEl.style.fontSize = hasKpiScore ? '17px' : '';
     document.getElementById('dash-pending-kpi').textContent = (d.pendingKPIs || []).length;
     document.getElementById('dash-pending-vac').textContent = vac.pendingRequests || 0;
 
@@ -355,8 +358,8 @@ var DashboardView = {
       : '<div class="empty-state"><span class="material-icons-round">cake</span><p>Sin cumpleaños próximos</p></div>';
 
     var kpi = d.kpi || {};
-    var trend = kpi.trend === 'up' ? '📈' : kpi.trend === 'down' ? '📉' : '➡️';
-    document.getElementById('dash-kpi-label').textContent = (kpi.avgScoreLabel || '') + ' ' + trend;
+    var trend = kpi.trend === 'up' ? '📈' : kpi.trend === 'down' ? '📉' : '';
+    document.getElementById('dash-kpi-label').textContent = hasKpiScore ? trend : 'Sin calificar';
 
     var ann = (d.announcements || []).slice(0, 4);
     document.getElementById('dash-announcements').innerHTML = ann.length
