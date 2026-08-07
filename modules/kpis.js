@@ -359,8 +359,11 @@ export var KPIModule = {
       })
     }
 
+    // Include any period that has a calculable score, not just formally-closed ones.
+    // This lets the dashboard show the score as soon as the manager finishes reviews,
+    // even if the period hasn't been formally closed yet.
     var completedPeriods = periodResults.filter(function(pr) {
-      return pr.period.status === CONFIG.STATUS.COMPLETED && pr.overallScore !== null
+      return pr.overallScore !== null
     }).slice(-6)
 
     var avgScore = completedPeriods.length > 0
