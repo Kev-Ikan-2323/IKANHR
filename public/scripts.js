@@ -359,7 +359,7 @@ var DashboardView = {
 
     var kpi = d.kpi || {};
     var trend = kpi.trend === 'up' ? '📈' : kpi.trend === 'down' ? '📉' : '';
-    document.getElementById('dash-kpi-label').textContent = hasKpiScore ? trend : 'Sin calificar';
+    document.getElementById('dash-kpi-label').textContent = hasKpiScore ? kpi.avgScore + ' pts ' + trend : 'Sin calificar';
 
     var ann = (d.announcements || []).slice(0, 4);
     document.getElementById('dash-announcements').innerHTML = ann.length
