@@ -1544,6 +1544,7 @@ var AdminHR = {
         '<button class="btn btn-outline btn-sm" onclick="AdminHR.addBatchRow()"><span class="material-icons-round">add</span>Agregar fila</button></div>' +
         '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse"><thead>' +
         '<tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:4px 6px;min-width:180px">Nombre *</th>' +
+        '<th style="text-align:left;padding:4px 6px;min-width:200px">Descripción</th>' +
         '<th style="text-align:left;padding:4px 6px;min-width:110px">Período</th>' +
         '<th style="text-align:left;padding:4px 6px;min-width:65px">Peso %</th><th style="text-align:left;padding:4px 6px;min-width:100px">Meta</th>' +
         '<th style="width:30px"></th></tr></thead><tbody id="bk-rows"></tbody></table></div>' +
@@ -1560,6 +1561,7 @@ var AdminHR = {
     var s=AdminHR._batchRowStyle||''; var po=AdminHR._batchPeriodOpts||'<option>Mensual</option>';
     var tr=document.createElement('tr'); tr.style.borderBottom='1px solid var(--border)';
     tr.innerHTML='<td style="padding:4px 4px"><input class="bk-name" placeholder="Nombre del KPI" '+s+' oninput="AdminHR.updateBatchWeightTotal()"></td>' +
+      '<td style="padding:4px 4px"><input class="bk-desc" placeholder="Descripción (opcional)" '+s+'></td>' +
       '<td style="padding:4px 4px"><select class="bk-period" '+s+'>'+po+'</select></td>' +
       '<td style="padding:4px 4px"><input type="number" class="bk-weight" min="1" max="100" value="20" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchWeightTotal()"></td>' +
       '<td style="padding:4px 4px"><input class="bk-target" placeholder="Meta" '+s+'></td>' +
@@ -1595,7 +1597,8 @@ var AdminHR = {
     var positionId=posEl.value; var toSave=[];
     document.querySelectorAll('#bk-rows tr').forEach(function(tr) {
       var name=(tr.querySelector('.bk-name')||{value:''}).value.trim(); if(!name) return;
-      toSave.push({ name:name, periodType:(tr.querySelector('.bk-period')||{value:'Mensual'}).value,
+      toSave.push({ name:name, description:(tr.querySelector('.bk-desc')||{value:''}).value.trim(),
+        periodType:(tr.querySelector('.bk-period')||{value:'Mensual'}).value,
         weight:(tr.querySelector('.bk-weight')||{value:'20'}).value, target:(tr.querySelector('.bk-target')||{value:''}).value.trim(), positionId:positionId, isActive:true });
     });
     if (!toSave.length) { APP.toast('Agrega al menos un KPI con nombre','error'); return; }
