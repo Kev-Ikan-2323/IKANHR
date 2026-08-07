@@ -606,10 +606,11 @@ async function _enrichReview(review) {
   var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, review.employeeId)
   var mgr = review.managerId ? await DB.getById(CONFIG.SHEETS.EMPLOYEES, review.managerId) : null
 
-  review.kpiName      = kpi ? kpi.name   : ''
-  review.kpiWeight    = kpi ? kpi.weight : 0
-  review.kpiType      = kpi ? kpi.type   : ''
-  review.kpiTarget    = kpi ? kpi.target : ''
+  review.kpiName        = kpi ? kpi.name        : ''
+  review.kpiWeight      = kpi ? kpi.weight      : 0
+  review.kpiType        = kpi ? kpi.type        : ''
+  review.kpiTarget      = kpi ? kpi.target      : ''
+  review.kpiMeasureType = kpi ? (kpi.measureType || 'Numérico') : 'Numérico'
   review.employeeName = emp ? (emp.firstName || '') + ' ' + (emp.lastName || '') : ''
   review.managerName  = mgr ? (mgr.firstName || '') + ' ' + (mgr.lastName || '') : ''
   review.scoreLabel   = _scoreLabel(review.finalScore || review.managerScore || review.selfScore)

@@ -305,6 +305,13 @@ var APP = {
   initials: function(name) { return (name || '').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); },
   fmtDate: function(d) { if (!d) return '—'; var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; },
   fmtScore: function(s) { var n = parseFloat(s); return isNaN(n) ? '—' : n.toFixed(1); },
+  fmtTarget: function(value, type) {
+    if (value === null || value === undefined || value === '') return '—';
+    if (type === 'Porcentual') return value + '%';
+    if (type === 'Monetario') return '$' + value;
+    if (type === 'Booleano') return 'Sí (logrado)';
+    return String(value);
+  },
   semLabel: function(s) {
     if (s === null || s === undefined || s === '') return '—';
     var n = parseFloat(s);
@@ -791,7 +798,7 @@ var KPIsView = {
       return '<div style="' + sep + '">' +
         '<div class="font-600 text-sm mb-8">' + r.kpiName + '</div>' +
         '<div style="background:var(--bg);border-radius:6px;padding:10px 12px;margin-bottom:12px">' +
-          '<div class="text-xs" style="color:var(--text-muted)">Autoevaluación: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + r.kpiTarget : '') + '</div>' +
+          '<div class="text-xs" style="color:var(--text-muted)">Autoevaluación: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + APP.fmtTarget(r.kpiTarget, r.kpiMeasureType) : '') + '</div>' +
           (r.selfComments ? '<div class="text-xs mt-4" style="color:var(--text-muted)">💬 "' + r.selfComments + '"</div>' : '') +
         '</div>' +
         '<div class="form-group"><label>Tu evaluación *</label>' +
@@ -1546,6 +1553,7 @@ var AdminHR = {
         '<th style="text-align:left;padding:4px 6px;min-width:200px">Descripción</th>' +
         '<th style="text-align:left;padding:4px 6px;min-width:110px">Período</th>' +
         '<th style="text-align:left;padding:4px 6px;min-width:65px">Peso %</th><th style="text-align:left;padding:4px 6px;min-width:100px">Meta</th>' +
+        '<th style="text-align:left;padding:4px 6px;min-width:110px">Unidad</th>' +
         '<th style="width:30px"></th></tr></thead><tbody id="bk-rows"></tbody></table></div>' +
         '<div id="bk-weight-info" style="margin-top:10px;font-size:12px"></div>';
       APP.modal('Agregar KPIs por Puesto', body,
@@ -1564,6 +1572,12 @@ var AdminHR = {
       '<td style="padding:4px 4px"><select class="bk-period" '+s+'>'+po+'</select></td>' +
       '<td style="padding:4px 4px"><input type="number" class="bk-weight" min="1" max="100" value="20" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchWeightTotal()"></td>' +
       '<td style="padding:4px 4px"><input class="bk-target" placeholder="Meta" '+s+'></td>' +
+      '<td style="padding:4px 4px"><select class="bk-measure" '+s+'>' +
+        '<option value="Numérico">Numérico</option>' +
+        '<option value="Porcentual">Porcentual (%)</option>' +
+        '<option value="Monetario">Monetario ($)</option>' +
+        '<option value="Booleano">Sí / No</option>' +
+      '</select></td>' +
       '<td style="padding:4px 2px;text-align:center"><button onclick="this.closest(\'tr\').remove();AdminHR.updateBatchWeightTotal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px 4px"><span class="material-icons-round" style="font-size:15px">close</span></button></td>';
     tbody.appendChild(tr);
   },
@@ -1598,7 +1612,8 @@ var AdminHR = {
       var name=(tr.querySelector('.bk-name')||{value:''}).value.trim(); if(!name) return;
       toSave.push({ name:name, description:(tr.querySelector('.bk-desc')||{value:''}).value.trim(),
         periodType:(tr.querySelector('.bk-period')||{value:'Mensual'}).value,
-        weight:(tr.querySelector('.bk-weight')||{value:'20'}).value, target:(tr.querySelector('.bk-target')||{value:''}).value.trim(), positionId:positionId, isActive:true });
+        weight:(tr.querySelector('.bk-weight')||{value:'20'}).value, target:(tr.querySelector('.bk-target')||{value:''}).value.trim(),
+        measureType:(tr.querySelector('.bk-measure')||{value:'Numérico'}).value, positionId:positionId, isActive:true });
     });
     if (!toSave.length) { APP.toast('Agrega al menos un KPI con nombre','error'); return; }
     var saveBtn=document.querySelector('#app-modal .modal-footer .btn-primary');
