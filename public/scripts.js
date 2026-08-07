@@ -802,10 +802,11 @@ var KPIsView = {
         '<div class="form-group"><label>Retroalimentación</label><textarea id="mr-comments-' + r.id + '" rows="2" placeholder="Comentarios para ' + empName + '..."></textarea></div>' +
       '</div>';
     }).join('');
-    var ids = JSON.stringify(empReviews.map(function(r){ return r.id; }));
+    // Store IDs on the element to avoid double-quote conflict inside onclick attribute
+    var safeIds = empReviews.map(function(r){ return r.id; }).join(',');
     APP.modal('📊 Revisión: ' + empName, body,
       '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
-      '<button class="btn btn-primary" onclick="KPIsView.submitAllReviews(' + ids + ',true)"><span class="material-icons-round">check_circle</span>Aprobar todas</button>'
+      '<button class="btn btn-primary" id="btn-submit-all-reviews" data-ids="' + safeIds + '" onclick="KPIsView.submitAllReviews(this.dataset.ids.split(\',\'),true)"><span class="material-icons-round">check_circle</span>Aprobar todas</button>'
     );
   },
 
