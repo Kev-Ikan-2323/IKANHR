@@ -103,7 +103,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v5.7</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v5.8</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -150,7 +150,7 @@ var SHELL = `
         </div>
         <div class="card stat-card" onclick="APP.navigate('vacations')" style="cursor:pointer">
           <div class="stat-icon red"><span class="material-icons-round">hourglass_empty</span></div>
-          <div><div class="stat-value" id="dash-pending-vac">0</div><div class="stat-label">Solicitudes pendientes</div></div>
+          <div><div class="stat-value" id="dash-pending-vac">0</div><div class="stat-label" id="dash-pending-vac-label">Solicitudes pendientes</div></div>
         </div>
       </div>
       <div class="grid grid-2 gap-16">

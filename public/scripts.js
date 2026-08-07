@@ -357,7 +357,10 @@ var DashboardView = {
     kpiScoreEl.textContent = hasKpiScore ? APP.semLabel(d.kpi.avgScore) : '—';
     kpiScoreEl.style.fontSize = hasKpiScore ? '17px' : '';
     document.getElementById('dash-pending-kpi').textContent = (d.pendingKPIs || []).length;
-    document.getElementById('dash-pending-vac').textContent = vac.pendingRequests || 0;
+    var isApprover = APP.user && (APP.user.isAdmin || APP.user.isHR || APP.user.isManager);
+    document.getElementById('dash-pending-vac').textContent = isApprover ? ((d.team && d.team.pendingVacApproval) || 0) : (vac.pendingRequests || 0);
+    var vacLabel = document.getElementById('dash-pending-vac-label');
+    if (vacLabel) vacLabel.textContent = isApprover ? 'Por aprobar' : 'Solicitudes pendientes';
 
     var bdays = (d.birthdays || []).slice(0, 5);
     document.getElementById('dash-birthdays').innerHTML = bdays.length

@@ -36,7 +36,7 @@ export var DashboardModule = {
     var myTeams         = await TeamsModule.getMyTeams(user)
 
     var teamPendingVac = 0
-    if (user.isManager) {
+    if (user.isManager || user.isAdmin || user.isHR) {
       var teamReqs = await VacationsModule.teamRequests({}, user)
       teamPendingVac = teamReqs.length
     }
