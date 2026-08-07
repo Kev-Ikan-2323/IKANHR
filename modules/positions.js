@@ -43,16 +43,27 @@ export var PositionsModule = {
       throw new Error('No se puede eliminar: ' + active.length + ' empleado(s) activo(s) tienen este puesto.')
     }
 
-    var kpis = await DB.getBy(CONFIG.SHEETS.KPI_DEFINITIONS, 'positionId', id)
-    var activeKpis = kpis.filter(function(k) { return String(k.isActive) !== 'false' })
-    for (var i = 0; i < activeKpis.length; i++) {
-      await DB.update(CONFIG.SHEETS.KPI_DEFINITIONS, activeKpis[i].id, { isActive: false })
-    }
-
     var client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     )
+
+    // Must clear the FK on ALL kpi_definitions (active or not) before deleting the position.
+    // Soft-deleting (isActive:false) alone doesn't remove the row, so the FK constraint fires.
+    var { data: kpis } = await client
+      .from('kpi_definitions')
+      .select('id, is_active')
+      .eq('position_id', id)
+    var kpisAll    = kpis || []
+    var activeKpis = kpisAll.filter(function(k) { return k.is_active !== false })
+
+    if (kpisAll.length > 0) {
+      await client
+        .from('kpi_definitions')
+        .update({ position_id: null, is_active: false })
+        .eq('position_id', id)
+    }
+
     var { error } = await client.from('positions').delete().eq('id', id)
     if (error) throw new Error('Error eliminando puesto: ' + error.message)
     return { ok: true, kpisRemoved: activeKpis.length }
