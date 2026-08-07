@@ -64,6 +64,12 @@ export var PositionsModule = {
         .eq('position_id', id)
     }
 
+    // Also clear the FK on kpi_schedules
+    await client
+      .from('kpi_schedules')
+      .update({ position_id: null })
+      .eq('position_id', id)
+
     var { error } = await client.from('positions').delete().eq('id', id)
     if (error) throw new Error('Error eliminando puesto: ' + error.message)
     return { ok: true, kpisRemoved: activeKpis.length }
