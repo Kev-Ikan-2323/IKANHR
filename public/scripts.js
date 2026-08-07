@@ -323,22 +323,17 @@ var APP = {
 // ── DASHBOARD VIEW ────────────────────────────────────────────
 var DashboardView = {
   load: function() {
-    var d = APP.data;
-    if (!d) {
-      APP.api('dashboard.myData', {}, function(err, data) {
-        if (err) {
-          document.getElementById('dash-pending-list').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
-          document.getElementById('dash-birthdays').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
-          document.getElementById('dash-announcements').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
-          APP.toast('Error al cargar el dashboard', 'error');
-          return;
-        }
-        APP.data = data;
-        DashboardView.render(data);
-      });
-      return;
-    }
-    DashboardView.render(d);
+    APP.api('dashboard.myData', {}, function(err, data) {
+      if (err) {
+        document.getElementById('dash-pending-list').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
+        document.getElementById('dash-birthdays').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
+        document.getElementById('dash-announcements').innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>';
+        APP.toast('Error al cargar el dashboard', 'error');
+        return;
+      }
+      APP.data = data;
+      DashboardView.render(data);
+    });
   },
 
   render: function(d) {
@@ -2077,6 +2072,7 @@ var DebugView = {
       APP.impersonateId = empId;
       APP.user = viewUser;
       ClientCache.flush();
+      APP.data = null;
       APP.renderSidebar();
       DebugView._showBanner(viewUser.fullName || viewUser.email);
       APP.navigate('dashboard');
@@ -2089,6 +2085,7 @@ var DebugView = {
     APP.impersonateId = null;
     DebugView._realUser = null;
     ClientCache.flush();
+    APP.data = null;
     var banner = document.getElementById('debug-banner');
     if (banner) banner.remove();
     APP.renderSidebar();
