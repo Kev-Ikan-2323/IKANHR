@@ -1631,7 +1631,8 @@ var AdminHR = {
         '<td>'+(isActive?'<span class="badge badge-success">Activa</span>':'<span class="badge badge-gray">Inactiva</span>')+'</td>' +
         '<td>'+(isActive?'<span class="text-sm font-600" style="color:var(--primary)">'+APP.fmtDate(next)+'</span>':'<span class="text-muted text-sm">—</span>')+'</td>' +
         '<td style="white-space:nowrap"><button class="btn btn-outline btn-sm" onclick="AdminHR.openEditSchedule(\''+s.id+'\')">Editar</button> ' +
-        '<button class="btn btn-primary btn-sm" onclick="AdminHR.runScheduleNow(\''+s.id+'\',\''+s.name+'\')"><span class="material-icons-round" style="font-size:14px">play_arrow</span></button></td></tr>';
+        '<button class="btn btn-primary btn-sm" onclick="AdminHR.runScheduleNow(\''+s.id+'\',\''+s.name+'\')"><span class="material-icons-round" style="font-size:14px">play_arrow</span></button> ' +
+        '<button class="btn btn-outline btn-sm" onclick="AdminHR.deleteSchedule(\''+s.id+'\',\''+s.name.replace(/'/g,"\\'")+'\')" style="color:var(--danger);border-color:var(--danger)" title="Eliminar"><span class="material-icons-round" style="font-size:14px">delete</span></button></td></tr>';
     });
     return html+'</tbody></table></div>';
   },
@@ -1642,6 +1643,13 @@ var AdminHR = {
     var next=new Date(today.getFullYear(),today.getMonth(),day);
     if (skip||next<=today){var ma=periodType==='Semestral'?6:periodType==='Bimestral'?2:1;next.setMonth(next.getMonth()+ma);}
     return next.toISOString().split('T')[0];
+  },
+  deleteSchedule: function(id, name) {
+    if (!confirm('¿Eliminar la programación "'+name+'"?\nEsta acción no se puede deshacer.')) return;
+    APP.api('kpi.schedules.remove',{id:id},function(err){
+      if(err){APP.toast(err,'error');return;}
+      APP.toast('✅ Programación eliminada','success'); AdminHR.openKPIAdmin('schedules');
+    });
   },
   openNewSchedule: function() {
     var res={},pending=2;
