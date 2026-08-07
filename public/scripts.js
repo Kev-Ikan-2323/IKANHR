@@ -350,7 +350,7 @@ var DashboardView = {
     var vac = d.vacation || {};
     var bal = vac.balance || {};
     document.getElementById('dash-vac-days').textContent = bal.daysRemaining || 0;
-    document.getElementById('dash-kpi-score').textContent = d.kpi && d.kpi.avgScore ? d.kpi.avgScore : '—';
+    document.getElementById('dash-kpi-score').textContent = d.kpi && d.kpi.avgScore != null ? APP.semLabel(d.kpi.avgScore) : '—';
     document.getElementById('dash-pending-kpi').textContent = (d.pendingKPIs || []).length;
     document.getElementById('dash-pending-vac').textContent = vac.pendingRequests || 0;
 

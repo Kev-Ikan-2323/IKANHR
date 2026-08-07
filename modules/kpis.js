@@ -358,7 +358,14 @@ export var KPIModule = {
         weightedSum += (parseFloat(r.finalScore) || 0) * weight
       })
 
-      var overallScore = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 10) / 10 : null
+      var overallScore = null
+      if (totalWeight > 0) {
+        overallScore = Math.round((weightedSum / totalWeight) * 10) / 10
+      } else if (completed.length > 0) {
+        // Fallback: simple average when KPI definitions have no weights set
+        var sumScores = completed.reduce(function(s, r) { return s + (parseFloat(r.finalScore) || 0) }, 0)
+        overallScore = Math.round((sumScores / completed.length) * 10) / 10
+      }
 
       var enrichedReviews = await Promise.all(periodReviews.map(_enrichReview))
       periodResults.push({
