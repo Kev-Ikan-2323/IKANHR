@@ -5,6 +5,7 @@
 import { DB } from '../lib/db.js'
 import { CONFIG } from '../lib/auth.js'
 import { MailService } from '../lib/email.js'
+import { createClient } from '@supabase/supabase-js'
 
 export var KPISchedulesModule = {
 
@@ -49,7 +50,13 @@ export var KPISchedulesModule = {
 
   async remove(id, user) {
     if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere rol admin o hr.')
-    return DB.update(CONFIG.SHEETS.KPI_SCHEDULES, id, { isActive: false })
+    var client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+    var { error } = await client.from('kpi_schedules').delete().eq('id', id)
+    if (error) throw new Error('Error eliminando programación: ' + error.message)
+    return { ok: true }
   },
 
   // Called by daily cron job
