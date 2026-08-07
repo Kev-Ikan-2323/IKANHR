@@ -51,7 +51,6 @@ export var VacationsModule = {
       daysRemaining: (parseInt(balance.daysRemaining) || 0) - workDays
     })
 
-    if (managerId) await _notifyManagerRequest(managerId, emp, request)
     await _notifyHRTeam(emp, request)
 
     return request
@@ -540,7 +539,7 @@ async function _notifyHRTeam(emp, request) {
     var hrRoleIds = allRoles.filter(function(r) {
       try {
         var perms = typeof r.permissions === 'string' ? JSON.parse(r.permissions) : (r.permissions || [])
-        return perms.indexOf('hr') > -1 || perms.indexOf('admin') > -1
+        return perms.indexOf('hr') > -1
       } catch (e) { return false }
     }).map(function(r) { return r.id })
 
