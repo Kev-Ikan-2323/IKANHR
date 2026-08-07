@@ -1451,6 +1451,7 @@ var AdminHR = {
       var wCol=tw===100?'var(--success)':tw>100?'var(--danger)':'var(--warning)';
       html+='<div style="margin-bottom:20px"><div class="flex justify-between items-center mb-8"><span class="font-600 text-sm">'+(posNames[pId]||pId||'Sin puesto')+'</span>' +
         '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:'+wCol+';font-weight:600">Peso total: '+tw+'%</span>' +
+        '<button class="btn btn-outline btn-sm" onclick="AdminHR.openBatchEditKPI(\''+pId+'\')"><span class="material-icons-round" style="font-size:14px">edit</span>Editar</button>' +
         '<button class="btn btn-outline btn-sm" onclick="AdminHR.openBatchKPI(\''+pId+'\')"><span class="material-icons-round" style="font-size:14px">add</span>Agregar</button></div></div>' +
         '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Período</th><th>Peso</th><th>Meta</th><th>Estado</th><th></th></tr></thead><tbody>' +
         pKpis.map(function(k){
@@ -1623,6 +1624,92 @@ var AdminHR = {
     function saveNext(i) {
       if (i>=toSave.length) { APP.toast((failed?'':'✅ ')+saved+' KPI(s) creado(s)'+(failed?', '+failed+' error(es)':''),failed?'warning':'success'); AdminHR.openKPIAdmin('defs'); return; }
       APP.api('kpi.definitions.create',toSave[i],function(err){if(err)failed++;else saved++;saveNext(i+1);});
+    }
+    saveNext(0);
+  },
+
+  openBatchEditKPI: function(positionId) {
+    APP.api('kpi.definitions.list', {}, function(err, kpis) {
+      if (err) { APP.toast(err, 'error'); return; }
+      var posKpis = (kpis || []).filter(function(k) { return (k.positionId || '') === positionId; });
+      if (!posKpis.length) { APP.toast('No hay KPIs para editar en este puesto', 'warning'); return; }
+      AdminHR._withPositions(function(positions) {
+        var posName = (positions.filter(function(p) { return p.id === positionId; })[0] || {}).name || 'Sin puesto específico';
+        var s = 'style="padding:5px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:100%"';
+        var makeSel = function(cls, opts, sel) {
+          return '<select class="' + cls + '" ' + s + '>' +
+            opts.map(function(v) { return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select>';
+        };
+        var measureLabel = function(v) { return v === 'Porcentual' ? 'Porcentual (%)' : v === 'Monetario' ? 'Monetario ($)' : v === 'Booleano' ? 'Sí / No' : v; };
+        var rows = posKpis.map(function(k) {
+          var mSel = '<select class="be-measure" ' + s + '>' +
+            ['Numérico','Porcentual','Monetario','Booleano'].map(function(v) {
+              return '<option value="' + v + '"' + (v === (k.measureType || 'Numérico') ? ' selected' : '') + '>' + measureLabel(v) + '</option>';
+            }).join('') + '</select>';
+          return '<tr data-id="' + k.id + '" style="border-bottom:1px solid var(--border)">' +
+            '<td style="padding:4px 4px"><input class="be-name" value="' + (k.name || '').replace(/"/g, '&quot;') + '" placeholder="Nombre" ' + s + ' oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
+            '<td style="padding:4px 4px"><input class="be-desc" value="' + (k.description || '').replace(/"/g, '&quot;') + '" placeholder="Descripción" ' + s + '></td>' +
+            '<td style="padding:4px 4px">' + makeSel('be-period', ['Mensual','Bimestral','Semestral'], k.periodType || 'Mensual') + '</td>' +
+            '<td style="padding:4px 4px"><input type="number" class="be-weight" min="1" max="100" value="' + (k.weight || 20) + '" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
+            '<td style="padding:4px 4px"><input class="be-target" value="' + (k.target || '') + '" placeholder="Meta" ' + s + '></td>' +
+            '<td style="padding:4px 4px">' + mSel + '</td>' +
+            '</tr>';
+        }).join('');
+        var body = '<div style="margin-bottom:12px"><span class="font-600 text-sm">' + posKpis.length + ' KPIs — ' + posName + '</span></div>' +
+          '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse"><thead>' +
+          '<tr style="border-bottom:2px solid var(--border)">' +
+          '<th style="text-align:left;padding:4px 6px;min-width:180px">Nombre *</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:180px">Descripción</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:110px">Período</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:65px">Peso %</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:100px">Meta</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:110px">Unidad</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+          '<div id="be-weight-info" style="margin-top:10px;font-size:12px"></div>';
+        APP.modal('✏️ Editar KPIs: ' + posName, body,
+          '<button class="btn btn-outline" onclick="AdminHR.openKPIAdmin()">← Volver</button>' +
+          '<button class="btn btn-primary" onclick="AdminHR.saveBatchEditKPIs()"><span class="material-icons-round">save</span>Guardar cambios</button>');
+        var modalEl = document.querySelector('#app-modal .modal'); if (modalEl) modalEl.style.maxWidth = '900px';
+        AdminHR.updateBatchEditWeightTotal();
+      });
+    });
+  },
+
+  updateBatchEditWeightTotal: function() {
+    var infoEl = document.getElementById('be-weight-info'); if (!infoEl) return;
+    var total = 0; document.querySelectorAll('.be-weight').forEach(function(el) { total += parseFloat(el.value || 0) || 0; });
+    var col = total === 100 ? 'var(--success)' : total > 100 ? 'var(--danger)' : 'var(--text-muted)';
+    var msg = total === 100 ? '✅ Peso total: 100% — perfecto' : total > 100 ? '⚠️ Peso total: ' + total + '% — excede 100%' : 'Peso total: ' + total + '%';
+    infoEl.innerHTML = '<span style="color:' + col + ';font-weight:' + (total >= 100 ? '600' : '400') + '">' + msg + '</span>';
+  },
+
+  saveBatchEditKPIs: function() {
+    var toSave = [];
+    document.querySelectorAll('#app-modal tbody tr[data-id]').forEach(function(tr) {
+      var id = tr.getAttribute('data-id');
+      var name = (tr.querySelector('.be-name') || {value: ''}).value.trim();
+      if (!id || !name) return;
+      toSave.push({
+        id:          id,
+        name:        name,
+        description: (tr.querySelector('.be-desc')    || {value: ''}).value.trim(),
+        periodType:  (tr.querySelector('.be-period')  || {value: 'Mensual'}).value,
+        weight:      (tr.querySelector('.be-weight')  || {value: '20'}).value,
+        target:      (tr.querySelector('.be-target')  || {value: ''}).value.trim(),
+        measureType: (tr.querySelector('.be-measure') || {value: 'Numérico'}).value
+      });
+    });
+    if (!toSave.length) { APP.toast('No hay KPIs para guardar', 'error'); return; }
+    var saveBtn = document.querySelector('#app-modal .modal-footer .btn-primary');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando ' + toSave.length + '...'; }
+    var saved = 0, failed = 0;
+    function saveNext(i) {
+      if (i >= toSave.length) {
+        APP.toast((failed ? '' : '✅ ') + saved + ' KPI(s) actualizado(s)' + (failed ? ', ' + failed + ' error(es)' : ''), failed ? 'warning' : 'success');
+        AdminHR.openKPIAdmin('defs');
+        return;
+      }
+      APP.api('kpi.definitions.update', toSave[i], function(err) { if (err) failed++; else saved++; saveNext(i + 1); });
     }
     saveNext(0);
   },
