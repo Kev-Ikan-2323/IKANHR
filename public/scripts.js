@@ -1218,6 +1218,7 @@ var AdminHR = {
       '<div id="kadmin-evaluaciones"' + (activeTab!=='evaluaciones' ?' style="display:none"':'') + '>' + AdminHR._evaluacionesTab(periods, schedules, kpis, positions)    + '</div>' +
       '<div id="kadmin-reports"'      + (activeTab!=='reports'      ?' style="display:none"':'') + '>' + AdminHR._reportsTab(report, periods)                             + '</div>'
     );
+    var kpiModal = document.querySelector('#app-modal .modal'); if (kpiModal) kpiModal.style.maxWidth = '900px';
     if (activeTab === 'evaluaciones') AdminHR._updateLaunchPreview();
   },
   showKPITab: function(tab, el) {
