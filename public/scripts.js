@@ -463,7 +463,7 @@ var EmployeesView = {
   showDetail: function(id) {
     APP.api('employees.get', { id: id }, function(err, emp) {
       if (err) { APP.toast(err, 'error'); return; }
-      var isAdmin = APP.user && (APP.user.isAdmin || APP.user.isHR || APP.user.isManager);
+      var isAdmin = APP.user && (APP.user.isAdmin || APP.user.isHR);
       APP.modal('👤 ' + emp.fullName,
         '<div class="flex gap-12 items-center mb-16">' +
         '<div class="emp-avatar" style="width:72px;height:72px;font-size:26px;flex-shrink:0">' + APP.initials(emp.fullName) + '</div>' +
