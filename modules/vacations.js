@@ -410,7 +410,9 @@ async function _validateRequest(data, employeeId) {
   })
   if (overlap.length > 0) throw new Error('Ya tienes una solicitud de vacaciones que se empalma con esas fechas.')
 
-  var workDays = await VacationsModule.calculateWorkingDays(data.startDate, data.endDate)
+  var emp     = await DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
+  var country = (emp && emp.country) ? emp.country : 'MX'
+  var workDays = await VacationsModule.calculateWorkingDays(data.startDate, data.endDate, country)
   if (workDays === 0) throw new Error('El rango seleccionado no contiene días hábiles (puede ser fin de semana o puente).')
 }
 
