@@ -52,7 +52,7 @@ export var VacationsModule = {
     })
 
     if (managerId) await _notifyManagerRequest(managerId, emp, request)
-    _notifyHRTeam(emp, request)
+    await _notifyHRTeam(emp, request)
 
     return request
   },
