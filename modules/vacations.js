@@ -296,10 +296,17 @@ export var VacationsModule = {
     var endDate  = new Date(y, m, 0)
     var endStr   = endDate.toISOString().split('T')[0]
 
+    var allEmps = await DB.getAll(CONFIG.SHEETS.EMPLOYEES)
     var allReqs = await DB.getAll(CONFIG.SHEETS.VACATION_REQUESTS)
     var requests = allReqs.filter(function(r) {
-      return r.status === CONFIG.STATUS.APPROVED &&
-             r.startDate <= endStr && r.endDate >= startStr
+      if (r.status !== CONFIG.STATUS.APPROVED) return false
+      if (!(r.startDate <= endStr && r.endDate >= startStr)) return false
+      if (user.isAdmin || user.isHR) return true
+      var emp = allEmps.find(function(e) { return e.id === r.employeeId })
+      if (!emp) return false
+      return emp.managerId === user.id ||
+             (user.ledTeams || []).indexOf(emp.teamId) > -1 ||
+             (user.coledTeams || []).indexOf(emp.teamId) > -1
     })
 
     var holidays = await this.getHolidays(y, user)

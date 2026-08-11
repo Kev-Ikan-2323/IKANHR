@@ -66,6 +66,9 @@ var SHELL = `
           <span class="material-icons-round">event_available</span><span>Aprobaciones</span>
           <span class="nav-badge" id="nav-vac-badge-approver" style="display:none"></span>
         </div>
+        <div class="nav-item" data-view="vac-calendar" onclick="APP.navigate('vac-calendar')">
+          <span class="material-icons-round">event</span><span>Calendario Vacaciones</span>
+        </div>
       </div>
     </div>
 
@@ -94,6 +97,9 @@ var SHELL = `
           <span class="material-icons-round">event_available</span><span>Aprobaciones</span>
           <span class="nav-badge" id="nav-vac-badge-admin" style="display:none"></span>
         </div>
+        <div class="nav-item" data-view="vac-calendar" onclick="APP.navigate('vac-calendar')">
+          <span class="material-icons-round">event</span><span>Calendario Vacaciones</span>
+        </div>
         <div class="nav-item" onclick="AdminHR.openSystemConfig()">
           <span class="material-icons-round">settings</span><span>Configuración</span>
         </div>
@@ -106,7 +112,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v6.3</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v6.4</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -195,6 +201,11 @@ var SHELL = `
     <div id="view-kpis" class="view">
       <div class="view-title"><span class="material-icons-round">analytics</span>KPIs &amp; Evaluaciones</div>
       <div id="kpi-content"></div>
+    </div>
+
+    <!-- VAC CALENDAR -->
+    <div id="view-vac-calendar" class="view">
+      <div id="vac-cal-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
     <!-- KPI REPORTS -->

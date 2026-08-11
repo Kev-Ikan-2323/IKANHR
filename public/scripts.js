@@ -171,20 +171,21 @@ var APP = {
   viewTitles: {
     dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
     kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
-    vacations: 'Vacaciones', birthdays: 'Cumpleaños',
-    team: 'Mi Equipo', settings: 'Configuración'
+    vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones',
+    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración'
   },
 
   loadView: function(view) {
     var fns = {
-      dashboard:    DashboardView.load,
-      employees:    EmployeesView.load,
-      orgchart:     OrgChartView.load,
-      kpis:         KPIsView.load,
-      'kpi-reports': KPIReportsView.load,
-      vacations:    VacationsView.load,
-      birthdays:    BirthdaysView.load,
-      team:         TeamView.load,
+      dashboard:      DashboardView.load,
+      employees:      EmployeesView.load,
+      orgchart:       OrgChartView.load,
+      kpis:           KPIsView.load,
+      'kpi-reports':  KPIReportsView.load,
+      vacations:      VacationsView.load,
+      'vac-calendar': VacCalendarView.load,
+      birthdays:      BirthdaysView.load,
+      team:           TeamView.load,
     };
     if (fns[view]) fns[view]();
   },
@@ -1042,6 +1043,158 @@ var KPIReportsView = {
       '</div>' +
       empList +
     '</div>';
+  }
+};
+
+// ── VACATION CALENDAR VIEW ────────────────────────────────────
+var VacCalendarView = {
+  _year:  new Date().getFullYear(),
+  _month: new Date().getMonth() + 1,
+
+  load: function() {
+    VacCalendarView._year  = new Date().getFullYear();
+    VacCalendarView._month = new Date().getMonth() + 1;
+    VacCalendarView._fetch();
+  },
+
+  _fetch: function() {
+    var el = document.getElementById('vac-cal-content');
+    if (el) el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('vacations.calendarMonth', { year: VacCalendarView._year, month: VacCalendarView._month }, function(err, data) {
+      if (err) { APP.toast(err, 'error'); return; }
+      VacCalendarView._render(data);
+    });
+  },
+
+  _nav: function(delta) {
+    VacCalendarView._month += delta;
+    if (VacCalendarView._month > 12) { VacCalendarView._month = 1;  VacCalendarView._year++; }
+    if (VacCalendarView._month < 1)  { VacCalendarView._month = 12; VacCalendarView._year--; }
+    VacCalendarView._fetch();
+  },
+
+  _render: function(data) {
+    var y = data.year; var m = data.month;
+    var requests  = data.requests  || [];
+    var holidays  = data.holidays  || [];
+    var monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var dayNames   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+    // Map date → list of requests
+    var byDay = {};
+    requests.forEach(function(r) {
+      var cur = new Date(r.startDate + 'T12:00:00');
+      var end = new Date(r.endDate   + 'T12:00:00');
+      while (cur <= end) {
+        var ds = cur.toISOString().split('T')[0];
+        if (!byDay[ds]) byDay[ds] = [];
+        byDay[ds].push(r);
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+
+    // Map date → holiday name
+    var holidayMap = {};
+    holidays.forEach(function(h) { if (h.date) holidayMap[h.date] = h.name || 'Feriado'; });
+
+    // Palette for employees (cycle through colors)
+    var palette = ['#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981','#EF4444','#06B6D4','#84CC16','#F97316','#6366F1'];
+    var empColors = {};
+    var colorIdx  = 0;
+    requests.forEach(function(r) {
+      if (!empColors[r.employeeId]) { empColors[r.employeeId] = palette[colorIdx % palette.length]; colorIdx++; }
+    });
+
+    // Build calendar grid
+    var firstDay = new Date(y, m - 1, 1).getDay(); // 0=Sun
+    var daysInMonth = new Date(y, m, 0).getDate();
+    var today = new Date(); today.setHours(0,0,0,0);
+    var todayStr = today.toISOString().split('T')[0];
+
+    var header =
+      '<div class="view-title"><span class="material-icons-round">event</span>Calendario de Vacaciones</div>' +
+      '<div class="card mb-20" style="padding:12px 20px">' +
+        '<div class="flex items-center justify-between">' +
+          '<button class="btn btn-outline btn-sm" onclick="VacCalendarView._nav(-1)"><span class="material-icons-round">chevron_left</span></button>' +
+          '<span class="font-600" style="font-size:16px">' + monthNames[m-1] + ' ' + y + '</span>' +
+          '<button class="btn btn-outline btn-sm" onclick="VacCalendarView._nav(1)"><span class="material-icons-round">chevron_right</span></button>' +
+        '</div>' +
+      '</div>';
+
+    // Legend
+    var legend = '';
+    if (requests.length) {
+      var seen = {};
+      legend = '<div class="card mb-20" style="padding:12px 16px"><div class="flex gap-12 flex-wrap">';
+      requests.forEach(function(r) {
+        if (seen[r.employeeId]) return; seen[r.employeeId] = true;
+        var col = empColors[r.employeeId];
+        legend += '<div class="flex items-center gap-6"><div style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex-shrink:0"></div>' +
+          '<span class="text-sm">' + r.employeeName + '</span>' +
+          (r.department ? '<span class="text-xs text-muted">· ' + r.department + '</span>' : '') + '</div>';
+      });
+      legend += '</div></div>';
+    }
+
+    // Day headers
+    var grid = '<div class="card" style="padding:16px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">';
+    dayNames.forEach(function(d) {
+      grid += '<div style="text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px;text-transform:uppercase">' + d + '</div>';
+    });
+    grid += '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+
+    // Empty cells before first day
+    for (var i = 0; i < firstDay; i++) grid += '<div></div>';
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var ds  = y + '-' + String(m).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+      var dow = new Date(ds + 'T12:00:00').getDay();
+      var isWeekend  = dow === 0 || dow === 6;
+      var isToday    = ds === todayStr;
+      var isHoliday  = !!holidayMap[ds];
+      var dayReqs    = byDay[ds] || [];
+
+      var bg   = isToday ? 'var(--primary)' : isHoliday ? 'var(--warning-light,#FEF3C7)' : isWeekend ? 'var(--bg)' : 'var(--surface)';
+      var fc   = isToday ? '#fff' : 'var(--text)';
+      var border = isToday ? 'none' : '1px solid var(--border)';
+
+      var chips = dayReqs.slice(0, 3).map(function(r) {
+        var col = empColors[r.employeeId];
+        var initials = APP.initials(r.employeeName);
+        return '<div title="' + r.employeeName + '" style="background:' + col + ';color:#fff;border-radius:4px;font-size:9px;font-weight:600;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">' + initials + '</div>';
+      }).join('');
+      if (dayReqs.length > 3) chips += '<div style="font-size:9px;color:var(--text-muted);padding-left:2px">+' + (dayReqs.length - 3) + '</div>';
+
+      var holidayLabel = isHoliday ? '<div style="font-size:8px;color:#92400E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + holidayMap[ds] + '</div>' : '';
+
+      grid += '<div style="background:' + bg + ';border:' + border + ';border-radius:8px;padding:6px;min-height:72px;color:' + fc + '">' +
+        '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + '">' + day + '</div>' +
+        holidayLabel + chips +
+      '</div>';
+    }
+
+    grid += '</div></div>';
+
+    // People out this month list
+    var listHTML = '';
+    if (requests.length) {
+      listHTML = '<div class="card mt-20"><div class="card-title"><span class="material-icons-round" style="margin-right:6px">people</span>Ausencias este mes (' + requests.length + ')</div>' +
+        '<div class="table-wrap"><table><thead><tr><th>Empleado</th><th>Departamento</th><th>Inicio</th><th>Fin</th><th>Días hábiles</th></tr></thead><tbody>' +
+        requests.map(function(r) {
+          var col = empColors[r.employeeId];
+          return '<tr><td><div class="flex items-center gap-8"><div style="width:8px;height:8px;border-radius:50%;background:' + col + ';flex-shrink:0"></div>' +
+            APP.initials ? ('<div class="td-avatar" style="width:28px;height:28px;font-size:11px">' + APP.initials(r.employeeName) + '</div>') : '' +
+            '<span class="font-600 text-sm">' + r.employeeName + '</span></div></td>' +
+            '<td class="text-sm text-muted">' + (r.department || '—') + '</td>' +
+            '<td class="text-sm">' + APP.fmtDate(r.startDate) + '</td>' +
+            '<td class="text-sm">' + APP.fmtDate(r.endDate) + '</td>' +
+            '<td class="text-sm">' + (r.workingDays || '—') + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div></div>';
+    }
+
+    var el = document.getElementById('vac-cal-content');
+    if (el) el.innerHTML = header + legend + grid + listHTML;
   }
 };
 
