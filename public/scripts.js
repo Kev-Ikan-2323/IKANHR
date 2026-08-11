@@ -937,23 +937,27 @@ var KPIReportsView = {
   },
 
   _statsRow: function(depts) {
-    var totalEmps = depts.reduce(function(s, d) { return s + d.employeeCount; }, 0);
-    var allScores = depts.filter(function(d) { return d.avgScore !== null; }).map(function(d) { return d.avgScore; });
-    var globalAvg = allScores.length
-      ? Math.round(allScores.reduce(function(a, b) { return a + b; }, 0) / allScores.length * 10) / 10
+    // Collect every employee across all departments (includes those with no KPIs)
+    var allEmps = [];
+    depts.forEach(function(d) { (d.employees || []).forEach(function(e) { allEmps.push(e); }); });
+    var totalEmps  = allEmps.length;
+    var withScore  = allEmps.filter(function(e) { return e.avgScore !== null; });
+    var globalAvg  = withScore.length
+      ? Math.round(withScore.reduce(function(s, e) { return s + e.avgScore; }, 0) / withScore.length * 10) / 10
       : null;
-    var totalRevs = depts.reduce(function(s, d) { return s + d.totalReviews; }, 0);
+    var totalRevs     = depts.reduce(function(s, d) { return s + d.totalReviews; }, 0);
     var completedRevs = depts.reduce(function(s, d) { return s + d.completedReviews; }, 0);
-    var globalPct = totalRevs > 0 ? Math.round(completedRevs / totalRevs * 100) : 0;
-    var semColor = globalAvg === null ? 'var(--text-muted)' : globalAvg >= 75 ? '#16A34A' : globalAvg >= 25 ? '#D97706' : '#DC2626';
+    var globalPct  = totalRevs > 0 ? Math.round(completedRevs / totalRevs * 100) : 0;
+    var semColor   = globalAvg === null ? 'var(--text-muted)' : globalAvg >= 75 ? '#16A34A' : globalAvg >= 25 ? '#D97706' : '#DC2626';
+    var scoredLabel = withScore.length + ' de ' + totalEmps + ' con score';
     return '' +
       '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">domain</span></div>' +
         '<div><div class="stat-value">' + depts.length + '</div><div class="stat-label">Áreas</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">people</span></div>' +
-        '<div><div class="stat-value">' + totalEmps + '</div><div class="stat-label">Empleados evaluados</div></div></div>' +
+        '<div><div class="stat-value">' + totalEmps + '</div><div class="stat-label">Total empleados</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">analytics</span></div>' +
         '<div><div class="stat-value" style="color:' + semColor + ';font-size:20px">' + (globalAvg !== null ? globalAvg + ' pts' : '—') + '</div>' +
-        '<div class="stat-label">Score global</div></div></div>' +
+        '<div class="stat-label">Score global <span style="font-size:10px;display:block;color:var(--text-muted)">' + scoredLabel + '</span></div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon red"><span class="material-icons-round">task_alt</span></div>' +
         '<div><div class="stat-value">' + globalPct + '%</div><div class="stat-label">Completadas</div></div></div>';
   },
