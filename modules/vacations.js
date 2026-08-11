@@ -404,11 +404,6 @@ async function _validateRequest(data, employeeId) {
   if (start < today) throw new Error('No puedes solicitar vacaciones para fechas pasadas.')
   if (end < start)   throw new Error('La fecha de fin debe ser posterior a la de inicio.')
 
-  var diffDays = Math.ceil((start - today) / 86400000)
-  if (diffDays < 7) {
-    throw new Error('Las vacaciones deben solicitarse con al menos 7 días de anticipación (1 semana). Días restantes: ' + diffDays + '.')
-  }
-
   var existing = await DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { employeeId: employeeId })
   var overlap = existing.filter(function(r) {
     if (r.status === 'Cancelado' || r.status === CONFIG.STATUS.REJECTED) return false

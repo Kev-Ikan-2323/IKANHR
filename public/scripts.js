@@ -1264,6 +1264,7 @@ var VacationsView = {
     var today = new Date().toISOString().split('T')[0];
     APP.modal('🏖️ Solicitar Vacaciones',
       '<div class="alert info mb-16">ℹ️ Solo se contarán días hábiles (lunes a viernes, excluyendo feriados).</div>' +
+      '<div id="vac-short-notice-warn" class="alert warning mb-16" style="display:none">⚠️ La fecha de inicio tiene menos de 7 días de anticipación. Tu solicitud se enviará de todas formas, pero los aprobadores verán este aviso.</div>' +
       '<div class="form-row"><div class="form-group"><label>Fecha inicio</label><input type="date" id="vac-start" min="' + today + '"></div>' +
       '<div class="form-group"><label>Fecha fin</label><input type="date" id="vac-end" min="' + today + '"></div></div>' +
       '<div class="form-group"><label>Días hábiles estimados</label><div id="vac-days-calc" class="alert info">Selecciona las fechas para calcular</div></div>' +
@@ -1286,6 +1287,12 @@ var VacationsView = {
     APP.api('vacations.workingDays', { startDate: s, endDate: e }, function(err, days) {
       if (err) { el.textContent = 'Error calculando'; return; }
       el.textContent = '📅 ' + days + ' días hábiles';
+      var warnEl = document.getElementById('vac-short-notice-warn');
+      if (warnEl) {
+        var today2 = new Date(); today2.setHours(0, 0, 0, 0);
+        var diff = Math.ceil((new Date(s) - today2) / 86400000);
+        warnEl.style.display = diff < 7 ? 'block' : 'none';
+      }
     });
   },
   submitRequest: function() {
@@ -1324,9 +1331,14 @@ var VacationsView = {
       APP.modal(title,
         '<div>' + data.map(function(r) {
           var approveLabel = isHROrAdmin ? '✅ Aprobar → Manager' : '✅ Aprobar';
+          var daysUntil = typeof r.daysUntilStart === 'number' ? r.daysUntilStart : null;
+          var urgentWarn = daysUntil !== null && daysUntil < 7
+            ? '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:4px 8px;border-radius:0 4px 4px 0;font-size:12px;color:#92400E;margin:4px 0">⚠️ Solicitud urgente — inicia en ' + daysUntil + ' día' + (daysUntil !== 1 ? 's' : '') + '</div>'
+            : '';
           return '<div class="request-card mt-8"><div><div class="font-600 text-sm">' + r.employeeName + '</div>' +
             '<div class="request-dates">' + APP.fmtDate(r.startDate) + ' → ' + APP.fmtDate(r.endDate) + '</div>' +
-            '<div class="request-days">' + r.workingDays + ' días hábiles' + (r.reason ? ' · ' + r.reason : '') + '</div></div>' +
+            '<div class="request-days">' + r.workingDays + ' días hábiles' + (r.reason ? ' · ' + r.reason : '') + '</div>' +
+            urgentWarn + '</div>' +
             '<div class="flex gap-8">' +
             '<button class="btn btn-success btn-sm" onclick="VacationsView.approveReq(\'' + r.id + '\')">' + approveLabel + '</button>' +
             '<button class="btn btn-danger btn-sm" onclick="VacationsView.rejectReq(\'' + r.id + '\')">❌ Rechazar</button></div></div>';
