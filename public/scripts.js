@@ -1181,9 +1181,11 @@ var VacCalendarView = {
       listHTML = '<div class="card mt-20"><div class="card-title"><span class="material-icons-round" style="margin-right:6px">people</span>Ausencias este mes (' + requests.length + ')</div>' +
         '<div class="table-wrap"><table><thead><tr><th>Empleado</th><th>Departamento</th><th>Inicio</th><th>Fin</th><th>Días hábiles</th></tr></thead><tbody>' +
         requests.map(function(r) {
-          var col = empColors[r.employeeId];
-          return '<tr><td><div class="flex items-center gap-8"><div style="width:8px;height:8px;border-radius:50%;background:' + col + ';flex-shrink:0"></div>' +
-            APP.initials ? ('<div class="td-avatar" style="width:28px;height:28px;font-size:11px">' + APP.initials(r.employeeName) + '</div>') : '' +
+          var col    = empColors[r.employeeId];
+          var avatar = '<div class="td-avatar" style="width:28px;height:28px;font-size:11px">' + APP.initials(r.employeeName) + '</div>';
+          return '<tr><td><div class="flex items-center gap-8">' +
+            '<div style="width:8px;height:8px;border-radius:50%;background:' + col + ';flex-shrink:0"></div>' +
+            avatar +
             '<span class="font-600 text-sm">' + r.employeeName + '</span></div></td>' +
             '<td class="text-sm text-muted">' + (r.department || '—') + '</td>' +
             '<td class="text-sm">' + APP.fmtDate(r.startDate) + '</td>' +
