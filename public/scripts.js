@@ -170,19 +170,21 @@ var APP = {
 
   viewTitles: {
     dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
-    kpis: 'KPIs & Evaluaciones', vacations: 'Vacaciones', birthdays: 'Cumpleaños',
+    kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
+    vacations: 'Vacaciones', birthdays: 'Cumpleaños',
     team: 'Mi Equipo', settings: 'Configuración'
   },
 
   loadView: function(view) {
     var fns = {
-      dashboard:  DashboardView.load,
-      employees:  EmployeesView.load,
-      orgchart:   OrgChartView.load,
-      kpis:       KPIsView.load,
-      vacations:  VacationsView.load,
-      birthdays:  BirthdaysView.load,
-      team:       TeamView.load,
+      dashboard:    DashboardView.load,
+      employees:    EmployeesView.load,
+      orgchart:     OrgChartView.load,
+      kpis:         KPIsView.load,
+      'kpi-reports': KPIReportsView.load,
+      vacations:    VacationsView.load,
+      birthdays:    BirthdaysView.load,
+      team:         TeamView.load,
     };
     if (fns[view]) fns[view]();
   },
@@ -865,6 +867,177 @@ var KPIsView = {
           '<td><strong>' + k.weight + '%</strong></td><td>' + k.target + '</td>' +
           '<td>' + (String(k.isActive)==='true' ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
+  }
+};
+
+// ── KPI REPORTS VIEW ─────────────────────────────────────────
+var KPIReportsView = {
+  _data: null,
+
+  load: function() {
+    var el = document.getElementById('kpi-reports-content');
+    if (el) el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('kpi.reports.byDepartment', {}, function(err, data) {
+      if (err) { APP.toast(err, 'error'); return; }
+      KPIReportsView._data = data;
+      KPIReportsView.render(data, '');
+    });
+  },
+
+  reload: function(periodId) {
+    var el = document.getElementById('krpt-depts');
+    if (el) el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('kpi.reports.byDepartment', { periodId: periodId || '' }, function(err, data) {
+      if (err) { APP.toast(err, 'error'); return; }
+      KPIReportsView._data = data;
+      var depts = data.departments || [];
+      var chart = document.getElementById('krpt-chart');
+      if (chart) chart.innerHTML = KPIReportsView._barChart(depts);
+      var statsEl = document.getElementById('krpt-stats');
+      if (statsEl) statsEl.innerHTML = KPIReportsView._statsRow(depts);
+      if (el) el.innerHTML = depts.length
+        ? depts.map(function(d) { return KPIReportsView._deptCard(d); }).join('')
+        : '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Sin evaluaciones en este período.</p></div>';
+    });
+  },
+
+  render: function(data, periodId) {
+    var depts   = data.departments || [];
+    var periods = data.periods || [];
+    var periodOpts = '<option value="">— Todos los períodos —</option>' +
+      periods.map(function(p) {
+        return '<option value="' + p.id + '"' + (p.id === periodId ? ' selected' : '') + '>' + p.name + ' (' + p.periodType + ')</option>';
+      }).join('');
+
+    var html =
+      '<div class="view-title"><span class="material-icons-round">bar_chart</span>Reportes KPI por Área</div>' +
+      '<div class="card mb-20" style="padding:12px 16px">' +
+        '<div class="flex gap-8 items-center">' +
+          '<span class="material-icons-round" style="color:var(--text-muted);font-size:18px">filter_list</span>' +
+          '<select id="krpt-period" onchange="KPIReportsView.reload(this.value)" style="font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">' +
+            periodOpts +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div id="krpt-stats" class="grid grid-4 mb-20">' + KPIReportsView._statsRow(depts) + '</div>';
+
+    if (depts.length > 1) {
+      html += '<div class="card mb-20"><div class="card-title"><span class="material-icons-round" style="margin-right:6px">analytics</span>Comparativa por área</div>' +
+        '<div id="krpt-chart" style="overflow-x:auto">' + KPIReportsView._barChart(depts) + '</div></div>';
+    }
+
+    html += '<div id="krpt-depts" class="grid grid-2 gap-16">' +
+      (depts.length
+        ? depts.map(function(d) { return KPIReportsView._deptCard(d); }).join('')
+        : '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Sin evaluaciones registradas aún.</p></div>') +
+      '</div>';
+
+    var el = document.getElementById('kpi-reports-content');
+    if (el) el.innerHTML = html;
+  },
+
+  _statsRow: function(depts) {
+    var totalEmps = depts.reduce(function(s, d) { return s + d.employeeCount; }, 0);
+    var allScores = depts.filter(function(d) { return d.avgScore !== null; }).map(function(d) { return d.avgScore; });
+    var globalAvg = allScores.length
+      ? Math.round(allScores.reduce(function(a, b) { return a + b; }, 0) / allScores.length * 10) / 10
+      : null;
+    var totalRevs = depts.reduce(function(s, d) { return s + d.totalReviews; }, 0);
+    var completedRevs = depts.reduce(function(s, d) { return s + d.completedReviews; }, 0);
+    var globalPct = totalRevs > 0 ? Math.round(completedRevs / totalRevs * 100) : 0;
+    var semColor = globalAvg === null ? 'var(--text-muted)' : globalAvg >= 75 ? '#16A34A' : globalAvg >= 25 ? '#D97706' : '#DC2626';
+    return '' +
+      '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">domain</span></div>' +
+        '<div><div class="stat-value">' + depts.length + '</div><div class="stat-label">Áreas</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">people</span></div>' +
+        '<div><div class="stat-value">' + totalEmps + '</div><div class="stat-label">Empleados evaluados</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">analytics</span></div>' +
+        '<div><div class="stat-value" style="color:' + semColor + ';font-size:20px">' + (globalAvg !== null ? globalAvg + ' pts' : '—') + '</div>' +
+        '<div class="stat-label">Score global</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon red"><span class="material-icons-round">task_alt</span></div>' +
+        '<div><div class="stat-value">' + globalPct + '%</div><div class="stat-label">Completadas</div></div></div>';
+  },
+
+  _barChart: function(depts) {
+    var scored = depts.filter(function(d) { return d.avgScore !== null; });
+    if (!scored.length) return '<p class="text-muted text-sm" style="padding:8px">Sin scores disponibles.</p>';
+    var rowH  = 36;
+    var labelW = 160;
+    var barMax = 420;
+    var h = scored.length * rowH + 24;
+    var rows = scored.map(function(d, i) {
+      var score = d.avgScore;
+      var barW  = Math.round((score / 100) * barMax);
+      var color = score >= 75 ? '#16A34A' : score >= 25 ? '#D97706' : '#DC2626';
+      var y     = i * rowH + 12;
+      var name  = d.department.length > 22 ? d.department.slice(0, 20) + '…' : d.department;
+      return '<g>' +
+        '<text x="' + (labelW - 8) + '" y="' + (y + 11) + '" text-anchor="end" font-size="12" fill="currentColor" font-family="Inter,sans-serif">' + name + '</text>' +
+        '<rect x="' + labelW + '" y="' + y + '" width="' + barMax + '" height="22" rx="4" fill="var(--bg)" />' +
+        '<rect x="' + labelW + '" y="' + y + '" width="' + barW + '" height="22" rx="4" fill="' + color + '" opacity="0.85" />' +
+        '<text x="' + (labelW + barW + 8) + '" y="' + (y + 15) + '" font-size="12" font-weight="600" fill="' + color + '" font-family="Inter,sans-serif">' + score + '</text>' +
+        '</g>';
+    }).join('');
+    return '<svg viewBox="0 0 ' + (labelW + barMax + 60) + ' ' + h + '" style="width:100%;max-width:680px;display:block;margin:8px 0">' + rows + '</svg>';
+  },
+
+  _scoreRing: function(score) {
+    if (score === null || score === undefined) {
+      return '<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="6"/>' +
+        '<text x="32" y="37" text-anchor="middle" font-size="14" fill="var(--text-muted)" font-family="Inter,sans-serif">—</text></svg>';
+    }
+    var color = score >= 75 ? '#16A34A' : score >= 25 ? '#D97706' : '#DC2626';
+    var r = 26; var circ = 2 * Math.PI * r;
+    var dash = Math.round((score / 100) * circ * 10) / 10;
+    return '<svg viewBox="0 0 64 64" width="64" height="64">' +
+      '<circle cx="32" cy="32" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="6"/>' +
+      '<circle cx="32" cy="32" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="6"' +
+        ' stroke-dasharray="' + dash + ' ' + circ + '" stroke-dashoffset="' + (circ * 0.25) + '"' +
+        ' stroke-linecap="round" transform="rotate(-90 32 32)"/>' +
+      '<text x="32" y="36" text-anchor="middle" font-size="13" font-weight="700" fill="' + color + '" font-family="Inter,sans-serif">' + score + '</text>' +
+      '</svg>';
+  },
+
+  _deptCard: function(d) {
+    var semLabel  = d.avgScore !== null ? APP.semLabel(d.avgScore) : '—';
+    var pctColor  = d.completionPct >= 80 ? '#16A34A' : d.completionPct >= 40 ? '#D97706' : '#DC2626';
+    var empList = '';
+    if (d.employees && d.employees.length) {
+      empList = '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">' +
+        '<div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Empleados</div>' +
+        d.employees.map(function(e) {
+          var sc = e.avgScore !== null ? e.avgScore : null;
+          var dot = sc === null ? 'var(--text-muted)' : sc >= 75 ? '#16A34A' : sc >= 25 ? '#D97706' : '#DC2626';
+          return '<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border)">' +
+            '<div class="td-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">' + APP.initials(e.name) + '</div>' +
+            '<div style="flex:1;min-width:0"><div class="font-600 text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</div>' +
+            '<div class="text-xs text-muted">' + (e.jobTitle || '—') + '</div></div>' +
+            '<div style="text-align:right;flex-shrink:0">' +
+              (sc !== null ? '<div style="font-weight:700;font-size:13px;color:' + dot + '">' + sc + '</div>' : '<div class="text-muted text-sm">—</div>') +
+              '<div class="text-xs text-muted">' + e.completed + '/' + e.total + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+        '</div>';
+    }
+    return '<div class="card">' +
+      '<div class="flex items-center gap-12 mb-12">' +
+        KPIReportsView._scoreRing(d.avgScore) +
+        '<div style="flex:1">' +
+          '<div class="font-600" style="font-size:15px">' + d.department + '</div>' +
+          '<div class="text-sm text-muted">' + d.employeeCount + ' empleado' + (d.employeeCount !== 1 ? 's' : '') + '</div>' +
+          '<div class="mt-4" style="font-size:13px">' + semLabel + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span class="text-xs text-muted">Completado</span>' +
+        '<span class="text-xs font-600" style="color:' + pctColor + '">' + d.completionPct + '% (' + d.completedReviews + '/' + d.totalReviews + ')</span>' +
+      '</div>' +
+      '<div style="height:6px;background:var(--border);border-radius:4px">' +
+        '<div style="height:6px;background:' + pctColor + ';width:' + d.completionPct + '%;border-radius:4px;transition:width .4s"></div>' +
+      '</div>' +
+      empList +
+    '</div>';
   }
 };
 

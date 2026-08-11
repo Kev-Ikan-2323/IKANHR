@@ -490,6 +490,105 @@ export var KPIModule = {
     }
   },
 
+  async getReportByDepartment(params, user) {
+    params = params || {}
+
+    var employees = await DB.getAll(CONFIG.SHEETS.EMPLOYEES)
+    var reviews   = await DB.getAll(CONFIG.SHEETS.KPI_REVIEWS)
+    var periods   = await DB.getAll(CONFIG.SHEETS.KPI_PERIODS)
+    var kpis      = await DB.getAll(CONFIG.SHEETS.KPI_DEFINITIONS)
+
+    // Determine which employees are visible based on role
+    var visibleEmpIds = null  // null = all
+    if (!user.isAdmin && !user.isHR) {
+      if (user.isManager) {
+        var subordinates = employees.filter(function(e) {
+          return e.managerId === user.id ||
+                 user.ledTeams.indexOf(e.teamId) > -1 ||
+                 user.coledTeams.indexOf(e.teamId) > -1
+        })
+        visibleEmpIds = subordinates.map(function(e) { return e.id })
+      } else {
+        visibleEmpIds = [user.id]
+      }
+    }
+
+    var filteredReviews = params.periodId
+      ? reviews.filter(function(r) { return r.periodId === params.periodId })
+      : reviews
+
+    var empSubset = employees.filter(function(e) {
+      if (e.status === 'inactivo') return false
+      return visibleEmpIds === null || visibleEmpIds.indexOf(e.id) > -1
+    })
+
+    // Group employees by department
+    var byDept = {}
+    empSubset.forEach(function(e) {
+      var dept = e.department || 'Sin departamento'
+      if (!byDept[dept]) byDept[dept] = { employees: [], reviews: [] }
+      byDept[dept].employees.push(e)
+    })
+
+    // Assign reviews to departments
+    filteredReviews.forEach(function(r) {
+      var emp = employees.find(function(e) { return e.id === r.employeeId })
+      if (!emp) return
+      var dept = emp.department || 'Sin departamento'
+      if (!byDept[dept]) return
+      var kpiDef = kpis.find(function(k) { return k.id === r.kpiDefinitionId }) || {}
+      byDept[dept].reviews.push(Object.assign({}, r, { kpiName: kpiDef.name || '', kpiWeight: kpiDef.weight || 0 }))
+    })
+
+    var departments = Object.keys(byDept).sort().map(function(deptName) {
+      var group = byDept[deptName]
+      var deptReviews = group.reviews
+      var completed = deptReviews.filter(function(r) { return r.status === CONFIG.STATUS.COMPLETED }).length
+      var total     = deptReviews.length
+      var scores    = deptReviews
+        .filter(function(r) { return r.finalScore !== null && r.finalScore !== '' && r.finalScore !== undefined })
+        .map(function(r)    { return parseFloat(r.finalScore) || 0 })
+      var avgScore  = scores.length
+        ? Math.round(scores.reduce(function(a, b) { return a + b }, 0) / scores.length * 10) / 10
+        : null
+
+      var employeeSummaries = group.employees.map(function(e) {
+        var empRevs   = deptReviews.filter(function(r) { return r.employeeId === e.id })
+        var empScores = empRevs
+          .filter(function(r) { return r.finalScore !== null && r.finalScore !== '' && r.finalScore !== undefined })
+          .map(function(r) { return parseFloat(r.finalScore) || 0 })
+        var empAvg = empScores.length
+          ? Math.round(empScores.reduce(function(a, b) { return a + b }, 0) / empScores.length * 10) / 10
+          : null
+        return {
+          id:        e.id,
+          name:      (e.firstName || '') + ' ' + (e.lastName || ''),
+          jobTitle:  e.jobTitle || '',
+          avgScore:  empAvg,
+          completed: empRevs.filter(function(r) { return r.status === CONFIG.STATUS.COMPLETED }).length,
+          total:     empRevs.length
+        }
+      }).sort(function(a, b) { return (b.avgScore || -1) - (a.avgScore || -1) })
+
+      return {
+        department:       deptName,
+        employeeCount:    group.employees.length,
+        totalReviews:     total,
+        completedReviews: completed,
+        completionPct:    total > 0 ? Math.round(completed / total * 100) : 0,
+        avgScore:         avgScore,
+        employees:        employeeSummaries
+      }
+    })
+
+    return {
+      departments: departments,
+      periods: periods
+        .filter(function(p) { return p.status !== 'inactivo' })
+        .map(function(p) { return { id: p.id, name: p.name, periodType: p.periodType } })
+    }
+  },
+
   async getTeamDashboard(teamId, user) {
     var team = await DB.getById(CONFIG.SHEETS.TEAMS, teamId)
     if (!team) throw new Error('Equipo no encontrado.')

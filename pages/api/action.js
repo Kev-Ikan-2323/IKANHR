@@ -100,7 +100,8 @@ async function dispatch(action, data, user) {
     // ── KPI DASHBOARDS ─────────────────────────────────────────
     'kpi.dashboard':        function() { return KPIModule.getDashboard(data.employeeId, user) },
     'kpi.teamDashboard':    function() { return KPIModule.getTeamDashboard(data.teamId, user) },
-    'kpi.reports.overview': function() { return KPIModule.getReport(data, user) },
+    'kpi.reports.overview':      function() { return KPIModule.getReport(data, user) },
+    'kpi.reports.byDepartment':  function() { return KPIModule.getReportByDepartment(data, user) },
 
     // ── VACATIONS ──────────────────────────────────────────────
     'vacations.request':          function() { return VacationsModule.createRequest(data, user) },

@@ -41,6 +41,9 @@ var SHELL = `
         <span class="material-icons-round">analytics</span><span>KPIs</span>
         <span class="nav-badge" id="nav-kpi-badge" style="display:none"></span>
       </div>
+      <div class="nav-item" data-view="kpi-reports" onclick="APP.navigate('kpi-reports')">
+        <span class="material-icons-round">bar_chart</span><span>Reportes KPI</span>
+      </div>
       <div class="nav-item" data-view="vacations" onclick="APP.navigate('vacations')">
         <span class="material-icons-round">beach_access</span><span>Vacaciones</span>
       </div>
@@ -103,7 +106,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v6.1</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v6.2</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -192,6 +195,11 @@ var SHELL = `
     <div id="view-kpis" class="view">
       <div class="view-title"><span class="material-icons-round">analytics</span>KPIs &amp; Evaluaciones</div>
       <div id="kpi-content"></div>
+    </div>
+
+    <!-- KPI REPORTS -->
+    <div id="view-kpi-reports" class="view">
+      <div id="kpi-reports-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
     <!-- VACATIONS -->
