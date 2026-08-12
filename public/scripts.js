@@ -1160,8 +1160,7 @@ var VacCalendarView = {
 
       var chips = dayReqs.slice(0, 3).map(function(r) {
         var col = empColors[r.employeeId];
-        var initials = APP.initials(r.employeeName);
-        return '<div title="' + r.employeeName + '" style="background:' + col + ';color:#fff;border-radius:4px;font-size:9px;font-weight:600;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">' + initials + '</div>';
+        return '<div title="' + r.employeeName + '" style="background:' + col + ';color:#fff;border-radius:4px;font-size:9px;font-weight:600;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">' + r.employeeName + '</div>';
       }).join('');
       if (dayReqs.length > 3) chips += '<div style="font-size:9px;color:var(--text-muted);padding-left:2px">+' + (dayReqs.length - 3) + '</div>';
 
