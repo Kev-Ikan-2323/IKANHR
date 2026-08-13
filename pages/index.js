@@ -112,7 +112,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v6.7</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v6.8</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -298,6 +298,8 @@ export default function Home() {
       }} />
       {/* Supabase browser SDK — handles PKCE OAuth automatically */}
       <Script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" strategy="beforeInteractive" />
+      {/* html2canvas — org chart PNG export */}
+      <Script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" strategy="afterInteractive" />
       {/* Client-side app logic; loads after page is interactive */}
       <Script src="/scripts.js" strategy="afterInteractive" />
     </>

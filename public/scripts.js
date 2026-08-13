@@ -512,6 +512,7 @@ var OrgChartView = {
           '<span id="org-zoom-label" style="font-size:13px;font-weight:600;min-width:42px;text-align:center">100%</span>' +
           '<button class="btn btn-outline btn-sm" onclick="OrgChartView.zoomIn()"><span class="material-icons-round" style="font-size:16px">add</span></button>' +
           '<button class="btn btn-outline btn-sm" onclick="OrgChartView.resetZoom()" style="margin-left:4px">↺ Reset</button>' +
+          '<button class="btn btn-outline btn-sm" onclick="OrgChartView.exportPNG()" id="org-export-btn" style="margin-left:auto"><span class="material-icons-round" style="font-size:16px">download</span> Exportar PNG</button>' +
         '</div>' +
         '<div id="org-zoom-outer" style="overflow:auto;width:100%;max-height:72vh">' +
           '<div id="org-zoom-inner" style="display:inline-block;transform-origin:top left;transition:transform .15s">' +
@@ -572,6 +573,54 @@ var OrgChartView = {
     if (inner) inner.style.transform = 'scale(' + OrgChartView.zoom + ')';
     var label = document.getElementById('org-zoom-label');
     if (label) label.textContent = Math.round(OrgChartView.zoom * 100) + '%';
+  },
+  exportPNG: function() {
+    var inner = document.getElementById('org-zoom-inner');
+    if (!inner) return;
+    if (!window.html2canvas) { APP.toast('La librería de exportación aún no cargó, intenta de nuevo', 'error'); return; }
+
+    var btn = document.getElementById('org-export-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+
+    var currentZoom = OrgChartView.zoom;
+    var hiddenChildren = [];
+    var hiddenVlines   = [];
+
+    // Expand all collapsed subtrees
+    inner.querySelectorAll('.org-children').forEach(function(el) {
+      if (el.style.display === 'none') { hiddenChildren.push(el); el.style.display = 'flex'; }
+    });
+    inner.querySelectorAll('.org-vline').forEach(function(el) {
+      if (el.style.display === 'none') { hiddenVlines.push(el); el.style.display = 'block'; }
+    });
+
+    // Reset zoom and disable transition during capture
+    inner.style.transition = 'none';
+    inner.style.transform  = 'scale(1)';
+
+    function restore() {
+      hiddenChildren.forEach(function(el) { el.style.display = 'none'; });
+      hiddenVlines.forEach(function(el)   { el.style.display = 'none'; });
+      inner.style.transform  = 'scale(' + currentZoom + ')';
+      inner.style.transition = 'transform .15s';
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-round" style="font-size:16px">download</span> Exportar PNG'; }
+    }
+
+    setTimeout(function() {
+      html2canvas(inner, { backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false })
+        .then(function(canvas) {
+          restore();
+          var link = document.createElement('a');
+          link.download = 'organigrama-ikan.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          APP.toast('PNG exportado correctamente', 'success');
+        })
+        .catch(function() {
+          restore();
+          APP.toast('Error al generar la imagen', 'error');
+        });
+    }, 150);
   }
 };
 
