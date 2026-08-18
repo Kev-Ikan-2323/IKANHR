@@ -1282,14 +1282,33 @@ var VacationsView = {
       (APP.user.isAdmin||APP.user.isHR||(APP.user.isManager&&APP.user.canApproveVacations) ? '<button class="btn btn-outline" onclick="VacationsView.loadTeamRequests()"><span class="material-icons-round">group</span>Ver equipo</button>' : '') +
       (APP.user.isAdmin||APP.user.isHR ? '<button class="btn btn-outline" onclick="VacationsView.recalcBalances()"><span class="material-icons-round">sync</span>Recalcular balances</button>' : '') +
       '</div>';
-    html += '<div class="grid grid-2 gap-16"><div><div class="card"><div class="card-title">Mis Solicitudes</div>';
-    if (!reqs.length) html += '<div class="empty-state"><span class="material-icons-round">beach_access</span><p>Sin solicitudes aún</p></div>';
-    else html += reqs.slice(0,10).map(VacationsView.requestCard).join('');
-    html += '</div></div>';
+    var sorted = reqs.slice().sort(function(a,b){ return (b.startDate||'') > (a.startDate||'') ? 1 : -1; });
+    html += '<div class="card mb-20">' +
+      '<div class="card-title"><span class="material-icons-round" style="margin-right:6px">history</span>Historial de Solicitudes</div>';
+    if (!sorted.length) {
+      html += '<div class="empty-state"><span class="material-icons-round">beach_access</span><p>Sin solicitudes aún</p></div>';
+    } else {
+      html += '<div class="table-wrap"><table><thead><tr>' +
+        '<th>Inicio</th><th>Fin</th><th style="text-align:center">Días hábiles</th><th>Motivo</th><th>Estado</th><th></th>' +
+        '</tr></thead><tbody>' +
+        sorted.map(function(r) {
+          var canCancel = r.status === 'Pendiente' || r.status === 'Pendiente Manager';
+          return '<tr>' +
+            '<td class="text-sm">' + APP.fmtDate(r.startDate) + '</td>' +
+            '<td class="text-sm">' + APP.fmtDate(r.endDate) + '</td>' +
+            '<td class="text-sm" style="text-align:center">' + (r.workingDays||0) + '</td>' +
+            '<td class="text-sm" style="color:var(--text-muted)">' + (r.reason || '—') + '</td>' +
+            '<td>' + APP.badgeStatus(r.status) + '</td>' +
+            '<td>' + (canCancel ? '<button class="btn btn-outline btn-sm" onclick="VacationsView.cancelReq(\'' + r.id + '\')">Cancelar</button>' : '') + '</td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+    html += '</div>';
     VacationsView._hols = hols;
     var _c = VacationsView._country || 'MX';
     var _countryChips = {MX:'🇲🇽 MX',AR:'🇦🇷 AR',BR:'🇧🇷 BR',US:'🇺🇸 US',JP:'🇯🇵 JP',CO:'🇨🇴 CO',PA:'🇵🇦 PA'};
-    html += '<div><div class="card">' +
+    html += '<div class="card">' +
       '<div class="card-title">📅 Feriados ' + new Date().getFullYear() + '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' +
       Object.keys(_countryChips).map(function(k) {
@@ -1298,7 +1317,7 @@ var VacationsView = {
       }).join('') +
       '</div>' +
       '<div id="hol-list">' + VacationsView._holRows(hols, _c) + '</div>' +
-      '</div></div></div>';
+      '</div>';
     el.innerHTML = html;
   },
   requestCard: function(r) {
