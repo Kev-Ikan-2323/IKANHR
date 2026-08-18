@@ -171,7 +171,7 @@ var APP = {
   viewTitles: {
     dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
     kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
-    vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones',
+    vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones',
     birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración'
   },
 
@@ -184,6 +184,7 @@ var APP = {
       'kpi-reports':  KPIReportsView.load,
       vacations:      VacationsView.load,
       'vac-calendar': VacCalendarView.load,
+      'vac-history':  VacHistoryView.load,
       birthdays:      BirthdaysView.load,
       team:           TeamView.load,
     };
@@ -1246,6 +1247,96 @@ var VacCalendarView = {
     var el = document.getElementById('vac-cal-content');
     if (el) el.innerHTML = header + legend + grid + listHTML;
   }
+};
+
+// ── VAC HISTORY VIEW (HR / Admin only) ───────────────────────
+var VacHistoryView = {
+  _data:   [],
+  _filter: { status: '', search: '' },
+
+  load: function() {
+    var el = document.getElementById('vac-history-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('vacations.allRequests', {}, function(err, data) {
+      if (err) {
+        el.innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>' + err + '</p></div>';
+        return;
+      }
+      VacHistoryView._data   = data || [];
+      VacHistoryView._filter = { status: '', search: '' };
+      VacHistoryView._render();
+    });
+  },
+
+  _render: function() {
+    var el = document.getElementById('vac-history-content');
+    if (!el) return;
+    var f    = VacHistoryView._filter;
+    var rows = VacHistoryView._data.filter(function(r) {
+      if (f.status && r.status !== f.status) return false;
+      if (f.search) {
+        var s    = f.search.toLowerCase();
+        var name = (r.employeeName || '').toLowerCase();
+        var dept = (r.department   || '').toLowerCase();
+        if (name.indexOf(s) === -1 && dept.indexOf(s) === -1) return false;
+      }
+      return true;
+    });
+
+    var statuses = ['Pendiente', 'Pendiente Manager', 'Aprobado', 'Rechazado', 'Cancelado'];
+
+    var html = '<div class="view-title"><span class="material-icons-round">manage_search</span>Historial de Vacaciones</div>';
+
+    html += '<div class="card mb-16" style="padding:12px 16px">' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">' +
+        '<div class="form-group" style="margin:0;flex:1;min-width:200px">' +
+          '<input id="vhist-search" placeholder="Buscar empleado o área..." value="' + (f.search || '') + '" ' +
+          'oninput="VacHistoryView._onSearch(this.value)" style="width:100%">' +
+        '</div>' +
+        '<div class="form-group" style="margin:0">' +
+          '<select id="vhist-status" onchange="VacHistoryView._onStatus(this.value)">' +
+            '<option value="">Todos los estatus</option>' +
+            statuses.map(function(s) {
+              return '<option value="' + s + '"' + (f.status === s ? ' selected' : '') + '>' + s + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>' +
+        '<div style="color:var(--text-muted);font-size:13px;white-space:nowrap">' +
+          rows.length + ' de ' + VacHistoryView._data.length + ' solicitudes' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    html += '<div class="card"><div class="table-wrap"><table><thead><tr>' +
+      '<th>Empleado</th><th>Área</th><th>Inicio</th><th>Fin</th>' +
+      '<th style="text-align:center">Días hábiles</th><th>Motivo</th><th>Estado</th><th>Solicitado</th>' +
+      '</tr></thead><tbody>';
+
+    if (!rows.length) {
+      html += '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Sin resultados</td></tr>';
+    } else {
+      html += rows.map(function(r) {
+        var reqDate = r.requestedAt ? APP.fmtDate(r.requestedAt.split('T')[0]) : '—';
+        return '<tr>' +
+          '<td style="font-weight:500">' + (r.employeeName || '—') + '</td>' +
+          '<td class="text-sm" style="color:var(--text-muted)">' + (r.department || '—') + '</td>' +
+          '<td class="text-sm">' + APP.fmtDate(r.startDate) + '</td>' +
+          '<td class="text-sm">' + APP.fmtDate(r.endDate) + '</td>' +
+          '<td class="text-sm" style="text-align:center">' + (r.workingDays || 0) + '</td>' +
+          '<td class="text-sm" style="color:var(--text-muted)">' + (r.reason || '—') + '</td>' +
+          '<td>' + APP.badgeStatus(r.status) + '</td>' +
+          '<td class="text-sm" style="color:var(--text-muted)">' + reqDate + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+  },
+
+  _onSearch: function(val) { VacHistoryView._filter.search = val; VacHistoryView._render(); },
+  _onStatus: function(val) { VacHistoryView._filter.status = val; VacHistoryView._render(); }
 };
 
 // ── VACATIONS VIEW ────────────────────────────────────────────

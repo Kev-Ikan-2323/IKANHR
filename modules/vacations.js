@@ -388,6 +388,15 @@ export var VacationsModule = {
     }
 
     return { updated: employees.length, year: year }
+  },
+
+  async getAllRequests(params, user) {
+    if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado.')
+    var all = await DB.getAll(CONFIG.SHEETS.VACATION_REQUESTS)
+    var enriched = await Promise.all(all.map(_enrichRequest))
+    return enriched.sort(function(a, b) {
+      return new Date(b.requestedAt || b.startDate) - new Date(a.requestedAt || a.startDate)
+    })
   }
 }
 

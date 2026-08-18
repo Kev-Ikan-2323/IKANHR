@@ -119,6 +119,7 @@ async function dispatch(action, data, user) {
     'vacations.calendarMonth':    function() { return VacationsModule.getCalendarMonth(data.year, data.month, user) },
     'vacations.upcomingAbsences': function() { return VacationsModule.getUpcomingAbsences(data.days, user) },
     'vacations.recalcBalances':   function() { return VacationsModule.recalculateAnnualBalances(user) },
+    'vacations.allRequests':      function() { return VacationsModule.getAllRequests(data, user) },
 
     // ── BIRTHDAYS ──────────────────────────────────────────────
     'birthdays.upcoming': function() { return BirthdaysModule.getUpcoming(data.days || 30, user) },
