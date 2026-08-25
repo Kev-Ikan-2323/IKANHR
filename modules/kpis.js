@@ -297,12 +297,9 @@ export var KPIModule = {
 
     var pending = await DB.query(CONFIG.SHEETS.KPI_REVIEWS, { status: CONFIG.STATUS.IN_REVIEW })
 
-    if (!user.isAdmin && !user.isHR) {
-      var checks = await Promise.all(pending.map(function(r) {
-        return isManagerOf(user, r.employeeId)
-      }))
-      pending = pending.filter(function(_, i) { return checks[i] })
-    }
+    // Filter to only reviews where this user is the assigned manager.
+    // Admin/HR are not exempt — they should only see their own team's queue.
+    pending = pending.filter(function(r) { return r.managerId === user.id })
 
     return Promise.all(pending.map(_enrichReview))
   },
