@@ -69,9 +69,14 @@ export var PositionsModule = {
         .eq('position_id', id)
     }
 
-    // Also clear the FK on kpi_schedules
+    // Also clear the FK on kpi_schedules and kpi_periods
     await client
       .from('kpi_schedules')
+      .update({ position_id: null })
+      .eq('position_id', id)
+
+    await client
+      .from('kpi_periods')
       .update({ position_id: null })
       .eq('position_id', id)
 
