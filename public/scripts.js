@@ -745,12 +745,15 @@ var KPIsView = {
           var kpi = item.kpi;
           var draftScore   = item.draft && item.draft.selfScore !== '' ? item.draft.selfScore : undefined;
           var draftComment = item.draft ? (item.draft.selfComments || '') : '';
+          var evalBadge = item.evaluationType === 'meta'
+            ? '<span class="badge badge-success" style="font-size:11px;padding:2px 7px">🎯 Evaluación de Meta</span>'
+            : '<span class="badge badge-info"    style="font-size:11px;padding:2px 7px">📈 Evaluación de Progreso</span>';
           html += '<div class="kpi-review-row">' +
-            '<div class="kpi-row-name">' + kpi.name + '</div>' +
+            '<div class="kpi-row-name" style="display:flex;align-items:center;gap:8px">' + kpi.name + evalBadge + '</div>' +
             '<div class="kpi-row-meta">' +
               (kpi.target ? '<span>🎯 ' + kpi.target + '</span>' : '') +
               '<span>⚖️ ' + kpi.weight + '%</span>' +
-              '<span>📦 ' + kpi.periodType + '</span>' +
+              '<span>📆 Horizonte: ' + kpi.periodType + '</span>' +
             '</div>' +
             (kpi.instructions ? '<div class="alert info" style="margin-bottom:10px;font-size:12px">📋 ' + kpi.instructions + '</div>' : '') +
             KPIsView._semHtml(kpi.id, draftScore) +
@@ -1999,7 +2002,7 @@ var AdminHR = {
       '<div class="form-group"><label>Nombre *</label><input id="kf-name" value="'+(v.name||'')+'" placeholder="Cuota mensual de ventas"></div>' +
       '<div class="form-group"><label>Categoría</label><input id="kf-cat" value="'+(v.category||'')+'" placeholder="Ventas, Productividad..."></div>' +
       '</div><div class="form-row">' +
-      '<div class="form-group"><label>Período</label>'+sel('kf-period',[{value:'Mensual',label:'Mensual'},{value:'Bimestral',label:'Bimestral'},{value:'Semestral',label:'Semestral'}],v.periodType||'Mensual')+'</div>' +
+      '<div class="form-group"><label>Periodicidad de meta <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(todos evalúan mensualmente)</span></label>'+sel('kf-period',[{value:'Mensual',label:'Mensual'},{value:'Bimestral',label:'Bimestral'},{value:'Semestral',label:'Semestral'},{value:'Anual',label:'Anual'}],v.periodType||'Mensual')+'<span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px">Mensual: la meta se evalúa cada mes · Bimestral: mes 1 es progreso, mes 2 es meta · Semestral: meta cada 6 meses · Anual: meta en diciembre</span></div>' +
       '<div class="form-group"><label>Peso (%) *</label><input type="number" id="kf-weight" min="1" max="100" value="'+(v.weight||20)+'"></div>' +
       '</div><div class="form-row">' +
       '<div class="form-group"><label>Meta</label><input id="kf-target" value="'+(v.target||'')+'" placeholder="Entregar 100% de pedidos, Tasa 90%..."></div>' +
@@ -2050,7 +2053,7 @@ var AdminHR = {
       var posSel='<select id="bk-pos" onchange="AdminHR.updateBatchPositionInfo()" style="width:100%">'+posOpts.map(function(o){return '<option value="'+o.value+'"'+(o.value===(prePos||'')?'  selected':'')+'>'+o.label+'</option>';}).join('')+'</select>';
       var s='style="padding:5px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:100%"';
       AdminHR._batchRowStyle=s;
-      AdminHR._batchPeriodOpts='<option>Mensual</option><option>Bimestral</option><option>Semestral</option>';
+      AdminHR._batchPeriodOpts='<option>Mensual</option><option>Bimestral</option><option>Semestral</option><option>Anual</option>';
       var body='<div class="form-group" style="margin-bottom:12px"><label>Puesto al que aplican los KPIs</label>'+posSel+'</div>' +
         '<div id="bk-pos-info" style="margin-bottom:14px"></div>' +
         '<div class="flex justify-between items-center mb-8"><span class="font-600 text-sm">Nuevos KPIs</span>' +
@@ -2154,7 +2157,7 @@ var AdminHR = {
           return '<tr data-id="' + k.id + '" style="border-bottom:1px solid var(--border)">' +
             '<td style="padding:4px 4px"><input class="be-name" value="' + (k.name || '').replace(/"/g, '&quot;') + '" placeholder="Nombre" ' + s + ' oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
             '<td style="padding:4px 4px"><input class="be-desc" value="' + (k.description || '').replace(/"/g, '&quot;') + '" placeholder="Descripción" ' + s + '></td>' +
-            '<td style="padding:4px 4px">' + makeSel('be-period', ['Mensual','Bimestral','Semestral'], k.periodType || 'Mensual') + '</td>' +
+            '<td style="padding:4px 4px">' + makeSel('be-period', ['Mensual','Bimestral','Semestral','Anual'], k.periodType || 'Mensual') + '</td>' +
             '<td style="padding:4px 4px"><input type="number" class="be-weight" min="1" max="100" value="' + (k.weight || 20) + '" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
             '<td style="padding:4px 4px"><input class="be-target" value="' + (k.target || '') + '" placeholder="Meta" ' + s + '></td>' +
             '<td style="padding:4px 4px">' + mSel + '</td>' +
@@ -2222,7 +2225,7 @@ var AdminHR = {
   // ── SCHEDULES ──────────────────────────────────────────────
   _schedulesTable: function(schedules, kpis, positions) {
     var posNames={}; (positions||AdminHR._cachedPositions||[]).forEach(function(p){posNames[p.id]=p.name;});
-    var freqIcon={Mensual:'🗓',Bimestral:'📆',Semestral:'📅'};
+    var freqIcon={Mensual:'🗓',Bimestral:'📆',Semestral:'📅',Anual:'📆'};
     var html='<div class="flex justify-between items-center mb-12"><div><span class="font-600">'+schedules.length+' programación(es)</span>' +
       '<span class="text-xs text-muted" style="display:block;margin-top:2px">Se activan automáticamente según la configuración</span></div>' +
       '<button class="btn btn-primary btn-sm" onclick="AdminHR.openNewSchedule()"><span class="material-icons-round">add</span>Nueva programación</button></div>';

@@ -259,9 +259,10 @@ export var KPIModule = {
     var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, user.id)
     if (!emp) return []
 
+    // All KPIs evaluate monthly — only use active Mensual periods
     var periods = await DB.query(CONFIG.SHEETS.KPI_PERIODS, { status: 'activo' })
     var applicable = periods.filter(function(p) {
-      return !p.positionId || p.positionId === emp.positionId
+      return (!p.positionId || p.positionId === emp.positionId) && p.periodType === 'Mensual'
     })
 
     var kpis = await DB.query(CONFIG.SHEETS.KPI_DEFINITIONS, { positionId: emp.positionId, isActive: true })
@@ -269,9 +270,12 @@ export var KPIModule = {
     var pending = []
     for (var i = 0; i < applicable.length; i++) {
       var period = applicable[i]
+      // Determine which calendar month this period falls in (1–12)
+      var periodMonth = period.startDate
+        ? new Date(period.startDate + 'T12:00:00').getMonth() + 1
+        : new Date().getMonth() + 1
       for (var j = 0; j < kpis.length; j++) {
         var kpi = kpis[j]
-        if (kpi.periodType !== period.periodType) continue
         var existing = await DB.query(CONFIG.SHEETS.KPI_REVIEWS, {
           periodId:        period.id,
           kpiDefinitionId: kpi.id,
@@ -282,9 +286,10 @@ export var KPIModule = {
         })
         if (!submitted) {
           pending.push({
-            period: _enrichPeriod(period),
-            kpi:    await _enrichDefinition(kpi),
-            draft:  existing.length > 0 ? existing[0] : null
+            period:         _enrichPeriod(period),
+            kpi:            await _enrichDefinition(kpi),
+            draft:          existing.length > 0 ? existing[0] : null,
+            evaluationType: _getEvaluationType(kpi.periodType, periodMonth)
           })
         }
       }
@@ -847,4 +852,13 @@ async function _notifyPeriodOpen(period) {
   } catch (e) {
     console.error('Error enviando notificaciones masivas:', e.message)
   }
+}
+
+// Returns 'meta' on the last month of the horizon cycle, 'progreso' on all others.
+// Cycles are calendar-aligned and reset at month 1 (January).
+function _getEvaluationType(metaPeriod, month) {
+  var cycleLen = { 'Mensual': 1, 'Bimestral': 2, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12 }
+  var len = cycleLen[metaPeriod] || 1
+  var posInCycle = (month - 1) % len
+  return posInCycle === len - 1 ? 'meta' : 'progreso'
 }
