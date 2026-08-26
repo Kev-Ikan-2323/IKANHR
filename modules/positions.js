@@ -39,14 +39,19 @@ export var PositionsModule = {
 
     var employees = await DB.getBy(CONFIG.SHEETS.EMPLOYEES, 'positionId', id)
     var active    = employees.filter(function(e) { return e.status !== 'inactivo' })
-    if (active.length > 0) {
-      throw new Error('No se puede eliminar: ' + active.length + ' empleado(s) activo(s) tienen este puesto.')
-    }
 
     var client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     )
+
+    // Unassign position from active employees instead of blocking
+    if (active.length > 0) {
+      await client
+        .from('employees')
+        .update({ position_id: null })
+        .in('id', active.map(function(e) { return e.id }))
+    }
 
     // Must clear the FK on ALL kpi_definitions (active or not) before deleting the position.
     // Soft-deleting (isActive:false) alone doesn't remove the row, so the FK constraint fires.
@@ -72,6 +77,6 @@ export var PositionsModule = {
 
     var { error } = await client.from('positions').delete().eq('id', id)
     if (error) throw new Error('Error eliminando puesto: ' + error.message)
-    return { ok: true, kpisRemoved: activeKpis.length }
+    return { ok: true, kpisRemoved: activeKpis.length, employeesUnassigned: active.length }
   }
 }

@@ -2461,12 +2461,15 @@ var AdminHR = {
     });
   },
   deletePosition: function(id, name) {
-    if (!confirm('⚠️ ¿Eliminar el puesto "'+name+'"?\n\nTodos los KPIs asociados a este puesto también serán eliminados.\nEsta acción no se puede deshacer.')) return;
+    if (!confirm('⚠️ ¿Eliminar el puesto "'+name+'"?\n\nLos empleados activos con este puesto quedarán sin asignar.\nLos KPIs asociados también serán eliminados.\nEsta acción no se puede deshacer.')) return;
     APP.api('positions.remove',{id:id},function(err,res){
       if(err){APP.toast(err,'error');return;}
       AdminHR._cachedPositions=null;
-      var msg = res&&res.kpisRemoved ? '✅ Puesto eliminado ('+res.kpisRemoved+' KPI(s) eliminados)' : '✅ Puesto eliminado';
-      APP.toast(msg,'success'); AdminHR.openPositionsAdmin();
+      var parts=[];
+      if(res&&res.kpisRemoved)         parts.push(res.kpisRemoved+' KPI(s) eliminados');
+      if(res&&res.employeesUnassigned) parts.push(res.employeesUnassigned+' empleado(s) desasignados');
+      APP.toast('✅ Puesto eliminado'+(parts.length?' ('+parts.join(', ')+')':''),'success');
+      AdminHR.openPositionsAdmin();
     });
   },
 
