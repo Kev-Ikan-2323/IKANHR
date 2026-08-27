@@ -211,6 +211,36 @@ var APP = {
     if (dot) dot.style.display = alerts > 0 ? 'block' : 'none';
   },
 
+  openNotifications: function() {
+    var d = APP.data || {};
+    var alerts = d.alerts || [];
+    var pending = d.pendingKPIs || [];
+    var items = '';
+    if (alerts.length) {
+      items += '<div class="font-600 text-sm mb-8" style="color:var(--warning)">⚠️ Alertas</div>';
+      items += alerts.map(function(a) {
+        return '<div class="alert ' + a.type + '" style="margin-bottom:6px;cursor:pointer" onclick="APP.closeModal();APP.navigate(\'' + (a.action||'dashboard') + '\')">' + a.icon + ' ' + a.message + '</div>';
+      }).join('');
+    }
+    if (pending.length) {
+      items += '<div class="font-600 text-sm mb-8 mt-12">📋 KPIs pendientes de autoevaluación</div>';
+      items += pending.map(function(p) {
+        var evalBadge = p.evaluationType === 'meta'
+          ? '<span class="badge badge-success" style="font-size:10px;margin-left:6px">🎯 Meta</span>'
+          : '<span class="badge badge-info" style="font-size:10px;margin-left:6px">📈 Progreso</span>';
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +
+          '<div class="text-sm font-600">' + p.kpi.name + evalBadge + '</div>' +
+          '<div class="text-xs text-muted">📅 ' + p.period.name + ' · ⚖️ ' + p.kpi.weight + '%</div>' +
+        '</div>';
+      }).join('');
+    }
+    if (!items) items = '<div class="empty-state"><span class="material-icons-round">notifications_none</span><p>Sin notificaciones 🎉</p></div>';
+    APP.modal('🔔 Notificaciones', items,
+      '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>' +
+      (pending.length ? '<button class="btn btn-primary" onclick="APP.closeModal();APP.navigate(\'kpis\')">Ir a KPIs</button>' : '')
+    );
+  },
+
   renderSidebar: function() {
     var u = APP.user;
     if (!u) return;
@@ -838,8 +868,11 @@ var KPIsView = {
         '<div style="margin-left:50px">' +
           empReviews.map(function(r) {
             var comment = r.selfComments ? ' · <em style="color:var(--text-muted)">"' + r.selfComments.substring(0,90) + (r.selfComments.length>90?'…':'') + '"</em>' : '';
+            var evalBadge = r.evaluationType === 'meta'
+              ? '<span class="badge badge-success" style="font-size:10px;margin-left:6px">🎯 Meta</span>'
+              : '<span class="badge badge-info" style="font-size:10px;margin-left:6px">📈 Progreso</span>';
             return '<div style="padding:8px 12px;background:var(--bg);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
-              '<div><div class="text-sm font-600">' + r.kpiName + '</div>' +
+              '<div><div class="text-sm font-600">' + r.kpiName + evalBadge + '</div>' +
               '<div class="text-xs" style="color:var(--text-muted)">Auto: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + comment + '</div></div>' +
               '<span class="badge badge-warning" style="font-size:10px">En revisión</span></div>';
           }).join('') +
@@ -854,8 +887,11 @@ var KPIsView = {
     if (!empReviews || !empReviews.length) return;
     var body = empReviews.map(function(r, i) {
       var sep = i > 0 ? 'padding-top:20px;margin-top:20px;border-top:1px solid var(--border)' : '';
+      var evalBadge = r.evaluationType === 'meta'
+        ? '<span class="badge badge-success" style="font-size:11px;margin-left:8px">🎯 Meta</span>'
+        : '<span class="badge badge-info" style="font-size:11px;margin-left:8px">📈 Progreso</span>';
       return '<div style="' + sep + '">' +
-        '<div class="font-600 text-sm mb-8">' + r.kpiName + '</div>' +
+        '<div class="font-600 text-sm mb-8" style="display:flex;align-items:center">' + r.kpiName + evalBadge + '</div>' +
         '<div style="background:var(--bg);border-radius:6px;padding:10px 12px;margin-bottom:12px">' +
           '<div class="text-xs" style="color:var(--text-muted)">Autoevaluación: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + APP.fmtTarget(r.kpiTarget, r.kpiMeasureType) : '') + '</div>' +
           (r.selfComments ? '<div class="text-xs mt-4" style="color:var(--text-muted)">💬 "' + r.selfComments + '"</div>' : '') +
@@ -1066,13 +1102,13 @@ var KPIReportsView = {
         d.employees.map(function(e) {
           var sc = e.avgScore !== null ? e.avgScore : null;
           var dot = sc === null ? 'var(--text-muted)' : sc >= 75 ? '#16A34A' : sc >= 25 ? '#D97706' : '#DC2626';
-          return '<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border)">' +
+          return '<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="KPIReportsView.openEmployeeDetail(\'' + e.id + '\',\'' + e.name.replace(/'/g,"\\'") + '\')">' +
             '<div class="td-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">' + APP.initials(e.name) + '</div>' +
             '<div style="flex:1;min-width:0"><div class="font-600 text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</div>' +
             '<div class="text-xs text-muted">' + (e.jobTitle || '—') + '</div></div>' +
             '<div style="text-align:right;flex-shrink:0">' +
               (sc !== null ? '<div style="font-weight:700;font-size:13px;color:' + dot + '">' + sc + '</div>' : '<div class="text-muted text-sm">—</div>') +
-              '<div class="text-xs text-muted">' + e.completed + '/' + e.total + '</div>' +
+              '<div class="text-xs text-muted">' + e.completed + '/' + e.total + ' · <span style="color:var(--primary)">Ver →</span></div>' +
             '</div>' +
           '</div>';
         }).join('') +
@@ -1096,6 +1132,41 @@ var KPIReportsView = {
       '</div>' +
       empList +
     '</div>';
+  },
+
+  openEmployeeDetail: function(empId, empName) {
+    APP.api('kpi.dashboard', { employeeId: empId }, function(err, data) {
+      if (err) { APP.toast(err, 'error'); return; }
+      var results = data.periodResults || [];
+      var body = results.length === 0
+        ? '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Sin evaluaciones registradas</p></div>'
+        : results.map(function(pr) {
+            var scoreColor = pr.overallScore === null ? 'var(--text-muted)' : pr.overallScore >= 75 ? '#16A34A' : pr.overallScore >= 25 ? '#D97706' : '#DC2626';
+            var kpiRows = (pr.reviews || []).map(function(r) {
+              var sc = r.finalScore !== '' && r.finalScore !== null ? parseFloat(r.finalScore) : null;
+              var c2 = sc === null ? 'var(--text-muted)' : sc >= 75 ? '#16A34A' : sc >= 25 ? '#D97706' : '#DC2626';
+              return '<tr>' +
+                '<td class="text-sm">' + (r.kpiName || '—') + '</td>' +
+                '<td class="text-sm" style="text-align:center">' + (r.kpiWeight || 0) + '%</td>' +
+                '<td class="text-sm" style="text-align:center;color:' + c2 + ';font-weight:600">' + (sc !== null ? sc : '—') + '</td>' +
+                '<td class="text-xs text-muted">' + (r.managerComments || '') + '</td>' +
+              '</tr>';
+            }).join('');
+            return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">' +
+              '<div class="flex justify-between items-center mb-8">' +
+                '<div class="font-600 text-sm">' + pr.period.name + '</div>' +
+                '<div style="font-weight:700;font-size:15px;color:' + scoreColor + '">' + (pr.overallScore !== null ? pr.overallScore + ' pts' : '—') + '</div>' +
+              '</div>' +
+              (kpiRows ? '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
+                '<th class="text-xs text-muted" style="text-align:left;padding:4px 6px">KPI</th>' +
+                '<th class="text-xs text-muted" style="text-align:center;padding:4px 6px">Peso</th>' +
+                '<th class="text-xs text-muted" style="text-align:center;padding:4px 6px">Score</th>' +
+                '<th class="text-xs text-muted" style="text-align:left;padding:4px 6px">Comentarios</th>' +
+              '</tr></thead><tbody>' + kpiRows + '</tbody></table></div>' : '') +
+            '</div>';
+          }).join('');
+      APP.modal('📊 KPI History — ' + empName, body, '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>');
+    });
   }
 };
 
@@ -1386,7 +1457,7 @@ var VacationsView = {
         '<th>Inicio</th><th>Fin</th><th style="text-align:center">Días hábiles</th><th>Motivo</th><th>Estado</th><th></th>' +
         '</tr></thead><tbody>' +
         sorted.map(function(r) {
-          var canCancel = r.status === 'Pendiente' || r.status === 'Pendiente Manager';
+          var canCancel = r.status === 'Pendiente' || r.status === 'Pendiente Manager' || (r.status === 'Aprobado' && new Date(r.startDate) > new Date());
           return '<tr>' +
             '<td class="text-sm">' + APP.fmtDate(r.startDate) + '</td>' +
             '<td class="text-sm">' + APP.fmtDate(r.endDate) + '</td>' +
@@ -1415,7 +1486,7 @@ var VacationsView = {
     el.innerHTML = html;
   },
   requestCard: function(r) {
-    var canCancel = r.status === 'Pendiente' || r.status === 'Pendiente Manager';
+    var canCancel = r.status === 'Pendiente' || r.status === 'Pendiente Manager' || (r.status === 'Aprobado' && new Date(r.startDate) > new Date());
     return '<div class="request-card mt-8"><div>' +
       '<div class="request-dates">📅 ' + APP.fmtDate(r.startDate) + ' → ' + APP.fmtDate(r.endDate) + '</div>' +
       '<div class="request-days">' + r.workingDays + ' días hábiles' + (r.reason ? ' · ' + r.reason : '') + '</div></div>' +
@@ -2248,10 +2319,10 @@ var AdminHR = {
   },
   _calcNextDate: function(dayOfMonth, periodType, lastActivatedAt) {
     var today=new Date(); var day=Math.max(1,Math.min(28,parseInt(dayOfMonth)||1));
-    var windowDays={Mensual:27,Bimestral:54,Semestral:170}; var skip=false;
+    var windowDays={Mensual:27,Bimestral:54,Semestral:170,Anual:335}; var skip=false;
     if (lastActivatedAt){var last=new Date(lastActivatedAt);var win=(windowDays[periodType]||27)*86400000;skip=!isNaN(last.getTime())&&(today.getTime()-last.getTime())<win;}
     var next=new Date(today.getFullYear(),today.getMonth(),day);
-    if (skip||next<=today){var ma=periodType==='Semestral'?6:periodType==='Bimestral'?2:1;next.setMonth(next.getMonth()+ma);}
+    if (skip||next<=today){var ma=periodType==='Anual'?12:periodType==='Semestral'?6:periodType==='Bimestral'?2:1;next.setMonth(next.getMonth()+ma);}
     return next.toISOString().split('T')[0];
   },
   deleteSchedule: function(id, name) {
@@ -2287,7 +2358,7 @@ var AdminHR = {
       :'<span class="text-muted text-sm">No hay KPIs configurados aún.</span>';
     return '<div class="form-group"><label>Nombre *</label><input id="sf-name" value="'+(v.name||'')+'" placeholder="Evaluación Mensual Ventas"></div>' +
       '<div class="form-row"><div class="form-group"><label>Aplica a (puesto)</label>'+sel('sf-pos',posOpts,v.positionId)+'</div>' +
-      '<div class="form-group"><label>Frecuencia</label>'+sel('sf-freq',[{value:'Mensual',label:'Mensual'},{value:'Bimestral',label:'Bimestral'},{value:'Semestral',label:'Semestral'}],v.periodType||'Mensual')+'</div></div>' +
+      '<div class="form-group"><label>Frecuencia</label>'+sel('sf-freq',[{value:'Mensual',label:'Mensual'},{value:'Bimestral',label:'Bimestral'},{value:'Semestral',label:'Semestral'},{value:'Anual',label:'Anual'}],v.periodType||'Mensual')+'</div></div>' +
       '<div class="form-row"><div class="form-group"><label>Día del mes *</label><input type="number" id="sf-day" min="1" max="28" value="'+(v.dayOfMonth||1)+'"></div>' +
       '<div class="form-group"></div></div>' +
       '<div class="form-row"><div class="form-group"><label>Días para autocalificación</label><input type="number" id="sf-self" min="1" max="60" value="'+(v.selfAssessmentDays||25)+'"></div>' +
@@ -2461,7 +2532,7 @@ var AdminHR = {
     });
   },
   deletePosition: function(id, name) {
-    if (!confirm('⚠️ ¿Eliminar el puesto "'+name+'"?\n\nLos empleados activos con este puesto quedarán sin asignar.\nLos KPIs asociados también serán eliminados.\nEsta acción no se puede deshacer.')) return;
+    if (!confirm('⚠️ ¿Eliminar el puesto "'+name+'"?\n\nLos empleados activos con este puesto quedarán SIN PUESTO y SIN KPIs asignados.\nLos KPIs asociados al puesto también serán desactivados.\nEsta acción no se puede deshacer.')) return;
     APP.api('positions.remove',{id:id},function(err,res){
       if(err){APP.toast(err,'error');return;}
       AdminHR._cachedPositions=null;

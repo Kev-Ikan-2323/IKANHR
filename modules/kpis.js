@@ -306,7 +306,19 @@ export var KPIModule = {
     // Admin/HR are not exempt — they should only see their own team's queue.
     pending = pending.filter(function(r) { return r.managerId === user.id })
 
-    return Promise.all(pending.map(_enrichReview))
+    var enriched = await Promise.all(pending.map(_enrichReview))
+
+    // Attach evaluationType so the manager knows if this is a meta or progreso evaluation
+    for (var i = 0; i < enriched.length; i++) {
+      var r = enriched[i]
+      var period = await DB.getById(CONFIG.SHEETS.KPI_PERIODS, r.periodId)
+      var periodMonth = period && period.startDate
+        ? new Date(period.startDate + 'T12:00:00').getMonth() + 1
+        : new Date().getMonth() + 1
+      r.evaluationType = _getEvaluationType(r.kpiPeriodType, periodMonth)
+    }
+
+    return enriched
   },
 
   // ── DASHBOARDS ───────────────────────────────────────────────
@@ -712,6 +724,7 @@ async function _enrichReview(review) {
   review.kpiType        = kpi ? kpi.type        : ''
   review.kpiTarget      = kpi ? kpi.target      : ''
   review.kpiMeasureType = kpi ? (kpi.measureType || 'Numérico') : 'Numérico'
+  review.kpiPeriodType  = kpi ? (kpi.periodType || 'Mensual')   : 'Mensual'
   review.employeeName = emp ? (emp.firstName || '') + ' ' + (emp.lastName || '') : ''
   review.managerName  = mgr ? (mgr.firstName || '') + ' ' + (mgr.lastName || '') : ''
   review.scoreLabel   = _scoreLabel(review.finalScore || review.managerScore || review.selfScore)
