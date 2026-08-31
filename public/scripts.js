@@ -339,12 +339,33 @@ var APP = {
   initials: function(name) { return (name || '').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); },
   fmtDate: function(d) { if (!d) return '—'; var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; },
   fmtScore: function(s) { var n = parseFloat(s); return isNaN(n) ? '—' : n.toFixed(1); },
-  // Renders selfComments text — keeps plain text but turns evidence file lines into links.
+  // Renders selfComments: separates plain text from the evidence block,
+  // and turns each "• filename: url" line into a download link.
   fmtComments: function(text) {
     if (!text) return '';
-    return text.replace(/(https?:\/\/[^\s]+)/g, function(url) {
-      return '<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--primary)">📎 Ver archivo</a>';
-    });
+    var evidenceMarker = '📎 Evidencia:';
+    var markerIdx = text.indexOf(evidenceMarker);
+    var commentText = markerIdx > -1 ? text.slice(0, markerIdx).trim() : text.trim();
+    var evidenceBlock = markerIdx > -1 ? text.slice(markerIdx + evidenceMarker.length) : '';
+
+    var html = commentText
+      ? '<span style="white-space:pre-line">' + commentText + '</span>'
+      : '';
+
+    if (evidenceBlock) {
+      var links = evidenceBlock.split('\n').map(function(line) {
+        line = line.trim();
+        if (!line.startsWith('•')) return '';
+        var colonIdx = line.indexOf(': http');
+        if (colonIdx === -1) return '';
+        var fname = line.slice(1, colonIdx).trim();
+        var url   = line.slice(colonIdx + 2).trim();
+        var dlUrl = url + (url.indexOf('?') === -1 ? '?download=' : '&download=') + encodeURIComponent(fname);
+        return '<a href="' + dlUrl + '" target="_blank" rel="noopener" download="' + fname + '" style="display:inline-flex;align-items:center;gap:4px;color:var(--primary);font-size:12px;margin-top:4px"><span class="material-icons-round" style="font-size:14px">download</span>' + fname + '</a>';
+      }).filter(Boolean).join('<br>');
+      if (links) html += (html ? '<br>' : '') + '<div style="margin-top:4px">' + links + '</div>';
+    }
+    return html || '—';
   },
 
   fmtTarget: function(value, type) {
@@ -859,7 +880,8 @@ var KPIsView = {
           if (data.error) { placeholder.textContent = '❌ ' + file.name + ': ' + data.error; return; }
           if (!KPIsView._evidenceUrls[kpiId]) KPIsView._evidenceUrls[kpiId] = [];
           KPIsView._evidenceUrls[kpiId].push({ name: data.name, url: data.url });
-          placeholder.innerHTML = '📎 <a href="' + data.url + '" target="_blank" style="color:var(--primary)">' + data.name + '</a>';
+          var dlUrl = data.url + (data.url.indexOf('?') === -1 ? '?download=' : '&download=') + encodeURIComponent(data.name);
+          placeholder.innerHTML = '<a href="' + dlUrl + '" target="_blank" download="' + data.name + '" style="display:inline-flex;align-items:center;gap:4px;color:var(--primary);font-size:12px"><span class="material-icons-round" style="font-size:14px">download</span>' + data.name + '</a>';
         })
         .catch(function(e) { placeholder.textContent = '❌ Error subiendo ' + file.name; });
     });
