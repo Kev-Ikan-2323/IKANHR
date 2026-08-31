@@ -339,11 +339,19 @@ var APP = {
   initials: function(name) { return (name || '').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); },
   fmtDate: function(d) { if (!d) return '—'; var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; },
   fmtScore: function(s) { var n = parseFloat(s); return isNaN(n) ? '—' : n.toFixed(1); },
+  // Renders selfComments text — keeps plain text but turns evidence file lines into links.
+  fmtComments: function(text) {
+    if (!text) return '';
+    return text.replace(/(https?:\/\/[^\s]+)/g, function(url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--primary)">📎 Ver archivo</a>';
+    });
+  },
+
   fmtTarget: function(value, type) {
     if (value === null || value === undefined || value === '') return '—';
-    if (type === 'Porcentual') return value + '%';
+    if (type === 'Porcentaje' || type === 'Porcentual') return value + '%';
     if (type === 'Monetario') return '$' + value;
-    if (type === 'Booleano') return 'Sí (logrado)';
+    if (type === 'Booleano' || type === 'Sí/No') return 'Sí (logrado)';
     return String(value);
   },
   semLabel: function(s) {
@@ -781,13 +789,20 @@ var KPIsView = {
           html += '<div class="kpi-review-row">' +
             '<div class="kpi-row-name" style="display:flex;align-items:center;gap:8px">' + kpi.name + evalBadge + '</div>' +
             '<div class="kpi-row-meta">' +
-              (kpi.target ? '<span>🎯 ' + kpi.target + '</span>' : '') +
+              (kpi.target ? '<span>🎯 ' + APP.fmtTarget(kpi.target, kpi.measureType) + '</span>' : '') +
               '<span>⚖️ ' + kpi.weight + '%</span>' +
               '<span>📆 Horizonte: ' + kpi.periodType + '</span>' +
             '</div>' +
             (kpi.instructions ? '<div class="alert info" style="margin-bottom:10px;font-size:12px">📋 ' + kpi.instructions + '</div>' : '') +
             KPIsView._semHtml(kpi.id, draftScore) +
             '<textarea id="sem-comment-' + kpi.id + '" class="mt-8" rows="2" placeholder="Contexto o evidencia (opcional)...">' + draftComment + '</textarea>' +
+            '<div class="mt-8" id="evidence-area-' + kpi.id + '">' +
+              '<div id="evidence-list-' + kpi.id + '" style="margin-bottom:6px"></div>' +
+              '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);border:1px dashed var(--border);border-radius:6px;padding:6px 12px">' +
+                '<span class="material-icons-round" style="font-size:16px">attach_file</span>Adjuntar evidencia' +
+                '<input type="file" style="display:none" multiple onchange="KPIsView.uploadEvidence(\'' + kpi.id + '\',this)">' +
+              '</label>' +
+            '</div>' +
           '</div>';
         });
         html += '<div style="text-align:right;margin-top:16px">' +
@@ -816,6 +831,41 @@ var KPIsView = {
     return html;
   },
 
+  _evidenceUrls: {},  // kpiId → [{ name, url }]
+
+  uploadEvidence: function(kpiId, input) {
+    var files = Array.from(input.files);
+    if (!files.length) return;
+    var listEl = document.getElementById('evidence-list-' + kpiId);
+    files.forEach(function(file) {
+      if (file.size > 20 * 1024 * 1024) { APP.toast('El archivo "' + file.name + '" supera 20 MB', 'error'); return; }
+      var placeholder = document.createElement('div');
+      placeholder.style.cssText = 'font-size:12px;color:var(--text-muted);margin-bottom:4px';
+      placeholder.textContent = '⏳ Subiendo ' + file.name + '…';
+      if (listEl) listEl.appendChild(placeholder);
+
+      var fd = new FormData();
+      fd.append('file', file);
+      var token = window._sb && window._sb.auth ? null : null;
+      // Get auth token from Supabase session
+      (window._sb ? window._sb.auth.getSession() : Promise.resolve({ data: { session: null } }))
+        .then(function(res) {
+          var session = res.data && res.data.session;
+          var headers = session ? { Authorization: 'Bearer ' + session.access_token } : {};
+          return fetch('/api/upload-evidence', { method: 'POST', headers: headers, body: fd });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) { placeholder.textContent = '❌ ' + file.name + ': ' + data.error; return; }
+          if (!KPIsView._evidenceUrls[kpiId]) KPIsView._evidenceUrls[kpiId] = [];
+          KPIsView._evidenceUrls[kpiId].push({ name: data.name, url: data.url });
+          placeholder.innerHTML = '📎 <a href="' + data.url + '" target="_blank" style="color:var(--primary)">' + data.name + '</a>';
+        })
+        .catch(function(e) { placeholder.textContent = '❌ Error subiendo ' + file.name; });
+    });
+    input.value = '';
+  },
+
   submitPeriodSelf: function(periodId) {
     var kpiIds = KPIsView._pendingPeriods[periodId] || [];
     for (var i = 0; i < kpiIds.length; i++) {
@@ -830,12 +880,18 @@ var KPIsView = {
     function next() {
       if (idx >= kpiIds.length) {
         APP.toast('✅ Autoevaluación enviada al manager', 'success');
+        KPIsView._evidenceUrls = {};
         APP.data = null; KPIsView.loadTab('self'); return;
       }
       var kpiId    = kpiIds[idx++];
       var score    = document.getElementById('sem-val-' + kpiId).value;
       var comments = (document.getElementById('sem-comment-' + kpiId)||{}).value || '';
-      APP.api('kpi.reviews.selfSubmit', { kpiDefinitionId: kpiId, periodId: periodId, selfScore: score, selfComments: comments },
+      var evUrls   = KPIsView._evidenceUrls[kpiId] || [];
+      var selfComments = comments;
+      if (evUrls.length) {
+        selfComments += (comments ? '\n' : '') + '📎 Evidencia:\n' + evUrls.map(function(f){ return '• ' + f.name + ': ' + f.url; }).join('\n');
+      }
+      APP.api('kpi.reviews.selfSubmit', { kpiDefinitionId: kpiId, periodId: periodId, selfScore: score, selfComments: selfComments },
         function(err) {
           if (err) { APP.toast(err, 'error'); btns.forEach(function(b){b.disabled=false;b.textContent='Enviar autoevaluación →';}); return; }
           next();
@@ -894,7 +950,7 @@ var KPIsView = {
         '<div class="font-600 text-sm mb-8" style="display:flex;align-items:center">' + r.kpiName + evalBadge + '</div>' +
         '<div style="background:var(--bg);border-radius:6px;padding:10px 12px;margin-bottom:12px">' +
           '<div class="text-xs" style="color:var(--text-muted)">Autoevaluación: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + APP.fmtTarget(r.kpiTarget, r.kpiMeasureType) : '') + '</div>' +
-          (r.selfComments ? '<div class="text-xs mt-4" style="color:var(--text-muted)">💬 "' + r.selfComments + '"</div>' : '') +
+          (r.selfComments ? '<div class="text-xs mt-4" style="color:var(--text-muted);white-space:pre-line">' + APP.fmtComments(r.selfComments) + '</div>' : '') +
         '</div>' +
         '<div class="form-group"><label>Tu evaluación *</label>' +
           KPIsView._semHtml('mr-' + r.id, '') +
