@@ -1301,13 +1301,16 @@ var KPIReportsView = {
         d.employees.map(function(e) {
           var sc = e.avgScore !== null ? e.avgScore : null;
           var dot = sc === null ? 'var(--text-muted)' : sc >= 75 ? '#16A34A' : sc >= 25 ? '#D97706' : '#DC2626';
-          return '<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="KPIReportsView.openEmployeeDetail(\'' + e.id + '\',\'' + e.name.replace(/'/g,"\\'") + '\')">' +
+          var noKpis = e.total === 0;
+          return '<div class="flex items-center gap-8" style="padding:4px 0;border-bottom:1px solid var(--border);' + (noKpis ? 'opacity:.6' : 'cursor:pointer') + '"' + (noKpis ? '' : ' onclick="KPIReportsView.openEmployeeDetail(\'' + e.id + '\',\'' + e.name.replace(/'/g,"\\'") + '\')"') + '>' +
             '<div class="td-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">' + APP.initials(e.name) + '</div>' +
             '<div style="flex:1;min-width:0"><div class="font-600 text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</div>' +
             '<div class="text-xs text-muted">' + (e.jobTitle || '—') + '</div></div>' +
             '<div style="text-align:right;flex-shrink:0">' +
-              (sc !== null ? '<div style="font-weight:700;font-size:13px;color:' + dot + '">' + sc + '</div>' : '<div class="text-muted text-sm">—</div>') +
-              '<div class="text-xs text-muted">' + e.completed + '/' + e.total + ' · <span style="color:var(--primary)">Ver →</span></div>' +
+              (noKpis
+                ? '<div style="font-size:11px;font-weight:600;color:var(--text-muted);background:var(--bg);border:1px dashed var(--border);border-radius:4px;padding:2px 7px;white-space:nowrap">Sin KPIs</div>'
+                : (sc !== null ? '<div style="font-weight:700;font-size:13px;color:' + dot + '">' + sc + '</div>' : '<div class="text-muted text-sm">—</div>') +
+                  '<div class="text-xs text-muted">' + e.completed + '/' + e.total + ' · <span style="color:var(--primary)">Ver →</span></div>') +
             '</div>' +
           '</div>';
         }).join('') +
