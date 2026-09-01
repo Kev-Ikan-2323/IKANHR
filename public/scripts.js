@@ -662,7 +662,7 @@ var OrgChartView = {
     }
 
     // Assign horizontal slot positions top-down (center of subtree)
-    var SLOT = 152;
+    var SLOT = 180;
     var PAD  = 76; // left offset so first card isn't clipped
     function assignX(nodes, startSlot) {
       nodes.sort(function(a, b) {
@@ -709,7 +709,7 @@ var OrgChartView = {
             ? 'draggable="true" ondragstart="OrgChartView._pyrDragStart(event,\'' + e.id + '\')" ondragend="OrgChartView._pyrDragEnd(event)"'
             : '';
           return '<div class="org-card" id="pyr-card-' + e.id + '" data-empid="' + e.id + '" data-level="' + lvl + '" ' + dragAttrs +
-            ' style="position:absolute;left:' + xPx + 'px;top:50%;transform:translate(-50%,-50%);width:128px;' + (isAdmin ? 'cursor:grab' : 'cursor:default') + '">' +
+            ' style="position:absolute;left:' + xPx + 'px;top:50%;transform:translate(-50%,-50%);width:160px;' + (isAdmin ? 'cursor:grab' : 'cursor:default') + '">' +
             (isAdmin ? '<div style="font-size:9px;color:var(--text-muted);text-align:right;margin-bottom:-4px">⠿</div>' : '') +
             '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
             '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
