@@ -635,28 +635,54 @@ var OrgChartView = {
     var colors = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' };
     var grouped = {};
     levels.forEach(function(l) { grouped[l] = []; });
-    // Unassigned employees fall into Operativo y Administrativo
+
+    // Build empMap with corrected hierarchy level
+    var empMap = {};
     emps.forEach(function(e) {
       var lvl = grouped[e.hierarchyLevel] ? e.hierarchyLevel : 'Operativo y Administrativo';
-      grouped[lvl].push(e);
+      empMap[e.id] = { id: e.id, firstName: e.firstName, lastName: e.lastName, jobTitle: e.jobTitle, department: e.department, hierarchyLevel: lvl, managerId: e.managerId, children: [] };
+      grouped[lvl].push(empMap[e.id]);
     });
 
-    // Sort each level by manager's column position in the level above (cascades top-down)
-    var posMap = {};
-    grouped[levels[0]].forEach(function(e, idx) { posMap[e.id] = idx; });
-    for (var li = 1; li < levels.length; li++) {
-      grouped[levels[li]].sort(function(a, b) {
-        var pa = (a.managerId && posMap[a.managerId] != null) ? posMap[a.managerId] : 9999;
-        var pb = (b.managerId && posMap[b.managerId] != null) ? posMap[b.managerId] : 9999;
-        if (pa !== pb) return pa - pb;
+    // Build tree via managerId relationships
+    var roots = [];
+    Object.keys(empMap).forEach(function(id) {
+      var node = empMap[id];
+      if (node.managerId && empMap[node.managerId]) {
+        empMap[node.managerId].children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    // Count leaf nodes in subtree (each leaf = 1 slot, parents span their children)
+    function leafCount(node) {
+      if (!node.children.length) return 1;
+      return node.children.reduce(function(s, c) { return s + leafCount(c); }, 0);
+    }
+
+    // Assign horizontal slot positions top-down (center of subtree)
+    var SLOT = 152;
+    var PAD  = 76; // left offset so first card isn't clipped
+    function assignX(nodes, startSlot) {
+      nodes.sort(function(a, b) {
         return ((a.firstName||'') + ' ' + (a.lastName||'')).localeCompare((b.firstName||'') + ' ' + (b.lastName||''));
       });
-      grouped[levels[li]].forEach(function(e, idx) { posMap[e.id] = idx; });
+      var slot = startSlot;
+      nodes.forEach(function(node) {
+        var lc = leafCount(node);
+        node._x = Math.round((slot + (lc - 1) / 2) * SLOT) + PAD;
+        assignX(node.children, slot);
+        slot += lc;
+      });
+      return slot;
     }
+    var totalSlots = assignX(roots, 0);
+    var totalWidth = totalSlots * SLOT + PAD + 76;
 
     var isAdmin = APP.user && APP.user.isAdmin;
 
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">' +
       levels.map(function(lvl, i) {
         var people  = grouped[lvl];
         var color   = colors[lvl];
@@ -664,10 +690,12 @@ var OrgChartView = {
         var lvlSafe = lvl.replace(/'/g, "\\'");
 
         var cards = people.map(function(e) {
+          var xPx = e._x != null ? e._x : PAD;
           var dragAttrs = isAdmin
             ? 'draggable="true" ondragstart="OrgChartView._pyrDragStart(event,\'' + e.id + '\')" ondragend="OrgChartView._pyrDragEnd(event)"'
             : '';
-          return '<div class="org-card" id="pyr-card-' + e.id + '" data-empid="' + e.id + '" data-level="' + lvl + '" ' + dragAttrs + ' style="width:128px;flex-shrink:0;' + (isAdmin ? 'cursor:grab' : 'cursor:default') + '">' +
+          return '<div class="org-card" id="pyr-card-' + e.id + '" data-empid="' + e.id + '" data-level="' + lvl + '" ' + dragAttrs +
+            ' style="position:absolute;left:' + xPx + 'px;top:50%;transform:translate(-50%,-50%);width:128px;' + (isAdmin ? 'cursor:grab' : 'cursor:default') + '">' +
             (isAdmin ? '<div style="font-size:9px;color:var(--text-muted);text-align:right;margin-bottom:-4px">⠿</div>' : '') +
             '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
             '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
@@ -680,17 +708,16 @@ var OrgChartView = {
           ? 'ondragover="OrgChartView._pyrDragOver(event)" ondragleave="OrgChartView._pyrDragLeave(event)" ondrop="OrgChartView._pyrDrop(event,\'' + lvlSafe + '\')"'
           : '';
 
-        var emptyHint = '<div style="font-size:11px;color:' + color + ';opacity:.5;font-style:italic;padding:8px 12px;border:1px dashed ' + color + ';border-radius:6px;margin:auto">' +
-          (isAdmin ? 'Arrastra aquí' : 'Sin asignar') + '</div>';
+        var emptyHint = !people.length
+          ? '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:11px;color:' + color + ';opacity:.5;font-style:italic;padding:8px 12px;border:1px dashed ' + color + ';border-radius:6px">' + (isAdmin ? 'Arrastra aquí' : 'Sin asignar') + '</div>'
+          : '';
 
         return '<div style="display:flex;' + (isLast ? '' : 'border-bottom:1px solid var(--border)') + '">' +
-          // Label stripe
           '<div style="width:72px;flex-shrink:0;background:' + color + ';display:flex;align-items:center;justify-content:center;padding:12px 4px">' +
             '<span style="color:#fff;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;writing-mode:vertical-lr;transform:rotate(180deg);white-space:nowrap">' + lvl + '</span>' +
           '</div>' +
-          // Cards zone
-          '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="flex:1;display:flex;flex-wrap:wrap;gap:14px;padding:16px 20px;align-items:center;background:' + color + '0a;min-height:110px;border:2px solid transparent;transition:border-color .15s,background .15s;overflow-x:auto">' +
-            (cards || emptyHint) +
+          '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="position:relative;min-width:' + totalWidth + 'px;height:130px;background:' + color + '0a;border:2px solid transparent;transition:border-color .15s,background .15s">' +
+            cards + emptyHint +
           '</div>' +
         '</div>';
       }).join('') +
