@@ -2533,51 +2533,98 @@ var AdminHR = {
     saveNext(0);
   },
 
+  _bePositionId:   null,
+  _bePositionName: null,
+  _beDeletedIds:   [],
+
   openBatchEditKPI: function(positionId) {
     APP.api('kpi.definitions.list', {}, function(err, kpis) {
       if (err) { APP.toast(err, 'error'); return; }
       var posKpis = (kpis || []).filter(function(k) { return (k.positionId || '') === positionId; });
-      if (!posKpis.length) { APP.toast('No hay KPIs para editar en este puesto', 'warning'); return; }
       AdminHR._withPositions(function(positions) {
         var posName = (positions.filter(function(p) { return p.id === positionId; })[0] || {}).name || 'Sin puesto específico';
+        AdminHR._bePositionId   = positionId;
+        AdminHR._bePositionName = posName;
+        AdminHR._beDeletedIds   = [];
+
         var s = 'style="padding:5px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:100%"';
-        var makeSel = function(cls, opts, sel) {
-          return '<select class="' + cls + '" ' + s + '>' +
-            opts.map(function(v) { return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select>';
-        };
         var measureLabel = function(v) { return v === 'Porcentual' ? 'Porcentual (%)' : v === 'Monetario' ? 'Monetario ($)' : v === 'Booleano' ? 'Sí / No' : v; };
-        var rows = posKpis.map(function(k) {
+        var makeRow = function(k) {
           var mSel = '<select class="be-measure" ' + s + '>' +
             ['Numérico','Porcentual','Monetario','Booleano'].map(function(v) {
               return '<option value="' + v + '"' + (v === (k.measureType || 'Numérico') ? ' selected' : '') + '>' + measureLabel(v) + '</option>';
             }).join('') + '</select>';
-          return '<tr data-id="' + k.id + '" style="border-bottom:1px solid var(--border)">' +
-            '<td style="padding:4px 4px"><input class="be-name" value="' + (k.name || '').replace(/"/g, '&quot;') + '" placeholder="Nombre" ' + s + ' oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
+          var perSel = '<select class="be-period" ' + s + '>' +
+            ['Mensual','Bimestral','Semestral','Anual'].map(function(v) {
+              return '<option value="' + v + '"' + (v === (k.periodType || 'Mensual') ? ' selected' : '') + '>' + v + '</option>';
+            }).join('') + '</select>';
+          return '<tr' + (k.id ? ' data-id="' + k.id + '"' : '') + ' style="border-bottom:1px solid var(--border)">' +
+            '<td style="padding:4px 4px"><input class="be-name" value="' + (k.name || '').replace(/"/g, '&quot;') + '" placeholder="Nombre *" ' + s + ' oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
             '<td style="padding:4px 4px"><input class="be-desc" value="' + (k.description || '').replace(/"/g, '&quot;') + '" placeholder="Descripción" ' + s + '></td>' +
-            '<td style="padding:4px 4px">' + makeSel('be-period', ['Mensual','Bimestral','Semestral','Anual'], k.periodType || 'Mensual') + '</td>' +
+            '<td style="padding:4px 4px">' + perSel + '</td>' +
             '<td style="padding:4px 4px"><input type="number" class="be-weight" min="1" max="100" value="' + (k.weight || 20) + '" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
             '<td style="padding:4px 4px"><input class="be-target" value="' + (k.target || '') + '" placeholder="Meta" ' + s + '></td>' +
             '<td style="padding:4px 4px">' + mSel + '</td>' +
-            '</tr>';
-        }).join('');
-        var body = '<div style="margin-bottom:12px"><span class="font-600 text-sm">' + posKpis.length + ' KPIs — ' + posName + '</span></div>' +
-          '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse"><thead>' +
+            '<td style="padding:4px 2px;text-align:center">' +
+              '<button onclick="AdminHR.deleteBatchEditRow(this)" title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;line-height:1;padding:4px">×</button>' +
+            '</td>' +
+          '</tr>';
+        };
+        var rows = posKpis.map(makeRow).join('');
+        var body =
+          '<div style="overflow-x:auto"><table id="be-table" style="width:100%;font-size:12px;border-collapse:collapse"><thead>' +
           '<tr style="border-bottom:2px solid var(--border)">' +
           '<th style="text-align:left;padding:4px 6px;min-width:180px">Nombre *</th>' +
-          '<th style="text-align:left;padding:4px 6px;min-width:180px">Descripción</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:160px">Descripción</th>' +
           '<th style="text-align:left;padding:4px 6px;min-width:110px">Período</th>' +
           '<th style="text-align:left;padding:4px 6px;min-width:65px">Peso %</th>' +
-          '<th style="text-align:left;padding:4px 6px;min-width:100px">Meta</th>' +
+          '<th style="text-align:left;padding:4px 6px;min-width:90px">Meta</th>' +
           '<th style="text-align:left;padding:4px 6px;min-width:110px">Unidad</th>' +
+          '<th style="padding:4px 6px;width:32px"></th>' +
           '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
-          '<div id="be-weight-info" style="margin-top:10px;font-size:12px"></div>';
+          '<div style="margin-top:10px;display:flex;align-items:center;gap:12px">' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.addBatchEditRow()"><span class="material-icons-round" style="font-size:14px">add</span>Agregar KPI</button>' +
+            '<div id="be-weight-info" style="font-size:12px"></div>' +
+          '</div>';
         APP.modal('✏️ Editar KPIs: ' + posName, body,
           '<button class="btn btn-outline" onclick="AdminHR.openKPIAdmin()">← Volver</button>' +
           '<button class="btn btn-primary" onclick="AdminHR.saveBatchEditKPIs()"><span class="material-icons-round">save</span>Guardar cambios</button>');
-        var modalEl = document.querySelector('#app-modal .modal'); if (modalEl) modalEl.style.maxWidth = '900px';
+        var modalEl = document.querySelector('#app-modal .modal'); if (modalEl) modalEl.style.maxWidth = '960px';
         AdminHR.updateBatchEditWeightTotal();
       });
     });
+  },
+
+  addBatchEditRow: function() {
+    var tbody = document.querySelector('#be-table tbody');
+    if (!tbody) return;
+    var s = 'style="padding:5px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:100%"';
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+    tr.innerHTML =
+      '<td style="padding:4px 4px"><input class="be-name" placeholder="Nombre *" ' + s + ' oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
+      '<td style="padding:4px 4px"><input class="be-desc" placeholder="Descripción" ' + s + '></td>' +
+      '<td style="padding:4px 4px"><select class="be-period" ' + s + '>' +
+        ['Mensual','Bimestral','Semestral','Anual'].map(function(v){ return '<option>' + v + '</option>'; }).join('') +
+      '</select></td>' +
+      '<td style="padding:4px 4px"><input type="number" class="be-weight" min="1" max="100" value="0" style="width:58px;padding:5px 4px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" oninput="AdminHR.updateBatchEditWeightTotal()"></td>' +
+      '<td style="padding:4px 4px"><input class="be-target" placeholder="Meta" ' + s + '></td>' +
+      '<td style="padding:4px 4px"><select class="be-measure" ' + s + '>' +
+        [['Numérico','Numérico'],['Porcentual','Porcentual (%)'],['Monetario','Monetario ($)'],['Booleano','Sí / No']].map(function(v){ return '<option value="' + v[0] + '">' + v[1] + '</option>'; }).join('') +
+      '</select></td>' +
+      '<td style="padding:4px 2px;text-align:center"><button onclick="AdminHR.deleteBatchEditRow(this)" title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;line-height:1;padding:4px">×</button></td>';
+    tbody.appendChild(tr);
+    tr.querySelector('.be-name').focus();
+    AdminHR.updateBatchEditWeightTotal();
+  },
+
+  deleteBatchEditRow: function(btn) {
+    var tr = btn.closest('tr');
+    if (!tr) return;
+    var id = tr.getAttribute('data-id');
+    if (id) AdminHR._beDeletedIds.push(id);
+    tr.remove();
+    AdminHR.updateBatchEditWeightTotal();
   },
 
   updateBatchEditWeightTotal: function() {
@@ -2589,34 +2636,43 @@ var AdminHR = {
   },
 
   saveBatchEditKPIs: function() {
-    var toSave = [];
-    document.querySelectorAll('#app-modal tbody tr[data-id]').forEach(function(tr) {
-      var id = tr.getAttribute('data-id');
+    var toUpdate = [], toCreate = [];
+    document.querySelectorAll('#be-table tbody tr').forEach(function(tr) {
+      var id   = tr.getAttribute('data-id');
       var name = (tr.querySelector('.be-name') || {value: ''}).value.trim();
-      if (!id || !name) return;
-      toSave.push({
-        id:          id,
+      if (!name) return;
+      var rec = {
         name:        name,
         description: (tr.querySelector('.be-desc')    || {value: ''}).value.trim(),
         periodType:  (tr.querySelector('.be-period')  || {value: 'Mensual'}).value,
         weight:      (tr.querySelector('.be-weight')  || {value: '20'}).value,
         target:      (tr.querySelector('.be-target')  || {value: ''}).value.trim(),
         measureType: (tr.querySelector('.be-measure') || {value: 'Numérico'}).value
-      });
+      };
+      if (id) { rec.id = id; toUpdate.push(rec); }
+      else    { rec.positionId = AdminHR._bePositionId; rec.isActive = true; toCreate.push(rec); }
     });
-    if (!toSave.length) { APP.toast('No hay KPIs para guardar', 'error'); return; }
+    var toDelete = AdminHR._beDeletedIds.slice();
+    if (!toUpdate.length && !toCreate.length && !toDelete.length) { APP.toast('Sin cambios para guardar', 'warning'); return; }
+
     var saveBtn = document.querySelector('#app-modal .modal-footer .btn-primary');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando ' + toSave.length + '...'; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+
     var saved = 0, failed = 0;
-    function saveNext(i) {
-      if (i >= toSave.length) {
-        APP.toast((failed ? '' : '✅ ') + saved + ' KPI(s) actualizado(s)' + (failed ? ', ' + failed + ' error(es)' : ''), failed ? 'warning' : 'success');
+    var ops = [];
+    toUpdate.forEach(function(r) { ops.push({ action: 'kpi.definitions.update', data: r }); });
+    toCreate.forEach(function(r) { ops.push({ action: 'kpi.definitions.create', data: r }); });
+    toDelete.forEach(function(id) { ops.push({ action: 'kpi.definitions.delete', data: { id: id } }); });
+
+    function runNext(i) {
+      if (i >= ops.length) {
+        APP.toast((failed ? '⚠️ ' : '✅ ') + saved + ' op(s) correctas' + (failed ? ', ' + failed + ' error(es)' : ''), failed ? 'warning' : 'success');
         AdminHR.openKPIAdmin('defs');
         return;
       }
-      APP.api('kpi.definitions.update', toSave[i], function(err) { if (err) failed++; else saved++; saveNext(i + 1); });
+      APP.api(ops[i].action, ops[i].data, function(err) { if (err) failed++; else saved++; runNext(i + 1); });
     }
-    saveNext(0);
+    runNext(0);
   },
 
   // ── SCHEDULES ──────────────────────────────────────────────
