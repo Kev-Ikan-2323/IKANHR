@@ -122,6 +122,7 @@ async function dispatch(action, data, user) {
     'vacations.allRequests':      function() { return VacationsModule.getAllRequests(data, user) },
     'vacations.allBalances':      function() { return VacationsModule.getAllBalances(user) },
     'vacations.adjustBalance':    function() { return VacationsModule.adjustBalance(data, user) },
+    'vacations.recalculate':      function() { return VacationsModule.recalculateAnnualBalances(user) },
 
     // ── BIRTHDAYS ──────────────────────────────────────────────
     'birthdays.upcoming': function() { return BirthdaysModule.getUpcoming(data.days || 30, user) },

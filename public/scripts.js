@@ -561,34 +561,102 @@ var EmployeesView = {
 // ── ORG CHART VIEW ────────────────────────────────────────────
 var OrgChartView = {
   zoom: 1,
+  _mode: 'tree',
   load: function() {
-    var el = document.getElementById('org-tree');
-    if (el && el.dataset.loaded) return;
     OrgChartView.zoom = 1;
+    OrgChartView._mode = 'tree';
     document.getElementById('view-orgchart').innerHTML =
       '<div class="view-title"><span class="material-icons-round">account_tree</span>Organigrama</div>' +
       '<div class="card" style="padding:0;overflow:hidden">' +
         '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">' +
-          '<button class="btn btn-outline btn-sm" onclick="OrgChartView.zoomOut()"><span class="material-icons-round" style="font-size:16px">remove</span></button>' +
-          '<span id="org-zoom-label" style="font-size:13px;font-weight:600;min-width:42px;text-align:center">100%</span>' +
-          '<button class="btn btn-outline btn-sm" onclick="OrgChartView.zoomIn()"><span class="material-icons-round" style="font-size:16px">add</span></button>' +
-          '<button class="btn btn-outline btn-sm" onclick="OrgChartView.resetZoom()" style="margin-left:4px">↺ Reset</button>' +
+          '<button id="org-btn-tree" class="btn btn-primary btn-sm" onclick="OrgChartView.switchMode(\'tree\')"><span class="material-icons-round" style="font-size:15px">account_tree</span>Árbol</button>' +
+          '<button id="org-btn-pyramid" class="btn btn-outline btn-sm" onclick="OrgChartView.switchMode(\'pyramid\')"><span class="material-icons-round" style="font-size:15px">layers</span>Pirámide</button>' +
+          '<div id="org-tree-controls" style="display:flex;align-items:center;gap:8px;margin-left:8px">' +
+            '<button class="btn btn-outline btn-sm" onclick="OrgChartView.zoomOut()"><span class="material-icons-round" style="font-size:16px">remove</span></button>' +
+            '<span id="org-zoom-label" style="font-size:13px;font-weight:600;min-width:42px;text-align:center">100%</span>' +
+            '<button class="btn btn-outline btn-sm" onclick="OrgChartView.zoomIn()"><span class="material-icons-round" style="font-size:16px">add</span></button>' +
+            '<button class="btn btn-outline btn-sm" onclick="OrgChartView.resetZoom()">↺ Reset</button>' +
+          '</div>' +
           '<button class="btn btn-outline btn-sm" onclick="OrgChartView.exportPNG()" id="org-export-btn" style="margin-left:auto"><span class="material-icons-round" style="font-size:16px">download</span> Exportar PNG</button>' +
         '</div>' +
         '<div id="org-zoom-outer" style="overflow:auto;width:100%;max-height:72vh">' +
-          '<div id="org-zoom-inner" style="display:inline-block;transform-origin:top left;transition:transform .15s">' +
+          '<div id="org-zoom-inner" style="display:inline-block;transform-origin:top left;transition:transform .15s;width:100%">' +
             '<div id="org-tree" class="loader"><div class="spinner"></div> Construyendo organigrama...</div>' +
           '</div>' +
         '</div>' +
       '</div>';
+    OrgChartView._loadTree();
+  },
+  switchMode: function(mode) {
+    OrgChartView._mode = mode;
+    var treeBtn    = document.getElementById('org-btn-tree');
+    var pyramidBtn = document.getElementById('org-btn-pyramid');
+    var treeCtrl   = document.getElementById('org-tree-controls');
+    if (treeBtn)    { treeBtn.className    = mode === 'tree'    ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'; }
+    if (pyramidBtn) { pyramidBtn.className = mode === 'pyramid' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'; }
+    if (treeCtrl)   { treeCtrl.style.display = mode === 'tree' ? 'flex' : 'none'; }
+    if (mode === 'tree') { OrgChartView._loadTree(); } else { OrgChartView._loadPyramid(); }
+  },
+  _loadTree: function() {
+    var tree = document.getElementById('org-tree');
+    if (!tree) return;
+    tree.className = 'loader';
+    tree.innerHTML = '<div class="spinner"></div> Construyendo organigrama...';
     APP.api('orgchart.get', {}, function(err, data) {
       if (err) { APP.toast(err,'error'); return; }
-      var tree = document.getElementById('org-tree');
-      if (!tree) return;
-      tree.dataset.loaded = '1';
-      tree.className = 'org-tree';
-      tree.innerHTML = OrgChartView.renderNodes(data.nodes, 0);
+      var t = document.getElementById('org-tree');
+      if (!t) return;
+      t.className = 'org-tree';
+      t.innerHTML = OrgChartView.renderNodes(data.nodes, 0);
     });
+  },
+  _loadPyramid: function() {
+    var tree = document.getElementById('org-tree');
+    if (!tree) return;
+    tree.className = 'loader';
+    tree.innerHTML = '<div class="spinner"></div> Cargando pirámide...';
+    tree.style.minHeight = '';
+    APP.api('employees.list', {}, function(err, emps) {
+      if (err) { APP.toast(err,'error'); return; }
+      var t = document.getElementById('org-tree');
+      if (!t) return;
+      t.className = '';
+      t.style.cssText = 'padding:24px 16px;min-width:600px';
+      t.innerHTML = OrgChartView._renderPyramid(emps || []);
+    });
+  },
+  _renderPyramid: function(emps) {
+    var levels = ['CEO','Heads','Managers','Supervisores','Operativo y Administrativo'];
+    var colors = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' };
+    var grouped = {};
+    levels.forEach(function(l) { grouped[l] = []; });
+    emps.forEach(function(e) {
+      if (e.status && e.status !== 'activo') return;
+      var lvl = e.hierarchyLevel;
+      if (grouped[lvl]) grouped[lvl].push(e);
+      else grouped['Operativo y Administrativo'].push(e);
+    });
+    var total = emps.filter(function(e){ return !e.status || e.status === 'activo'; }).length || 1;
+    return levels.map(function(lvl, i) {
+      var people = grouped[lvl];
+      var widthPct = 20 + i * 16;
+      var color = colors[lvl];
+      var cards = people.map(function(e) {
+        return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:100px;max-width:140px">' +
+          '<div style="width:32px;height:32px;border-radius:50%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
+          '<div style="font-size:12px;font-weight:600;text-align:center;line-height:1.2">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
+          (e.jobTitle ? '<div style="font-size:10px;color:var(--text-muted);text-align:center">' + e.jobTitle + '</div>' : '') +
+        '</div>';
+      }).join('');
+      var noCards = !people.length ? '<div style="font-size:12px;color:var(--text-muted);font-style:italic">Sin asignar</div>' : '';
+      return '<div style="display:flex;flex-direction:column;align-items:center;margin-bottom:8px">' +
+        '<div style="width:' + widthPct + '%;min-width:200px;background:' + color + '18;border:2px solid ' + color + ';border-radius:10px;padding:10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px">' +
+          '<div style="font-size:13px;font-weight:700;color:' + color + ';letter-spacing:.5px;text-transform:uppercase">' + lvl + '<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px">' + people.length + ' personas</span></div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' + (cards || noCards) + '</div>' +
+        '</div>' +
+        (i < levels.length - 1 ? '<div style="width:2px;height:16px;background:var(--border)"></div>' : '') +
+      '</div>';
+    }).join('');
   },
   renderNodes: function(nodes, depth) {
     depth = depth || 0;
@@ -1514,21 +1582,23 @@ var VacBalanceView = {
     if (!el) return;
     var q    = VacBalanceView._search.toLowerCase();
     var rows = VacBalanceView._data.filter(function(r) {
-      return !q || r.employeeName.toLowerCase().indexOf(q) > -1 || (r.department||'').toLowerCase().indexOf(q) > -1;
+      return !q || r.employeeName.toLowerCase().indexOf(q) > -1 || (r.department||'').toLowerCase().indexOf(q) > -1 || (r.hierarchyLevel||'').toLowerCase().indexOf(q) > -1;
     });
     var isAdmin = APP.user && APP.user.isAdmin;
 
     var html =
       '<div class="view-title"><span class="material-icons-round">event_available</span>Concentrado de Vacaciones ' + (VacBalanceView._data[0] ? VacBalanceView._data[0].year : new Date().getFullYear()) + '</div>' +
       '<div class="card mb-16" style="padding:12px 16px">' +
-        '<div class="flex gap-8 items-center">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
           '<span class="material-icons-round" style="color:var(--text-muted);font-size:18px">search</span>' +
-          '<input placeholder="Buscar empleado o departamento..." oninput="VacBalanceView._onSearch(this.value)" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text)">' +
+          '<input placeholder="Buscar empleado, departamento o nivel..." oninput="VacBalanceView._onSearch(this.value)" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text)">' +
+          (isAdmin ? '<button class="btn btn-outline btn-sm" onclick="VacBalanceView.recalcAll()"><span class="material-icons-round" style="font-size:15px">refresh</span>Recalcular balances</button>' : '') +
         '</div>' +
       '</div>' +
       '<div class="card" style="padding:0"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
       '<thead><tr style="border-bottom:2px solid var(--border)">' +
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Empleado</th>' +
+        '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Nivel Jerárquico</th>' +
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Departamento</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Días<br>asignados</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Usados</th>' +
@@ -1539,13 +1609,17 @@ var VacBalanceView = {
       rows.map(function(r) {
         var pct = r.daysEntitled > 0 ? Math.round(r.daysUsed / r.daysEntitled * 100) : 0;
         var barColor = r.daysRemaining <= 2 ? '#DC2626' : r.daysRemaining <= 5 ? '#D97706' : '#16A34A';
+        var hierColor = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' }[r.hierarchyLevel] || '#94a3b8';
         return '<tr style="border-bottom:1px solid var(--border)">' +
           '<td style="padding:10px 14px">' +
-            '<div class="flex items-center gap-8">' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
               '<div class="td-avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0">' + APP.initials(r.employeeName) + '</div>' +
-              '<div><div class="font-600 text-sm">' + r.employeeName + '</div>' +
-              '<div class="text-xs text-muted">' + r.jobTitle + '</div></div>' +
+              '<div><div style="font-weight:600;font-size:13px">' + r.employeeName + '</div>' +
+              '<div style="font-size:11px;color:var(--text-muted)">' + r.jobTitle + '</div></div>' +
             '</div>' +
+          '</td>' +
+          '<td style="padding:10px 14px">' +
+            (r.hierarchyLevel && r.hierarchyLevel !== '—' ? '<span style="font-size:11px;font-weight:600;color:' + hierColor + ';background:' + hierColor + '18;border-radius:4px;padding:2px 8px;white-space:nowrap">' + r.hierarchyLevel + '</span>' : '<span style="font-size:12px;color:var(--text-muted)">Sin asignar</span>') +
           '</td>' +
           '<td style="padding:10px 14px;font-size:13px;color:var(--text-muted)">' + r.department + '</td>' +
           '<td style="padding:10px 14px;text-align:center;font-size:13px;font-weight:600">' + r.daysEntitled + '</td>' +
@@ -1568,6 +1642,15 @@ var VacBalanceView = {
   },
 
   _onSearch: function(val) { VacBalanceView._search = val; VacBalanceView._render(); },
+
+  recalcAll: function() {
+    if (!confirm('¿Recalcular los balances de vacaciones de todos los empleados según su nivel jerárquico actual?')) return;
+    APP.api('vacations.recalculate', {}, function(err, data) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ Balances recalculados: ' + (data && data.updated ? data.updated + ' empleados' : 'OK'), 'success');
+      VacBalanceView.load();
+    });
+  },
 
   openAdjust: function(empId, empName, currentDays) {
     var body =
@@ -1893,6 +1976,7 @@ var AdminHR = {
     var deptOpts    = ['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH','Marketing'].map(function(d){return{value:d,label:d};});
     var typeOpts    = ['Planta','Contrato','Por Proyecto','Temporal'].map(function(t){return{value:t,label:t};});
     var countryOpts = [{value:'MX',label:'🇲🇽 México'},{value:'AR',label:'🇦🇷 Argentina'},{value:'BR',label:'🇧🇷 Brasil'},{value:'US',label:'🇺🇸 EE.UU.'},{value:'JP',label:'🇯🇵 Japón'},{value:'CO',label:'🇨🇴 Colombia'},{value:'PA',label:'🇵🇦 Panamá'}];
+    var hierOpts    = [{value:'',label:'— Sin asignar —'},{value:'CEO',label:'CEO'},{value:'Heads',label:'Heads'},{value:'Managers',label:'Managers'},{value:'Supervisores',label:'Supervisores'},{value:'Operativo y Administrativo',label:'Operativo y Administrativo'}];
     return '<div class="form-row">' +
       '<div class="form-group"><label>Nombre *</label><input id="ef-first" placeholder="Carlos" value="' + (v.firstName||'') + '"></div>' +
       '<div class="form-group"><label>Apellido *</label><input id="ef-last" placeholder="Martínez" value="' + (v.lastName||'') + '"></div>' +
@@ -1912,6 +1996,7 @@ var AdminHR = {
       '<div class="form-group"><label>Manager directo</label>' + sel('ef-mgr', mgrOpts, v.managerId) + '</div>' +
       '<div class="form-group"><label>Tipo de empleo</label>' + sel('ef-type', typeOpts, v.contractType||'Planta') + '</div>' +
       '</div><div class="form-row">' +
+      '<div class="form-group"><label>Nivel jerárquico</label>' + sel('ef-hier', hierOpts, v.hierarchyLevel||'') + '</div>' +
       '<div class="form-group"><label>País</label>' + sel('ef-country', countryOpts, v.country||'MX') + '</div>' +
       '<div class="form-group"><label>Status</label>' + sel('ef-status', [{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}], v.status||'activo') + '</div>' +
       '</div>' +
@@ -1933,8 +2018,9 @@ var AdminHR = {
       birthDate:  (document.getElementById('ef-bday') ||{value:''}).value,
       roleId:     (document.getElementById('ef-role') ||{value:''}).value,
       managerId:  (document.getElementById('ef-mgr')  ||{value:''}).value,
-      contractType:(document.getElementById('ef-type')   ||{value:''}).value,
-      country:   (document.getElementById('ef-country') ||{value:'MX'}).value,
+      contractType:   (document.getElementById('ef-type')   ||{value:''}).value,
+      hierarchyLevel: (document.getElementById('ef-hier')   ||{value:''}).value,
+      country:        (document.getElementById('ef-country') ||{value:'MX'}).value,
       status:    (document.getElementById('ef-status')  ||{value:''}).value,
       notes:     (document.getElementById('ef-notes')||{value:''}).value,
       canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked)

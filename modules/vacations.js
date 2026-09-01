@@ -226,10 +226,12 @@ export var VacationsModule = {
     var emp     = await DB.getById(CONFIG.SHEETS.EMPLOYEES, empId)
     var balance = await _getOrCreateBalance(empId)
 
-    var entitled = emp ? _calcVacationEntitlement(emp.hireDate) : 12
+    var entitled = emp ? _calcVacationEntitlement(emp.hireDate, emp.hierarchyLevel) : 12
     if (parseInt(balance.daysEntitled) !== entitled) {
-      await DB.update(CONFIG.SHEETS.VACATION_BALANCE, balance.id, { daysEntitled: entitled })
-      balance.daysEntitled = entitled
+      var newRemaining = entitled - (parseInt(balance.daysUsed) || 0) - (parseInt(balance.daysPending) || 0)
+      await DB.update(CONFIG.SHEETS.VACATION_BALANCE, balance.id, { daysEntitled: entitled, daysRemaining: newRemaining })
+      balance.daysEntitled  = entitled
+      balance.daysRemaining = newRemaining
     }
 
     return {
@@ -367,7 +369,7 @@ export var VacationsModule = {
 
     for (var i = 0; i < employees.length; i++) {
       var emp      = employees[i]
-      var entitled = _calcVacationEntitlement(emp.hireDate)
+      var entitled = _calcVacationEntitlement(emp.hireDate, emp.hierarchyLevel)
       var existing = await DB.query(CONFIG.SHEETS.VACATION_BALANCE, { employeeId: emp.id, year: year })
 
       if (existing.length > 0) {
@@ -413,16 +415,17 @@ export var VacationsModule = {
       .map(function(emp) {
         var bal = balances.find(function(b) { return b.employeeId === emp.id && String(b.year) === String(year) }) || {}
         return {
-          employeeId:   emp.id,
-          employeeName: (emp.firstName || '') + ' ' + (emp.lastName || ''),
-          department:   emp.department || '—',
-          jobTitle:     emp.jobTitle || '—',
-          year:         year,
-          daysEntitled: parseInt(bal.daysEntitled)  || 0,
-          daysUsed:     parseInt(bal.daysUsed)      || 0,
-          daysPending:  parseInt(bal.daysPending)   || 0,
-          daysRemaining:parseInt(bal.daysRemaining) || 0,
-          balanceId:    bal.id || null
+          employeeId:     emp.id,
+          employeeName:   (emp.firstName || '') + ' ' + (emp.lastName || ''),
+          department:     emp.department || '—',
+          jobTitle:       emp.jobTitle || '—',
+          hierarchyLevel: emp.hierarchyLevel || '—',
+          year:           year,
+          daysEntitled:   parseInt(bal.daysEntitled)  || 0,
+          daysUsed:       parseInt(bal.daysUsed)      || 0,
+          daysPending:    parseInt(bal.daysPending)   || 0,
+          daysRemaining:  parseInt(bal.daysRemaining) || 0,
+          balanceId:      bal.id || null
         }
       })
   },
@@ -486,7 +489,7 @@ async function _getOrCreateBalance(employeeId) {
   if (existing.length > 0) return existing[0]
 
   var emp      = await DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
-  var entitled = emp ? _calcVacationEntitlement(emp.hireDate) : 12
+  var entitled = emp ? _calcVacationEntitlement(emp.hireDate, emp.hierarchyLevel) : 12
   return DB.insert(CONFIG.SHEETS.VACATION_BALANCE, {
     employeeId:    employeeId,
     year:          year,
@@ -515,13 +518,12 @@ async function _getHolidayDates(year, country) {
     })
 }
 
-function _calcVacationEntitlement(hireDate) {
-  if (!hireDate) return 12
+function _calcVacationEntitlement(hireDate, hierarchyLevel) {
+  if (hierarchyLevel === 'CEO') return 365
+  var base = { 'Heads': 16, 'Managers': 16, 'Supervisores': 14, 'Operativo y Administrativo': 12 }[hierarchyLevel] || 12
+  if (!hireDate) return base
   var years = Math.floor((new Date() - new Date(hireDate)) / (365.25 * 86400000))
-  var table = CONFIG.VACATION_DAYS
-  if (years < 1) return 0
-  if (years >= 6) return 20 + Math.floor((years - 5) / 5) * 2
-  return table[Math.min(years, 5)] || table[1]
+  return base + Math.max(0, years) * 2
 }
 
 function _getRequestOrFail(requestId) {
