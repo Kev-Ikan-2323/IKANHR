@@ -611,18 +611,22 @@ var OrgChartView = {
     });
   },
   _loadPyramid: function() {
+    // Reset zoom so SVG coordinate math is reliable
+    OrgChartView.zoom = 1;
+    OrgChartView._applyZoom();
     var tree = document.getElementById('org-tree');
     if (!tree) return;
     tree.className = 'loader';
     tree.innerHTML = '<div class="spinner"></div> Cargando pirámide...';
-    tree.style.minHeight = '';
     APP.api('employees.list', {}, function(err, emps) {
-      if (err) { APP.toast(err,'error'); return; }
+      if (err) { APP.toast(err, 'error'); return; }
       var t = document.getElementById('org-tree');
       if (!t) return;
-      t.className = 'org-tree';
-      t.style.cssText = '';
-      t.innerHTML = OrgChartView._renderPyramid(emps || []);
+      OrgChartView._pyramidEmps = (emps || []).filter(function(e) { return !e.status || e.status === 'activo'; });
+      t.className = '';
+      t.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;padding:32px 48px;min-width:max-content';
+      t.innerHTML = OrgChartView._renderPyramid(OrgChartView._pyramidEmps);
+      setTimeout(function() { OrgChartView._drawPyramidLines(); }, 60);
     });
   },
   _renderPyramid: function(emps) {
@@ -631,57 +635,79 @@ var OrgChartView = {
     var grouped = {};
     levels.forEach(function(l) { grouped[l] = []; });
     emps.forEach(function(e) {
-      if (e.status && e.status !== 'activo') return;
-      var lvl = e.hierarchyLevel;
-      if (grouped[lvl]) grouped[lvl].push(e);
+      if (grouped[e.hierarchyLevel]) grouped[e.hierarchyLevel].push(e);
     });
 
-    var html = '';
-    levels.forEach(function(lvl, i) {
+    return levels.map(function(lvl, i) {
       var people = grouped[lvl];
       var color  = colors[lvl];
       var isLast = i === levels.length - 1;
 
-      // Level label pill — acts as the "parent node" header
-      var labelNode =
-        '<div class="org-node">' +
-          '<div style="background:' + color + '18;border:2px solid ' + color + ';border-radius:8px;padding:5px 20px;font-size:11px;font-weight:700;color:' + color + ';letter-spacing:.6px;text-transform:uppercase;white-space:nowrap">' +
-            lvl + '<span style="font-size:10px;font-weight:400;opacity:.7;margin-left:8px">' + people.length + ' personas</span>' +
-          '</div>' +
-        '</div>';
-
-      // Cards using .org-children + .org-node so the existing CSS draws the horizontal bar + vertical drops
-      var cardNodes;
-      if (!people.length) {
-        cardNodes =
-          '<div class="org-vline"></div>' +
-          '<div class="org-children">' +
-            '<div class="org-node"><div style="font-size:11px;color:var(--text-muted);font-style:italic;padding:6px 10px;border:1px dashed var(--border);border-radius:6px">Sin asignar</div></div>' +
-          '</div>';
-      } else {
-        cardNodes =
-          '<div class="org-vline"></div>' +
-          '<div class="org-children">' +
-          people.map(function(e) {
-            return '<div class="org-node">' +
-              '<div class="org-card">' +
-                '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
-                '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
-                (e.jobTitle ? '<div class="ot">' + e.jobTitle + '</div>' : '') +
-                (e.department ? '<div class="org-dept">' + e.department + '</div>' : '') +
-              '</div>' +
+      var cardHtml = people.length
+        ? people.map(function(e) {
+            return '<div class="org-card" id="pyr-card-' + e.id + '" style="width:128px;cursor:default">' +
+              '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
+              '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
+              (e.jobTitle    ? '<div class="ot">'    + e.jobTitle    + '</div>' : '') +
+              (e.department  ? '<div class="org-dept">' + e.department + '</div>' : '') +
             '</div>';
-          }).join('') +
-          '</div>';
-      }
+          }).join('')
+        : '<span style="font-size:11px;color:var(--text-muted);font-style:italic;padding:8px 12px;border:1px dashed var(--border);border-radius:6px">Sin asignar</span>';
 
-      html += labelNode + cardNodes;
+      return '<div style="display:flex;flex-direction:column;align-items:center;' + (isLast ? '' : 'margin-bottom:72px') + '">' +
+        '<div style="background:' + color + '18;border:2px solid ' + color + ';border-radius:8px;padding:4px 18px;font-size:11px;font-weight:700;color:' + color + ';letter-spacing:.6px;text-transform:uppercase;margin-bottom:14px;white-space:nowrap">' +
+          lvl + '<span style="font-size:10px;font-weight:400;opacity:.7;margin-left:8px">' + people.length + ' personas</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:16px;justify-content:center">' + cardHtml + '</div>' +
+      '</div>';
+    }).join('');
+  },
+  _drawPyramidLines: function() {
+    var container = document.getElementById('org-tree');
+    if (!container) return;
+    var existing = document.getElementById('pyr-svg');
+    if (existing) existing.remove();
 
-      // Inter-level connector: taller vline between each pair of levels
-      if (!isLast) html += '<div class="org-vline" style="height:32px"></div>';
+    var emps  = OrgChartView._pyramidEmps || [];
+    var cRect = container.getBoundingClientRect();
+    var scale = OrgChartView.zoom || 1;
+
+    // Index which employees have a rendered card
+    var hasCard = {};
+    emps.forEach(function(e) { if (document.getElementById('pyr-card-' + e.id)) hasCard[e.id] = true; });
+
+    var paths = [];
+    emps.forEach(function(emp) {
+      if (!emp.managerId || !hasCard[emp.id] || !hasCard[emp.managerId]) return;
+      var empCard = document.getElementById('pyr-card-' + emp.id);
+      var mgrCard = document.getElementById('pyr-card-' + emp.managerId);
+      if (!empCard || !mgrCard) return;
+
+      var eR = empCard.getBoundingClientRect();
+      var mR = mgrCard.getBoundingClientRect();
+
+      // Convert viewport coords → local coords (account for scale on parent)
+      var x1 = (mR.left + mR.width  / 2 - cRect.left) / scale;
+      var y1 = (mR.bottom            - cRect.top)      / scale;
+      var x2 = (eR.left + eR.width  / 2 - cRect.left) / scale;
+      var y2 = (eR.top               - cRect.top)      / scale;
+      var cy = (y1 + y2) / 2;
+
+      paths.push(
+        '<path d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + cy + ' ' + x2 + ' ' + cy + ' ' + x2 + ' ' + y2 + '" ' +
+        'fill="none" stroke="var(--border)" stroke-width="2"/>'
+      );
     });
 
-    return html;
+    if (!paths.length) return;
+
+    var svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgEl.id = 'pyr-svg';
+    svgEl.setAttribute('width',  container.scrollWidth);
+    svgEl.setAttribute('height', container.scrollHeight);
+    svgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible';
+    svgEl.innerHTML = paths.join('');
+    container.insertBefore(svgEl, container.firstChild);
   },
   renderNodes: function(nodes, depth) {
     depth = depth || 0;
