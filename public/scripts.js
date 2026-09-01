@@ -171,7 +171,7 @@ var APP = {
   viewTitles: {
     dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
     kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
-    vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones',
+    vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones', 'vac-balance': 'Concentrado de Vacaciones',
     birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración'
   },
 
@@ -185,6 +185,7 @@ var APP = {
       vacations:      VacationsView.load,
       'vac-calendar': VacCalendarView.load,
       'vac-history':  VacHistoryView.load,
+      'vac-balance':  VacBalanceView.load,
       birthdays:      BirthdaysView.load,
       team:           TeamView.load,
     };
@@ -1489,6 +1490,116 @@ var VacHistoryView = {
 
   _onSearch: function(val) { VacHistoryView._filter.search = val; VacHistoryView._render(); },
   _onStatus: function(val) { VacHistoryView._filter.status = val; VacHistoryView._render(); }
+};
+
+// ── VAC BALANCE VIEW (admin/HR) ───────────────────────────────
+var VacBalanceView = {
+  _data:   [],
+  _search: '',
+
+  load: function() {
+    var el = document.getElementById('vac-balance-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('vacations.allBalances', {}, function(err, data) {
+      if (err) { el.innerHTML = '<div class="empty-state"><p>' + err + '</p></div>'; return; }
+      VacBalanceView._data   = data || [];
+      VacBalanceView._search = '';
+      VacBalanceView._render();
+    });
+  },
+
+  _render: function() {
+    var el = document.getElementById('vac-balance-content');
+    if (!el) return;
+    var q    = VacBalanceView._search.toLowerCase();
+    var rows = VacBalanceView._data.filter(function(r) {
+      return !q || r.employeeName.toLowerCase().indexOf(q) > -1 || (r.department||'').toLowerCase().indexOf(q) > -1;
+    });
+    var isAdmin = APP.user && APP.user.isAdmin;
+
+    var html =
+      '<div class="view-title"><span class="material-icons-round">event_available</span>Concentrado de Vacaciones ' + (VacBalanceView._data[0] ? VacBalanceView._data[0].year : new Date().getFullYear()) + '</div>' +
+      '<div class="card mb-16" style="padding:12px 16px">' +
+        '<div class="flex gap-8 items-center">' +
+          '<span class="material-icons-round" style="color:var(--text-muted);font-size:18px">search</span>' +
+          '<input placeholder="Buscar empleado o departamento..." oninput="VacBalanceView._onSearch(this.value)" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text)">' +
+        '</div>' +
+      '</div>' +
+      '<div class="card" style="padding:0"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:2px solid var(--border)">' +
+        '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Empleado</th>' +
+        '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Departamento</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Días<br>asignados</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Usados</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Pendientes</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Disponibles</th>' +
+        (isAdmin ? '<th style="padding:10px 14px"></th>' : '') +
+      '</tr></thead><tbody>' +
+      rows.map(function(r) {
+        var pct = r.daysEntitled > 0 ? Math.round(r.daysUsed / r.daysEntitled * 100) : 0;
+        var barColor = r.daysRemaining <= 2 ? '#DC2626' : r.daysRemaining <= 5 ? '#D97706' : '#16A34A';
+        return '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 14px">' +
+            '<div class="flex items-center gap-8">' +
+              '<div class="td-avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0">' + APP.initials(r.employeeName) + '</div>' +
+              '<div><div class="font-600 text-sm">' + r.employeeName + '</div>' +
+              '<div class="text-xs text-muted">' + r.jobTitle + '</div></div>' +
+            '</div>' +
+          '</td>' +
+          '<td style="padding:10px 14px;font-size:13px;color:var(--text-muted)">' + r.department + '</td>' +
+          '<td style="padding:10px 14px;text-align:center;font-size:13px;font-weight:600">' + r.daysEntitled + '</td>' +
+          '<td style="padding:10px 14px;text-align:center;font-size:13px">' + r.daysUsed + '</td>' +
+          '<td style="padding:10px 14px;text-align:center;font-size:13px;color:var(--warning)">' + (r.daysPending > 0 ? r.daysPending : '—') + '</td>' +
+          '<td style="padding:10px 14px;text-align:center">' +
+            '<span style="font-weight:700;font-size:15px;color:' + barColor + '">' + r.daysRemaining + '</span>' +
+            '<div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;width:56px;margin-left:auto;margin-right:auto">' +
+              '<div style="height:4px;background:' + barColor + ';width:' + Math.min(100,pct) + '%;border-radius:2px"></div>' +
+            '</div>' +
+          '</td>' +
+          (isAdmin ? '<td style="padding:10px 14px;text-align:right">' +
+            '<button class="btn btn-outline btn-sm" onclick="VacBalanceView.openAdjust(\'' + r.employeeId + '\',\'' + r.employeeName.replace(/'/g,"\\'") + '\',' + r.daysRemaining + ')">Ajustar</button>' +
+          '</td>' : '') +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div></div>';
+
+    el.innerHTML = html;
+  },
+
+  _onSearch: function(val) { VacBalanceView._search = val; VacBalanceView._render(); },
+
+  openAdjust: function(empId, empName, currentDays) {
+    var body =
+      '<p class="text-sm text-muted mb-16">Empleado: <strong>' + empName + '</strong> · Disponibles actualmente: <strong>' + currentDays + ' días</strong></p>' +
+      '<div class="form-row">' +
+        '<div class="form-group">' +
+          '<label>Ajuste (días) *</label>' +
+          '<input type="number" id="adj-delta" placeholder="Ej: 3 para agregar, -2 para quitar" style="width:100%">' +
+          '<span class="text-xs text-muted">Número positivo = agregar · negativo = quitar</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="form-group"><label>Motivo *</label><input id="adj-reason" placeholder="Ej: Días adicionales por convenio, corrección de saldo..." style="width:100%"></div>';
+
+    APP.modal('✏️ Ajustar Vacaciones — ' + empName, body,
+      '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
+      '<button class="btn btn-primary" onclick="VacBalanceView.saveAdjust(\'' + empId + '\')"><span class="material-icons-round">save</span>Guardar ajuste</button>'
+    );
+  },
+
+  saveAdjust: function(empId) {
+    var delta  = parseInt((document.getElementById('adj-delta')  || {}).value);
+    var reason = ((document.getElementById('adj-reason') || {}).value || '').trim();
+    if (!delta || isNaN(delta)) { APP.toast('Ingresa un número de días válido', 'error'); return; }
+    if (!reason) { APP.toast('El motivo es obligatorio', 'error'); return; }
+    APP.api('vacations.adjustBalance', { employeeId: empId, delta: delta, reason: reason }, function(err, res) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.closeModal();
+      var sign = delta > 0 ? '+' : '';
+      APP.toast('✅ Ajuste aplicado (' + sign + delta + ' días). Disponibles: ' + res.newRemaining, 'success');
+      VacBalanceView.load();
+    });
+  }
 };
 
 // ── VACATIONS VIEW ────────────────────────────────────────────

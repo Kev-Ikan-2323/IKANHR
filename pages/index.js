@@ -103,6 +103,9 @@ var SHELL = `
         <div class="nav-item" data-view="vac-history" onclick="APP.navigate('vac-history')">
           <span class="material-icons-round">manage_search</span><span>Historial Vacaciones</span>
         </div>
+        <div class="nav-item" data-view="vac-balance" onclick="APP.navigate('vac-balance')">
+          <span class="material-icons-round">table_chart</span><span>Concentrado Vacaciones</span>
+        </div>
         <div class="nav-item" onclick="AdminHR.openSystemConfig()">
           <span class="material-icons-round">settings</span><span>Configuración</span>
         </div>
@@ -115,7 +118,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v7.6</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v7.7</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -209,6 +212,11 @@ var SHELL = `
     <!-- VAC HISTORY (HR/admin only) -->
     <div id="view-vac-history" class="view">
       <div id="vac-history-content"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- VAC BALANCE CONCENTRADO (HR/admin only) -->
+    <div id="view-vac-balance" class="view">
+      <div id="vac-balance-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
     <!-- VAC CALENDAR -->

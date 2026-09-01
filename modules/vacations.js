@@ -397,6 +397,57 @@ export var VacationsModule = {
     return enriched.sort(function(a, b) {
       return new Date(b.requestedAt || b.startDate) - new Date(a.requestedAt || a.startDate)
     })
+  },
+
+  // Returns vacation balance for every active employee — admin/HR only.
+  async getAllBalances(user) {
+    if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado.')
+    var year      = new Date().getFullYear()
+    var employees = await DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' })
+    var balances  = await DB.getAll(CONFIG.SHEETS.VACATION_BALANCE)
+
+    return employees
+      .sort(function(a, b) {
+        return ((a.firstName || '') + ' ' + (a.lastName || '')).localeCompare((b.firstName || '') + ' ' + (b.lastName || ''))
+      })
+      .map(function(emp) {
+        var bal = balances.find(function(b) { return b.employeeId === emp.id && String(b.year) === String(year) }) || {}
+        return {
+          employeeId:   emp.id,
+          employeeName: (emp.firstName || '') + ' ' + (emp.lastName || ''),
+          department:   emp.department || '—',
+          jobTitle:     emp.jobTitle || '—',
+          year:         year,
+          daysEntitled: parseInt(bal.daysEntitled)  || 0,
+          daysUsed:     parseInt(bal.daysUsed)      || 0,
+          daysPending:  parseInt(bal.daysPending)   || 0,
+          daysRemaining:parseInt(bal.daysRemaining) || 0,
+          balanceId:    bal.id || null
+        }
+      })
+  },
+
+  // Admin-only: add or remove vacation days from an employee's balance.
+  // delta > 0 = add days, delta < 0 = remove days.
+  async adjustBalance(data, user) {
+    if (!user.isAdmin) throw new Error('Solo administradores pueden ajustar balances.')
+    var delta  = parseInt(data.delta)
+    var reason = (data.reason || '').trim()
+    if (!delta || isNaN(delta)) throw new Error('Especifica un número de días válido.')
+    if (!reason) throw new Error('El motivo del ajuste es obligatorio.')
+
+    var year    = new Date().getFullYear()
+    var balance = await _getOrCreateBalance(data.employeeId)
+
+    var newRemaining = (parseInt(balance.daysRemaining) || 0) + delta
+    var newEntitled  = (parseInt(balance.daysEntitled)  || 0) + delta
+
+    await DB.update(CONFIG.SHEETS.VACATION_BALANCE, balance.id, {
+      daysEntitled:  Math.max(0, newEntitled),
+      daysRemaining: Math.max(0, newRemaining)
+    })
+
+    return { ok: true, delta: delta, newRemaining: Math.max(0, newRemaining) }
   }
 }
 
