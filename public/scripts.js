@@ -629,38 +629,121 @@ var OrgChartView = {
       setTimeout(function() { OrgChartView._drawPyramidLines(); }, 60);
     });
   },
+  _dragEmpId: null,
   _renderPyramid: function(emps) {
     var levels = ['CEO','Heads','Managers','Supervisores','Operativo y Administrativo'];
     var colors = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' };
     var grouped = {};
     levels.forEach(function(l) { grouped[l] = []; });
+    // Unassigned employees fall into Operativo y Administrativo
     emps.forEach(function(e) {
-      if (grouped[e.hierarchyLevel]) grouped[e.hierarchyLevel].push(e);
+      var lvl = grouped[e.hierarchyLevel] ? e.hierarchyLevel : 'Operativo y Administrativo';
+      grouped[lvl].push(e);
     });
+
+    var isAdmin = APP.user && APP.user.isAdmin;
 
     return levels.map(function(lvl, i) {
       var people = grouped[lvl];
       var color  = colors[lvl];
       var isLast = i === levels.length - 1;
+      var lvlSafe = lvl.replace(/'/g, "\\'");
 
-      var cardHtml = people.length
-        ? people.map(function(e) {
-            return '<div class="org-card" id="pyr-card-' + e.id + '" style="width:128px;cursor:default">' +
-              '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
-              '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
-              (e.jobTitle    ? '<div class="ot">'    + e.jobTitle    + '</div>' : '') +
-              (e.department  ? '<div class="org-dept">' + e.department + '</div>' : '') +
-            '</div>';
-          }).join('')
-        : '<span style="font-size:11px;color:var(--text-muted);font-style:italic;padding:8px 12px;border:1px dashed var(--border);border-radius:6px">Sin asignar</span>';
+      var cards = people.map(function(e) {
+        var dragAttrs = isAdmin
+          ? 'draggable="true" ' +
+            'ondragstart="OrgChartView._pyrDragStart(event,\'' + e.id + '\')" ' +
+            'ondragend="OrgChartView._pyrDragEnd(event)"'
+          : '';
+        return '<div class="org-card" id="pyr-card-' + e.id + '" data-empid="' + e.id + '" data-level="' + lvl + '" ' + dragAttrs + ' style="width:128px;' + (isAdmin ? 'cursor:grab' : 'cursor:default') + '">' +
+          (isAdmin ? '<div style="font-size:9px;color:var(--text-muted);text-align:right;margin-bottom:-4px;letter-spacing:.02em">⠿</div>' : '') +
+          '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
+          '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
+          (e.jobTitle   ? '<div class="ot">'       + e.jobTitle   + '</div>' : '') +
+          (e.department ? '<div class="org-dept">'  + e.department + '</div>' : '') +
+        '</div>';
+      }).join('');
+
+      var dropAttrs = isAdmin
+        ? 'ondragover="OrgChartView._pyrDragOver(event)" ' +
+          'ondragleave="OrgChartView._pyrDragLeave(event)" ' +
+          'ondrop="OrgChartView._pyrDrop(event,\'' + lvlSafe + '\')"'
+        : '';
+
+      var zoneContent = cards ||
+        '<div style="font-size:11px;color:var(--text-muted);font-style:italic;padding:10px 16px;border:1px dashed var(--border);border-radius:6px">' +
+          (isAdmin ? 'Arrastra aquí para asignar' : 'Sin asignar') +
+        '</div>';
 
       return '<div style="display:flex;flex-direction:column;align-items:center;' + (isLast ? '' : 'margin-bottom:72px') + '">' +
         '<div style="background:' + color + '18;border:2px solid ' + color + ';border-radius:8px;padding:4px 18px;font-size:11px;font-weight:700;color:' + color + ';letter-spacing:.6px;text-transform:uppercase;margin-bottom:14px;white-space:nowrap">' +
           lvl + '<span style="font-size:10px;font-weight:400;opacity:.7;margin-left:8px">' + people.length + ' personas</span>' +
         '</div>' +
-        '<div style="display:flex;gap:16px;justify-content:center">' + cardHtml + '</div>' +
+        '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;min-height:90px;min-width:220px;border-radius:10px;padding:8px;border:2px solid transparent;transition:border-color .15s,background .15s">' +
+          zoneContent +
+        '</div>' +
       '</div>';
     }).join('');
+  },
+
+  _pyrDragStart: function(event, empId) {
+    OrgChartView._dragEmpId = empId;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', empId);
+    // Use currentTarget (the card div) for opacity
+    setTimeout(function() {
+      var card = document.getElementById('pyr-card-' + empId);
+      if (card) card.style.opacity = '0.4';
+    }, 0);
+  },
+  _pyrDragEnd: function(event) {
+    var empId = OrgChartView._dragEmpId;
+    if (empId) {
+      var card = document.getElementById('pyr-card-' + empId);
+      if (card) card.style.opacity = '';
+    }
+  },
+  _pyrDragOver: function(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    var zone = event.currentTarget;
+    zone.style.borderColor = 'var(--primary)';
+    zone.style.background  = 'var(--primary-light)';
+  },
+  _pyrDragLeave: function(event) {
+    var zone = event.currentTarget;
+    zone.style.borderColor = 'transparent';
+    zone.style.background  = '';
+  },
+  _pyrDrop: function(event, targetLevel) {
+    event.preventDefault();
+    var zone = event.currentTarget;
+    zone.style.borderColor = 'transparent';
+    zone.style.background  = '';
+
+    var empId = OrgChartView._dragEmpId || event.dataTransfer.getData('text/plain');
+    OrgChartView._dragEmpId = null;
+    if (!empId) return;
+
+    var card = document.getElementById('pyr-card-' + empId);
+    if (card && card.getAttribute('data-level') === targetLevel) {
+      if (card) card.style.opacity = '';
+      return; // No change
+    }
+
+    var emp  = (OrgChartView._pyramidEmps || []).filter(function(e) { return e.id === empId; })[0];
+    var name = emp ? ((emp.firstName || '') + ' ' + (emp.lastName || '')).trim() : empId;
+
+    APP.api('employees.update', { id: empId, hierarchyLevel: targetLevel }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ ' + name + ' → ' + targetLevel, 'success');
+      if (emp) emp.hierarchyLevel = targetLevel;
+      var t = document.getElementById('org-tree');
+      if (t) {
+        t.innerHTML = OrgChartView._renderPyramid(OrgChartView._pyramidEmps);
+        setTimeout(function() { OrgChartView._drawPyramidLines(); }, 60);
+      }
+    });
   },
   _drawPyramidLines: function() {
     var container = document.getElementById('org-tree');
