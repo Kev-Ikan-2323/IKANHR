@@ -607,9 +607,7 @@ var OrgChartView = {
       var t = document.getElementById('org-tree');
       if (!t) return;
       t.className = 'org-tree';
-      t.style.cssText = 'position:relative;isolation:isolate';
       t.innerHTML = OrgChartView.renderNodes(data.nodes, 0);
-      setTimeout(function() { OrgChartView._addTreeBands(); }, 80);
     });
   },
   _loadPyramid: function() {
@@ -845,54 +843,6 @@ var OrgChartView = {
     svgEl.innerHTML = paths.join('');
     scrollEl.insertBefore(svgEl, scrollEl.firstChild);
   },
-  _addTreeBands: function() {
-    var container = document.getElementById('org-tree');
-    if (!container) return;
-    var old = document.getElementById('tree-bands');
-    if (old) old.remove();
-
-    var levels = ['CEO','Heads','Managers','Supervisores','Operativo y Administrativo'];
-    var colors = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' };
-
-    var cRect = container.getBoundingClientRect();
-    var cST   = container.scrollTop;
-
-    // Measure Y range for each level (coords relative to container content area)
-    var ranges = {};
-    levels.forEach(function(l) { ranges[l] = { min: Infinity, max: -Infinity }; });
-    container.querySelectorAll('[data-hierarchy]').forEach(function(card) {
-      var lvl = card.getAttribute('data-hierarchy');
-      if (!ranges[lvl]) return;
-      var r   = card.getBoundingClientRect();
-      var top = r.top    - cRect.top + cST;
-      var bot = r.bottom - cRect.top + cST;
-      if (top < ranges[lvl].min) ranges[lvl].min = top;
-      if (bot > ranges[lvl].max) ranges[lvl].max = bot;
-    });
-
-    var bandsDiv = document.createElement('div');
-    bandsDiv.id = 'tree-bands';
-    bandsDiv.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:-1';
-
-    var hasAny = false;
-    levels.forEach(function(lvl) {
-      var r = ranges[lvl];
-      if (r.min === Infinity) return;
-      hasAny = true;
-      var pad  = 16;
-      var top  = Math.max(0, r.min - pad);
-      var h    = r.max - r.min + pad * 2;
-      var band = document.createElement('div');
-      band.style.cssText = 'position:absolute;left:0;right:0;top:' + top + 'px;height:' + h + 'px;' +
-        'background:' + colors[lvl] + '0c;border-top:2px solid ' + colors[lvl] + '33;' +
-        'display:flex;align-items:flex-start;padding:6px 0 0 14px';
-      band.innerHTML = '<span style="font-size:9px;font-weight:800;color:' + colors[lvl] + ';letter-spacing:.08em;' +
-        'text-transform:uppercase;background:' + colors[lvl] + '22;padding:2px 8px;border-radius:3px;white-space:nowrap">' + lvl + '</span>';
-      bandsDiv.appendChild(band);
-    });
-
-    if (hasAny) container.insertBefore(bandsDiv, container.firstChild);
-  },
   renderNodes: function(nodes, depth) {
     depth = depth || 0;
     if (!nodes || !nodes.length) return '';
@@ -904,7 +854,7 @@ var OrgChartView = {
         : '';
       var hierColors = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' };
       var hc = n.hierarchyLevel && hierColors[n.hierarchyLevel] ? hierColors[n.hierarchyLevel] : null;
-      var card = '<div class="org-card' + (n.isLeader ? ' leader' : '') + '"' + (n.hierarchyLevel ? ' data-hierarchy="' + n.hierarchyLevel + '"' : '') + '>' +
+      var card = '<div class="org-card' + (n.isLeader ? ' leader' : '') + '">' +
         '<div class="oa">' + APP.initials(n.fullName) + '</div>' +
         '<div class="on">' + n.fullName + '</div>' +
         '<div class="ot">' + (n.jobTitle || '') + '</div>' +
@@ -931,7 +881,6 @@ var OrgChartView = {
     if (vline) vline.style.display = isHidden ? 'block' : 'none';
     var count = children.querySelectorAll(':scope > .org-node').length;
     btn.textContent = isHidden ? '▲' : '▼ ' + count;
-    setTimeout(function() { OrgChartView._addTreeBands(); }, 50);
   },
   zoomIn:    function() { OrgChartView.zoom = Math.min(2,  Math.round((OrgChartView.zoom+0.1)*10)/10); OrgChartView._applyZoom(); },
   zoomOut:   function() { OrgChartView.zoom = Math.max(0.3,Math.round((OrgChartView.zoom-0.1)*10)/10); OrgChartView._applyZoom(); },
