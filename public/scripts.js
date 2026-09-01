@@ -620,8 +620,8 @@ var OrgChartView = {
       if (err) { APP.toast(err,'error'); return; }
       var t = document.getElementById('org-tree');
       if (!t) return;
-      t.className = '';
-      t.style.cssText = 'padding:24px 16px;min-width:600px';
+      t.className = 'org-tree';
+      t.style.cssText = '';
       t.innerHTML = OrgChartView._renderPyramid(emps || []);
     });
   },
@@ -634,29 +634,54 @@ var OrgChartView = {
       if (e.status && e.status !== 'activo') return;
       var lvl = e.hierarchyLevel;
       if (grouped[lvl]) grouped[lvl].push(e);
-      else grouped['Operativo y Administrativo'].push(e);
     });
-    var total = emps.filter(function(e){ return !e.status || e.status === 'activo'; }).length || 1;
-    return levels.map(function(lvl, i) {
+
+    var html = '';
+    levels.forEach(function(lvl, i) {
       var people = grouped[lvl];
-      var widthPct = 20 + i * 16;
-      var color = colors[lvl];
-      var cards = people.map(function(e) {
-        return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:100px;max-width:140px">' +
-          '<div style="width:32px;height:32px;border-radius:50%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
-          '<div style="font-size:12px;font-weight:600;text-align:center;line-height:1.2">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
-          (e.jobTitle ? '<div style="font-size:10px;color:var(--text-muted);text-align:center">' + e.jobTitle + '</div>' : '') +
+      var color  = colors[lvl];
+      var isLast = i === levels.length - 1;
+
+      // Level label pill — acts as the "parent node" header
+      var labelNode =
+        '<div class="org-node">' +
+          '<div style="background:' + color + '18;border:2px solid ' + color + ';border-radius:8px;padding:5px 20px;font-size:11px;font-weight:700;color:' + color + ';letter-spacing:.6px;text-transform:uppercase;white-space:nowrap">' +
+            lvl + '<span style="font-size:10px;font-weight:400;opacity:.7;margin-left:8px">' + people.length + ' personas</span>' +
+          '</div>' +
         '</div>';
-      }).join('');
-      var noCards = !people.length ? '<div style="font-size:12px;color:var(--text-muted);font-style:italic">Sin asignar</div>' : '';
-      return '<div style="display:flex;flex-direction:column;align-items:center;margin-bottom:8px">' +
-        '<div style="width:' + widthPct + '%;min-width:200px;background:' + color + '18;border:2px solid ' + color + ';border-radius:10px;padding:10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px">' +
-          '<div style="font-size:13px;font-weight:700;color:' + color + ';letter-spacing:.5px;text-transform:uppercase">' + lvl + '<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px">' + people.length + ' personas</span></div>' +
-          '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' + (cards || noCards) + '</div>' +
-        '</div>' +
-        (i < levels.length - 1 ? '<div style="width:2px;height:16px;background:var(--border)"></div>' : '') +
-      '</div>';
-    }).join('');
+
+      // Cards using .org-children + .org-node so the existing CSS draws the horizontal bar + vertical drops
+      var cardNodes;
+      if (!people.length) {
+        cardNodes =
+          '<div class="org-vline"></div>' +
+          '<div class="org-children">' +
+            '<div class="org-node"><div style="font-size:11px;color:var(--text-muted);font-style:italic;padding:6px 10px;border:1px dashed var(--border);border-radius:6px">Sin asignar</div></div>' +
+          '</div>';
+      } else {
+        cardNodes =
+          '<div class="org-vline"></div>' +
+          '<div class="org-children">' +
+          people.map(function(e) {
+            return '<div class="org-node">' +
+              '<div class="org-card">' +
+                '<div class="oa" style="background:' + color + '22;color:' + color + '">' + APP.initials((e.firstName||'') + ' ' + (e.lastName||'')) + '</div>' +
+                '<div class="on">' + (e.firstName||'') + ' ' + (e.lastName||'') + '</div>' +
+                (e.jobTitle ? '<div class="ot">' + e.jobTitle + '</div>' : '') +
+                (e.department ? '<div class="org-dept">' + e.department + '</div>' : '') +
+              '</div>' +
+            '</div>';
+          }).join('') +
+          '</div>';
+      }
+
+      html += labelNode + cardNodes;
+
+      // Inter-level connector: taller vline between each pair of levels
+      if (!isLast) html += '<div class="org-vline" style="height:32px"></div>';
+    });
+
+    return html;
   },
   renderNodes: function(nodes, depth) {
     depth = depth || 0;
