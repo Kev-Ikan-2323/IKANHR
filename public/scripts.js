@@ -929,6 +929,7 @@ var KPIsView = {
             : '<span class="badge badge-info"    style="font-size:11px;padding:2px 7px">📈 Evaluación de Progreso</span>';
           html += '<div class="kpi-review-row">' +
             '<div class="kpi-row-name" style="display:flex;align-items:center;gap:8px">' + kpi.name + evalBadge + '</div>' +
+            (kpi.description ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;margin-bottom:4px">' + kpi.description + '</div>' : '') +
             '<div class="kpi-row-meta">' +
               (kpi.target ? '<span>🎯 ' + APP.fmtTarget(kpi.target, kpi.measureType) + '</span>' : '') +
               '<span>⚖️ ' + kpi.weight + '%</span>' +
