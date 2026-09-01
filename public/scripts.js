@@ -814,6 +814,8 @@ var OrgChartView = {
       var toggleBtn = hasChildren
         ? '<button class="org-toggle-btn" onclick="OrgChartView.toggle(this)">' + (collapsed ? '▼ ' + n.children.length : '▲') + '</button>'
         : '';
+      var hierColors = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' };
+      var hc = n.hierarchyLevel && hierColors[n.hierarchyLevel] ? hierColors[n.hierarchyLevel] : null;
       var card = '<div class="org-card' + (n.isLeader ? ' leader' : '') + '">' +
         '<div class="oa">' + APP.initials(n.fullName) + '</div>' +
         '<div class="on">' + n.fullName + '</div>' +
@@ -821,6 +823,7 @@ var OrgChartView = {
         (n.isLeader   ? '<div class="org-badge" style="color:var(--primary)">👑 Líder</div>'    : '') +
         (n.isCoLeader ? '<div class="org-badge" style="color:var(--warning)">⭐ Co-líder</div>' : '') +
         (n.department ? '<div class="org-dept">' + n.department + '</div>' : '') +
+        (hc ? '<div style="font-size:9px;font-weight:700;color:' + hc + ';background:' + hc + '18;border-radius:3px;padding:1px 6px;margin-top:4px;letter-spacing:.04em;text-transform:uppercase">' + n.hierarchyLevel + '</div>' : '') +
         toggleBtn + '</div>';
       var children = hasChildren
         ? '<div class="org-vline"></div>' +

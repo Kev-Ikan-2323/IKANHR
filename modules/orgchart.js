@@ -14,18 +14,19 @@ export var OrgChartModule = {
     var empMap = {}
     employees.forEach(function(e) {
       empMap[e.id] = {
-        id:         e.id,
-        fullName:   (e.firstName || '') + ' ' + (e.lastName || ''),
-        jobTitle:   e.jobTitle,
-        department: e.department,
-        email:      e.email,
-        photoUrl:   e.photoUrl,
-        teamId:     e.teamId,
-        managerId:  e.managerId,
-        hireDate:   e.hireDate,
-        children:   [],
-        isLeader:   false,
-        isCoLeader: false
+        id:             e.id,
+        fullName:       (e.firstName || '') + ' ' + (e.lastName || ''),
+        jobTitle:       e.jobTitle,
+        department:     e.department,
+        email:          e.email,
+        photoUrl:       e.photoUrl,
+        teamId:         e.teamId,
+        managerId:      e.managerId,
+        hireDate:       e.hireDate,
+        hierarchyLevel: e.hierarchyLevel || null,
+        children:       [],
+        isLeader:       false,
+        isCoLeader:     false
       }
     })
 
