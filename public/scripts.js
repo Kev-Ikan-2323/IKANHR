@@ -933,7 +933,7 @@ var KPIsView = {
             '<div class="kpi-row-meta">' +
               (kpi.target ? '<span>🎯 ' + APP.fmtTarget(kpi.target, kpi.measureType) + '</span>' : '') +
               '<span>⚖️ ' + kpi.weight + '%</span>' +
-              '<span>📆 Horizonte: ' + kpi.periodType + '</span>' +
+              '<span>📆 Meta: ' + kpi.periodType + '</span>' +
             '</div>' +
             (kpi.instructions ? '<div class="alert info" style="margin-bottom:10px;font-size:12px">📋 ' + kpi.instructions + '</div>' : '') +
             KPIsView._semHtml(kpi.id, draftScore) +
