@@ -681,7 +681,7 @@ var OrgChartView = {
     var totalWidth = totalSlots * SLOT + PAD + 76;
 
     // Store layout metadata so _drawPyramidLines can draw without getBoundingClientRect
-    var BAND_H = 170, LABEL_W = 72;
+    var BAND_H = 300, LABEL_W = 72;
     var xMap = {}, levelIdxMap = {};
     Object.keys(empMap).forEach(function(id) {
       xMap[id] = empMap[id]._x;
