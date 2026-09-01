@@ -641,6 +641,19 @@ var OrgChartView = {
       grouped[lvl].push(e);
     });
 
+    // Sort each level by manager's column position in the level above (cascades top-down)
+    var posMap = {};
+    grouped[levels[0]].forEach(function(e, idx) { posMap[e.id] = idx; });
+    for (var li = 1; li < levels.length; li++) {
+      grouped[levels[li]].sort(function(a, b) {
+        var pa = (a.managerId && posMap[a.managerId] != null) ? posMap[a.managerId] : 9999;
+        var pb = (b.managerId && posMap[b.managerId] != null) ? posMap[b.managerId] : 9999;
+        if (pa !== pb) return pa - pb;
+        return ((a.firstName||'') + ' ' + (a.lastName||'')).localeCompare((b.firstName||'') + ' ' + (b.lastName||''));
+      });
+      grouped[levels[li]].forEach(function(e, idx) { posMap[e.id] = idx; });
+    }
+
     var isAdmin = APP.user && APP.user.isAdmin;
 
     return levels.map(function(lvl, i) {
@@ -774,10 +787,10 @@ var OrgChartView = {
       var y1 = (mR.bottom            - cRect.top)      / scale;
       var x2 = (eR.left + eR.width  / 2 - cRect.left) / scale;
       var y2 = (eR.top               - cRect.top)      / scale;
-      var cy = (y1 + y2) / 2;
+      var cy = Math.round((y1 + y2) / 2);
 
       paths.push(
-        '<path d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + cy + ' ' + x2 + ' ' + cy + ' ' + x2 + ' ' + y2 + '" ' +
+        '<path d="M' + x1 + ' ' + y1 + ' L' + x1 + ' ' + cy + ' L' + x2 + ' ' + cy + ' L' + x2 + ' ' + y2 + '" ' +
         'fill="none" stroke="var(--border)" stroke-width="2"/>'
       );
     });
