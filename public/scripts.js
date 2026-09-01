@@ -680,9 +680,23 @@ var OrgChartView = {
     var totalSlots = assignX(roots, 0);
     var totalWidth = totalSlots * SLOT + PAD + 76;
 
+    // Store layout metadata so _drawPyramidLines can draw without getBoundingClientRect
+    var BAND_H = 130, LABEL_W = 72;
+    var xMap = {}, levelIdxMap = {};
+    Object.keys(empMap).forEach(function(id) {
+      xMap[id] = empMap[id]._x;
+      levelIdxMap[id] = levels.indexOf(empMap[id].hierarchyLevel);
+    });
+    OrgChartView._pyrXMap     = xMap;
+    OrgChartView._pyrLevelIdx = levelIdxMap;
+    OrgChartView._pyrBandH    = BAND_H;
+    OrgChartView._pyrLabelW   = LABEL_W;
+    OrgChartView._pyrTotalW   = LABEL_W + totalWidth;
+    OrgChartView._pyrTotalH   = levels.length * (BAND_H + 1);
+
     var isAdmin = APP.user && APP.user.isAdmin;
 
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">' +
+    return '<div id="pyr-scroll" style="position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">' +
       levels.map(function(lvl, i) {
         var people  = grouped[lvl];
         var color   = colors[lvl];
@@ -713,10 +727,10 @@ var OrgChartView = {
           : '';
 
         return '<div style="display:flex;' + (isLast ? '' : 'border-bottom:1px solid var(--border)') + '">' +
-          '<div style="width:72px;flex-shrink:0;background:' + color + ';display:flex;align-items:center;justify-content:center;padding:12px 4px">' +
+          '<div style="width:' + LABEL_W + 'px;flex-shrink:0;background:' + color + ';display:flex;align-items:center;justify-content:center;padding:12px 4px">' +
             '<span style="color:#fff;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;writing-mode:vertical-lr;transform:rotate(180deg);white-space:nowrap">' + lvl + '</span>' +
           '</div>' +
-          '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="position:relative;min-width:' + totalWidth + 'px;height:130px;background:' + color + '0a;border:2px solid transparent;transition:border-color .15s,background .15s">' +
+          '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="position:relative;min-width:' + totalWidth + 'px;height:' + BAND_H + 'px;background:' + color + '0a;border:2px solid transparent;transition:border-color .15s,background .15s">' +
             cards + emptyHint +
           '</div>' +
         '</div>';
@@ -784,34 +798,33 @@ var OrgChartView = {
     });
   },
   _drawPyramidLines: function() {
-    var container = document.getElementById('org-tree');
-    if (!container) return;
+    // SVG goes inside #pyr-scroll (the scrollable container) so it moves with the cards.
+    // Coordinates come from pre-computed layout data — no getBoundingClientRect() needed.
+    var scrollEl = document.getElementById('pyr-scroll');
+    if (!scrollEl) return;
     var existing = document.getElementById('pyr-svg');
     if (existing) existing.remove();
 
-    var emps  = OrgChartView._pyramidEmps || [];
-    var cRect = container.getBoundingClientRect();
-    var scale = OrgChartView.zoom || 1;
-
-    // Index which employees have a rendered card
-    var hasCard = {};
-    emps.forEach(function(e) { if (document.getElementById('pyr-card-' + e.id)) hasCard[e.id] = true; });
+    var emps      = OrgChartView._pyramidEmps || [];
+    var xMap      = OrgChartView._pyrXMap     || {};
+    var levelIdx  = OrgChartView._pyrLevelIdx || {};
+    var bandH     = OrgChartView._pyrBandH    || 130;
+    var labelW    = OrgChartView._pyrLabelW   || 72;
+    var totalW    = OrgChartView._pyrTotalW   || 600;
+    var totalH    = OrgChartView._pyrTotalH   || 650;
+    var rowH      = bandH + 1; // band height + 1px border
 
     var paths = [];
     emps.forEach(function(emp) {
-      if (!emp.managerId || !hasCard[emp.id] || !hasCard[emp.managerId]) return;
-      var empCard = document.getElementById('pyr-card-' + emp.id);
-      var mgrCard = document.getElementById('pyr-card-' + emp.managerId);
-      if (!empCard || !mgrCard) return;
+      if (!emp.managerId) return;
+      if (xMap[emp.id] == null || xMap[emp.managerId] == null) return;
+      var ei = levelIdx[emp.id], mi = levelIdx[emp.managerId];
+      if (ei == null || mi == null || ei <= mi) return;
 
-      var eR = empCard.getBoundingClientRect();
-      var mR = mgrCard.getBoundingClientRect();
-
-      // Convert viewport coords → local coords (account for scale on parent)
-      var x1 = (mR.left + mR.width  / 2 - cRect.left) / scale;
-      var y1 = (mR.bottom            - cRect.top)      / scale;
-      var x2 = (eR.left + eR.width  / 2 - cRect.left) / scale;
-      var y2 = (eR.top               - cRect.top)      / scale;
+      var x1 = labelW + xMap[emp.managerId]; // manager center X
+      var y1 = mi * rowH + bandH;             // manager band bottom
+      var x2 = labelW + xMap[emp.id];         // employee center X
+      var y2 = ei * rowH;                     // employee band top
       var cy = Math.round((y1 + y2) / 2);
 
       paths.push(
@@ -824,11 +837,11 @@ var OrgChartView = {
 
     var svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgEl.id = 'pyr-svg';
-    svgEl.setAttribute('width',  container.scrollWidth);
-    svgEl.setAttribute('height', container.scrollHeight);
-    svgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible';
+    svgEl.setAttribute('width',  totalW);
+    svgEl.setAttribute('height', totalH);
+    svgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none';
     svgEl.innerHTML = paths.join('');
-    container.insertBefore(svgEl, container.firstChild);
+    scrollEl.insertBefore(svgEl, scrollEl.firstChild);
   },
   renderNodes: function(nodes, depth) {
     depth = depth || 0;
