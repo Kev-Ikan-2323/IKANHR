@@ -570,7 +570,7 @@ var OrgChartView = {
       '<div class="card" style="padding:0;overflow:hidden">' +
         '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">' +
           '<button id="org-btn-tree" class="btn btn-primary btn-sm" onclick="OrgChartView.switchMode(\'tree\')"><span class="material-icons-round" style="font-size:15px">account_tree</span>Árbol</button>' +
-          '<button id="org-btn-pyramid" class="btn btn-outline btn-sm" onclick="OrgChartView.switchMode(\'pyramid\')"><span class="material-icons-round" style="font-size:15px">layers</span>Pirámide</button>' +
+          (OrgChartView._canSeePyramid() ? '<button id="org-btn-pyramid" class="btn btn-outline btn-sm" onclick="OrgChartView.switchMode(\'pyramid\')"><span class="material-icons-round" style="font-size:15px">layers</span>Pirámide</button>' : '') +
           '<div id="org-tree-controls" style="display:flex;align-items:center;gap:8px;margin-left:8px">' +
             '<button class="btn btn-outline btn-sm" onclick="OrgChartView.zoomOut()"><span class="material-icons-round" style="font-size:16px">remove</span></button>' +
             '<span id="org-zoom-label" style="font-size:13px;font-weight:600;min-width:42px;text-align:center">100%</span>' +
@@ -587,7 +587,12 @@ var OrgChartView = {
       '</div>';
     OrgChartView._loadTree();
   },
+  _canSeePyramid: function() {
+    var u = APP.user;
+    return u && (u.isAdmin || u.isManager || (u.hierarchyLevel === 'CEO'));
+  },
   switchMode: function(mode) {
+    if (mode === 'pyramid' && !OrgChartView._canSeePyramid()) return;
     OrgChartView._mode = mode;
     var treeBtn    = document.getElementById('org-btn-tree');
     var pyramidBtn = document.getElementById('org-btn-pyramid');
