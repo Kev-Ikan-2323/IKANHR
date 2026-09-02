@@ -599,7 +599,7 @@ var OrgChartView = {
     var treeCtrl   = document.getElementById('org-tree-controls');
     if (treeBtn)    { treeBtn.className    = mode === 'tree'    ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'; }
     if (pyramidBtn) { pyramidBtn.className = mode === 'pyramid' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'; }
-    if (treeCtrl)   { treeCtrl.style.display = mode === 'tree' ? 'flex' : 'none'; }
+    if (treeCtrl)   { treeCtrl.style.display = 'flex'; }
     if (mode === 'tree') { OrgChartView._loadTree(); } else { OrgChartView._loadPyramid(); }
   },
   _loadTree: function() {
@@ -616,9 +616,6 @@ var OrgChartView = {
     });
   },
   _loadPyramid: function() {
-    // Reset zoom so SVG coordinate math is reliable
-    OrgChartView.zoom = 1;
-    OrgChartView._applyZoom();
     var tree = document.getElementById('org-tree');
     if (!tree) return;
     tree.className = 'loader';
