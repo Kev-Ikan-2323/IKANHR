@@ -732,7 +732,7 @@ var OrgChartView = {
           '<div style="width:' + LABEL_W + 'px;flex-shrink:0;background:' + color + ';display:flex;align-items:center;justify-content:center;padding:12px 4px">' +
             '<span style="color:#fff;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;writing-mode:vertical-lr;transform:rotate(180deg);white-space:nowrap">' + lvl + '</span>' +
           '</div>' +
-          '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="position:relative;min-width:' + totalWidth + 'px;height:' + BAND_H + 'px;background:' + color + '0a;border:2px solid transparent;transition:border-color .15s,background .15s">' +
+          '<div id="pyr-zone-' + i + '" ' + dropAttrs + ' style="position:relative;flex:1;min-width:' + totalWidth + 'px;height:' + BAND_H + 'px;background:' + color + '0a;border:2px solid transparent;transition:border-color .15s,background .15s">' +
             cards + emptyHint +
           '</div>' +
         '</div>';
