@@ -589,7 +589,7 @@ var OrgChartView = {
   },
   _canSeePyramid: function() {
     var u = APP.user;
-    return u && (u.isAdmin || u.isManager || (u.hierarchyLevel === 'CEO'));
+    return u && (u.isAdmin || u.isHR || u.isManager || (u.hierarchyLevel === 'CEO'));
   },
   switchMode: function(mode) {
     if (mode === 'pyramid' && !OrgChartView._canSeePyramid()) return;
