@@ -613,6 +613,8 @@ var OrgChartView = {
       if (!t) return;
       t.className = 'org-tree';
       t.innerHTML = OrgChartView.renderNodes(data.nodes, 0);
+      var inner = document.getElementById('org-zoom-inner');
+      if (inner) inner.style.width = '100%';
     });
   },
   _loadPyramid: function() {
@@ -628,6 +630,8 @@ var OrgChartView = {
       t.className = '';
       t.style.cssText = 'position:relative;width:100%';
       t.innerHTML = OrgChartView._renderPyramid(OrgChartView._pyramidEmps);
+      var inner = document.getElementById('org-zoom-inner');
+      if (inner) inner.style.width = 'max-content';
       setTimeout(function() { OrgChartView._drawPyramidLines(); }, 60);
     });
   },
@@ -698,7 +702,7 @@ var OrgChartView = {
 
     var isAdmin = APP.user && APP.user.isAdmin;
 
-    return '<div id="pyr-scroll" style="position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">' +
+    return '<div id="pyr-scroll" style="position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
       levels.map(function(lvl, i) {
         var people  = grouped[lvl];
         var color   = colors[lvl];
