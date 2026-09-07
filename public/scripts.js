@@ -3383,7 +3383,7 @@ var PoliciesView = {
             '<span class="material-icons-round" style="font-size:16px">add</span>Agregar política</button>' : '') +
         '</div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px">' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:20px">' +
         cards +
       '</div>';
   },
