@@ -3383,7 +3383,7 @@ var PoliciesView = {
             '<span class="material-icons-round" style="font-size:16px">add</span>Agregar política</button>' : '') +
         '</div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px">' +
         cards +
       '</div>';
   },
@@ -3391,31 +3391,33 @@ var PoliciesView = {
   _card: function(p, canEdit) {
     var deptColor = { 'General': '#6366f1' };
     var color = deptColor[p.department] || '#0ea5e9';
-    return '<div class="card" style="display:flex;flex-direction:column;gap:10px;padding:16px">' +
-      '<div style="display:flex;align-items:flex-start;gap:12px">' +
-        '<div style="width:44px;height:44px;flex-shrink:0;background:#fee2e2;border-radius:10px;display:flex;align-items:center;justify-content:center">' +
-          '<span class="material-icons-round" style="color:#ef4444;font-size:24px">picture_as_pdf</span>' +
+    return '<div class="card" style="display:flex;flex-direction:column;gap:0;padding:20px">' +
+      '<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">' +
+        '<div style="width:48px;height:48px;flex-shrink:0;background:#fee2e2;border-radius:10px;display:flex;align-items:center;justify-content:center">' +
+          '<span class="material-icons-round" style="color:#ef4444;font-size:26px">picture_as_pdf</span>' +
         '</div>' +
         '<div style="flex:1;min-width:0">' +
-          '<div style="font-weight:700;font-size:14px;line-height:1.3;margin-bottom:4px">' + (p.name||'Sin nombre') + '</div>' +
-          (p.description ? '<div style="font-size:12px;color:var(--text-muted);line-height:1.4">' + p.description + '</div>' : '') +
+          '<div style="font-weight:700;font-size:15px;line-height:1.4;margin-bottom:8px">' + (p.name||'Sin nombre') + '</div>' +
+          (p.description ? '<div style="font-size:13px;color:var(--text-muted);line-height:1.6">' + p.description + '</div>' : '') +
         '</div>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:8px">' +
-        '<span style="font-size:11px;font-weight:700;color:' + color + ';background:' + color + '18;border-radius:4px;padding:2px 8px">' + (p.department||'General') + '</span>' +
-        '<span style="font-size:11px;color:var(--text-muted);margin-left:auto">' + (p.fileName||'') + '</span>' +
-      '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:4px">' +
-        '<button class="btn btn-primary btn-sm" style="flex:1" onclick="PoliciesView.viewPDF(\'' + p.id + '\')">' +
-          '<span class="material-icons-round" style="font-size:15px">visibility</span>Ver</button>' +
-        '<a href="' + (p.fileUrl||'#') + '" download="' + (p.fileName||'politica.pdf') + '" class="btn btn-outline btn-sm">' +
-          '<span class="material-icons-round" style="font-size:15px">download</span></a>' +
-        (canEdit
-          ? '<button class="btn btn-outline btn-sm" onclick="PoliciesView.openForm(\'' + p.id + '\')">' +
-              '<span class="material-icons-round" style="font-size:15px">edit</span></button>' +
-            '<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="PoliciesView.deletePolicy(\'' + p.id + '\')">' +
-              '<span class="material-icons-round" style="font-size:15px">delete</span></button>'
-          : '') +
+      '<div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--border)">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:11px;font-weight:700;color:' + color + ';background:' + color + '18;border-radius:4px;padding:3px 10px">' + (p.department||'General') + '</span>' +
+          (p.fileName ? '<span style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">' + p.fileName + '</span>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-primary btn-sm" style="flex:1" onclick="PoliciesView.viewPDF(\'' + p.id + '\')">' +
+            '<span class="material-icons-round" style="font-size:15px">visibility</span>Ver</button>' +
+          '<a href="' + (p.fileUrl||'#') + '" download="' + (p.fileName||'politica.pdf') + '" class="btn btn-outline btn-sm">' +
+            '<span class="material-icons-round" style="font-size:15px">download</span></a>' +
+          (canEdit
+            ? '<button class="btn btn-outline btn-sm" onclick="PoliciesView.openForm(\'' + p.id + '\')">' +
+                '<span class="material-icons-round" style="font-size:15px">edit</span></button>' +
+              '<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="PoliciesView.deletePolicy(\'' + p.id + '\')">' +
+                '<span class="material-icons-round" style="font-size:15px">delete</span></button>'
+            : '') +
+        '</div>' +
       '</div>' +
     '</div>';
   },
