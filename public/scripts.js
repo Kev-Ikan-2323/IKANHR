@@ -127,6 +127,14 @@ var APP = {
     } else { doFetch(null); }
   },
 
+  apiPromise: function(action, data) {
+    return new Promise(function(resolve, reject) {
+      APP.api(action, data, function(err, result) {
+        if (err) reject(new Error(err)); else resolve(result);
+      });
+    });
+  },
+
   _loadUser: function(token) {
     fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function(res) { return res.json(); })
@@ -172,7 +180,7 @@ var APP = {
     dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
     kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
     vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones', 'vac-balance': 'Concentrado de Vacaciones',
-    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración'
+    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración', policies: 'Políticas'
   },
 
   loadView: function(view) {
@@ -188,6 +196,7 @@ var APP = {
       'vac-balance':  VacBalanceView.load,
       birthdays:      BirthdaysView.load,
       team:           TeamView.load,
+      policies:       PoliciesView.load,
     };
     if (fns[view]) fns[view]();
   },
@@ -3320,6 +3329,217 @@ var DebugView = {
     banner.innerHTML = '🔍 Modo debug — Viendo como: <strong style="margin:0 6px">' + name + '</strong>' +
       '<button onclick="DebugView.deactivate()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:3px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:auto">Salir del modo debug</button>';
     content.prepend(banner);
+  }
+};
+
+// ── POLICIES VIEW ─────────────────────────────────────────────
+var PoliciesView = {
+  _policies: [],
+  _depts: [],
+  _filterDept: 'Todas',
+
+  load: function() {
+    var el = document.getElementById('policies-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('policies.list', {}, function(err, policies) {
+      if (err) { el.innerHTML = '<div class="empty-state">Error al cargar políticas</div>'; return; }
+      PoliciesView._policies = policies || [];
+      // Collect unique departments for filter
+      var depts = [];
+      (policies || []).forEach(function(p) { if (p.department && depts.indexOf(p.department) === -1) depts.push(p.department); });
+      depts.sort(function(a,b){ return a === 'General' ? -1 : b === 'General' ? 1 : a.localeCompare(b); });
+      PoliciesView._depts = depts;
+      PoliciesView._render();
+    });
+  },
+
+  _render: function() {
+    var el = document.getElementById('policies-content');
+    if (!el) return;
+    var u        = APP.user;
+    var canEdit  = u && (u.isAdmin || u.isHR);
+    var filter   = PoliciesView._filterDept;
+    var policies = PoliciesView._policies.filter(function(p) {
+      return filter === 'Todas' || p.department === filter;
+    });
+    var depts  = ['Todas'].concat(PoliciesView._depts);
+    var tabs   = depts.map(function(d) {
+      return '<button onclick="PoliciesView._setFilter(\'' + d.replace(/'/g,"\\'") + '\')" ' +
+        'style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:background .15s;' +
+        (filter === d ? 'background:var(--primary);color:#fff' : 'background:var(--bg-secondary);color:var(--text-muted)') + '">' + d + '</button>';
+    }).join('');
+
+    var cards = policies.length === 0
+      ? '<div class="empty-state" style="grid-column:1/-1">No hay políticas en esta categoría.</div>'
+      : policies.map(function(p) { return PoliciesView._card(p, canEdit); }).join('');
+
+    el.innerHTML =
+      '<div class="view-title"><span class="material-icons-round">policy</span>Políticas</div>' +
+      '<div class="card mb-20" style="padding:16px 20px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' + tabs + '</div>' +
+          (canEdit ? '<button class="btn btn-primary btn-sm" onclick="PoliciesView.openForm(null)">' +
+            '<span class="material-icons-round" style="font-size:16px">add</span>Agregar política</button>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">' +
+        cards +
+      '</div>';
+  },
+
+  _card: function(p, canEdit) {
+    var deptColor = { 'General': '#6366f1' };
+    var color = deptColor[p.department] || '#0ea5e9';
+    return '<div class="card" style="display:flex;flex-direction:column;gap:10px;padding:16px">' +
+      '<div style="display:flex;align-items:flex-start;gap:12px">' +
+        '<div style="width:44px;height:44px;flex-shrink:0;background:#fee2e2;border-radius:10px;display:flex;align-items:center;justify-content:center">' +
+          '<span class="material-icons-round" style="color:#ef4444;font-size:24px">picture_as_pdf</span>' +
+        '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:14px;line-height:1.3;margin-bottom:4px">' + (p.name||'Sin nombre') + '</div>' +
+          (p.description ? '<div style="font-size:12px;color:var(--text-muted);line-height:1.4">' + p.description + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:11px;font-weight:700;color:' + color + ';background:' + color + '18;border-radius:4px;padding:2px 8px">' + (p.department||'General') + '</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);margin-left:auto">' + (p.fileName||'') + '</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:4px">' +
+        '<button class="btn btn-primary btn-sm" style="flex:1" onclick="PoliciesView.viewPDF(\'' + p.id + '\')">' +
+          '<span class="material-icons-round" style="font-size:15px">visibility</span>Ver</button>' +
+        '<a href="' + (p.fileUrl||'#') + '" download="' + (p.fileName||'politica.pdf') + '" class="btn btn-outline btn-sm">' +
+          '<span class="material-icons-round" style="font-size:15px">download</span></a>' +
+        (canEdit
+          ? '<button class="btn btn-outline btn-sm" onclick="PoliciesView.openForm(\'' + p.id + '\')">' +
+              '<span class="material-icons-round" style="font-size:15px">edit</span></button>' +
+            '<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="PoliciesView.deletePolicy(\'' + p.id + '\')">' +
+              '<span class="material-icons-round" style="font-size:15px">delete</span></button>'
+          : '') +
+      '</div>' +
+    '</div>';
+  },
+
+  _setFilter: function(dept) {
+    PoliciesView._filterDept = dept;
+    PoliciesView._render();
+  },
+
+  viewPDF: function(id) {
+    var p = PoliciesView._policies.filter(function(x){ return x.id === id; })[0];
+    if (!p) return;
+    var url = p.fileUrl;
+    var overlay = document.createElement('div');
+    overlay.id = 'pdf-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);display:flex;flex-direction:column';
+    overlay.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--card);flex-shrink:0">' +
+        '<span style="font-weight:700;font-size:15px">' + p.name + '</span>' +
+        '<div style="display:flex;gap:8px">' +
+          '<a href="' + url + '" download="' + (p.fileName||'politica.pdf') + '" class="btn btn-outline btn-sm">' +
+            '<span class="material-icons-round" style="font-size:16px">download</span> Descargar</a>' +
+          '<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'pdf-overlay\').remove()">' +
+            '<span class="material-icons-round" style="font-size:16px">close</span></button>' +
+        '</div>' +
+      '</div>' +
+      '<iframe src="' + url + '" style="flex:1;border:none;background:#525659"></iframe>';
+    document.body.appendChild(overlay);
+  },
+
+  openForm: function(id) {
+    var p = id ? PoliciesView._policies.filter(function(x){ return x.id === id; })[0] : null;
+    // Build department options from unique departments in employees + General
+    APP.api('employees.list', {}, function(err, emps) {
+      var depts = ['General'];
+      (emps||[]).forEach(function(e){ if (e.department && depts.indexOf(e.department) === -1) depts.push(e.department); });
+      depts.sort(function(a,b){ return a === 'General' ? -1 : b === 'General' ? 1 : a.localeCompare(b); });
+
+      var deptSel = depts.map(function(d){
+        return '<option value="' + d + '"' + ((p && p.department === d) ? ' selected' : ((!p && d === 'General') ? ' selected' : '')) + '>' + d + '</option>';
+      }).join('');
+
+      var html =
+        '<div class="modal-overlay" id="policy-modal" onclick="if(event.target===this)this.remove()">' +
+          '<div class="modal" style="max-width:480px">' +
+            '<div class="modal-header"><h3>' + (p ? 'Editar política' : 'Nueva política') + '</h3>' +
+              '<button class="modal-close" onclick="document.getElementById(\'policy-modal\').remove()">×</button></div>' +
+            '<div class="modal-body" style="display:flex;flex-direction:column;gap:14px">' +
+              '<div class="form-group"><label>Nombre *</label>' +
+                '<input id="pol-name" class="form-control" value="' + (p ? p.name||'' : '') + '" placeholder="Nombre de la política"></div>' +
+              '<div class="form-group"><label>Descripción</label>' +
+                '<textarea id="pol-desc" class="form-control" rows="2" placeholder="Descripción breve (opcional)">' + (p ? p.description||'' : '') + '</textarea></div>' +
+              '<div class="form-group"><label>Departamento</label>' +
+                '<select id="pol-dept" class="form-control">' + deptSel + '</select></div>' +
+              (!p ? '<div class="form-group"><label>Archivo PDF *</label>' +
+                '<input id="pol-file" type="file" accept=".pdf,application/pdf" class="form-control"></div>' : '') +
+            '</div>' +
+            '<div class="modal-footer">' +
+              '<button class="btn btn-outline" onclick="document.getElementById(\'policy-modal\').remove()">Cancelar</button>' +
+              '<button class="btn btn-primary" id="pol-save-btn" onclick="PoliciesView.saveForm(\'' + (id||'') + '\')">' +
+                (p ? 'Guardar cambios' : 'Subir política') + '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      document.body.insertAdjacentHTML('beforeend', html);
+    });
+  },
+
+  saveForm: function(id) {
+    var name  = (document.getElementById('pol-name')||{value:''}).value.trim();
+    var desc  = (document.getElementById('pol-desc')||{value:''}).value.trim();
+    var dept  = (document.getElementById('pol-dept')||{value:'General'}).value;
+    var fileEl = document.getElementById('pol-file');
+    var btn   = document.getElementById('pol-save-btn');
+
+    if (!name) { APP.toast('El nombre es requerido', 'error'); return; }
+    if (!id && (!fileEl || !fileEl.files || !fileEl.files[0])) { APP.toast('Selecciona un archivo PDF', 'error'); return; }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Subiendo...'; }
+
+    if (id) {
+      // Update metadata only
+      APP.api('policies.update', { id: id, name: name, description: desc, department: dept }, function(err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+        if (err) { APP.toast(err, 'error'); return; }
+        var modal = document.getElementById('policy-modal');
+        if (modal) modal.remove();
+        APP.toast('Política actualizada', 'success');
+        PoliciesView.load();
+      });
+    } else {
+      // Upload file to Supabase Storage then save metadata
+      var file = fileEl.files[0];
+      var path = 'policies/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      window._sb.storage.from('policies').upload(path, file, { upsert: false })
+        .then(function(res) {
+          if (res.error) throw res.error;
+          var pub = window._sb.storage.from('policies').getPublicUrl(path);
+          var fileUrl = pub.data.publicUrl;
+          return APP.apiPromise('policies.create', { name: name, description: desc, department: dept, fileUrl: fileUrl, fileName: file.name, fileSize: file.size });
+        })
+        .then(function() {
+          if (btn) { btn.disabled = false; }
+          var modal = document.getElementById('policy-modal');
+          if (modal) modal.remove();
+          APP.toast('Política subida correctamente', 'success');
+          PoliciesView.load();
+        })
+        .catch(function(e) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Subir política'; }
+          APP.toast((e && e.message) || 'Error al subir el archivo', 'error');
+        });
+    }
+  },
+
+  deletePolicy: function(id) {
+    var p = PoliciesView._policies.filter(function(x){ return x.id === id; })[0];
+    if (!p) return;
+    if (!confirm('¿Eliminar la política "' + p.name + '"? Esta acción no se puede deshacer.')) return;
+    APP.api('policies.delete', { id: id }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('Política eliminada', 'success');
+      PoliciesView.load();
+    });
   }
 };
 

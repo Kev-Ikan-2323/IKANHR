@@ -16,6 +16,7 @@ import { DashboardModule }    from '../../modules/dashboard.js'
 import { RolesModule }        from '../../modules/roles.js'
 import { PositionsModule }    from '../../modules/positions.js'
 import { ConfigModule }       from '../../modules/config.js'
+import { PoliciesModule }     from '../../modules/policies.js'
 import { MailService }        from '../../lib/email.js'
 import { buildEmail }        from '../../lib/email-template.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
@@ -191,6 +192,12 @@ async function dispatch(action, data, user) {
     'positions.create':  function() { return PositionsModule.create(data, user) },
     'positions.update':  function() { return PositionsModule.update(data.id, data, user) },
     'positions.remove':  function() { return PositionsModule.remove(data.id, user) },
+
+    // ── POLICIES ───────────────────────────────────────────────
+    'policies.list':   function() { return PoliciesModule.list(user) },
+    'policies.create': function() { return PoliciesModule.create(data, user) },
+    'policies.update': function() { return PoliciesModule.update(data, user) },
+    'policies.delete': function() { return PoliciesModule.delete(data, user) },
 
     // ── KPI SCHEDULES ──────────────────────────────────────────
     'kpi.schedules.list':   function() { return KPISchedulesModule.list(user) },

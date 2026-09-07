@@ -50,6 +50,9 @@ var SHELL = `
       <div class="nav-item" data-view="birthdays" onclick="APP.navigate('birthdays')">
         <span class="material-icons-round">cake</span><span>Cumpleaños</span>
       </div>
+      <div class="nav-item" data-view="policies" onclick="APP.navigate('policies')">
+        <span class="material-icons-round">policy</span><span>Políticas</span>
+      </div>
     </div>
 
     <div class="nav-section">
@@ -118,7 +121,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v9.1</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v9.2</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -245,6 +248,11 @@ var SHELL = `
     <div id="view-team" class="view">
       <div class="view-title"><span class="material-icons-round">group</span>Mi Equipo</div>
       <div id="team-content"></div>
+    </div>
+
+    <!-- POLICIES -->
+    <div id="view-policies" class="view">
+      <div id="policies-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
   </div>
