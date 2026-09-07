@@ -3407,7 +3407,7 @@ var PoliciesView = {
           (p.fileName ? '<span style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">' + p.fileName + '</span>' : '') +
         '</div>' +
         '<div style="display:flex;gap:8px">' +
-          '<button class="btn btn-primary btn-sm" style="flex:1" onclick="PoliciesView.viewPDF(\'' + p.id + '\')">' +
+          '<button class="btn btn-primary btn-sm" style="flex:1;justify-content:center" onclick="PoliciesView.viewPDF(\'' + p.id + '\')">' +
             '<span class="material-icons-round" style="font-size:15px">visibility</span>Ver</button>' +
           '<a href="' + (p.fileUrl||'#') + '" download="' + (p.fileName||'politica.pdf') + '" class="btn btn-outline btn-sm">' +
             '<span class="material-icons-round" style="font-size:15px">download</span></a>' +
