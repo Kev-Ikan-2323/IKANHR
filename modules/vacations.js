@@ -403,7 +403,7 @@ export var VacationsModule = {
 
   // Returns vacation balance for every active employee — admin/HR only.
   async getAllBalances(user) {
-    if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado.')
+    if (!user.isAdmin && !user.isHR && !user.isManager) throw new Error('Acceso denegado.')
     var year      = new Date().getFullYear()
     var employees = await DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' })
     var balances  = await DB.getAll(CONFIG.SHEETS.VACATION_BALANCE)
@@ -574,6 +574,7 @@ async function _notifyManagerApproval(managerId, request) {
     var mgr = await DB.getById(CONFIG.SHEETS.EMPLOYEES, managerId)
     var emp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, request.employeeId)
     if (!mgr || !emp) return
+    var balance = await _getOrCreateBalance(request.employeeId)
     await MailService.send({
       to:      mgr.email,
       subject: '[IKAN HR] Aprobación requerida — Vacaciones de ' + emp.firstName + ' ' + emp.lastName,
@@ -584,10 +585,15 @@ async function _notifyManagerApproval(managerId, request) {
           '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + mgr.firstName + '</strong>,</p>' +
           '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">RH ha revisado la solicitud de vacaciones de <strong style="color:#1E293B">' + emp.firstName + ' ' + emp.lastName + '</strong>. Ahora requiere tu autorización final.</p>',
         details: [
-          { label: 'Empleado',      value: emp.firstName + ' ' + emp.lastName },
-          { label: 'Fecha inicio',  value: request.startDate },
-          { label: 'Fecha fin',     value: request.endDate },
-          { label: 'Días hábiles',  value: String(request.workingDays) }
+          { label: 'Empleado',             value: emp.firstName + ' ' + emp.lastName },
+          { label: 'Fecha inicio',         value: request.startDate },
+          { label: 'Fecha fin',            value: request.endDate },
+          { label: 'Días hábiles',         value: String(request.workingDays) },
+          { label: 'Políticas Aplicables', value: emp.hierarchyLevel || 'Sin asignar' },
+          { label: 'Departamento',         value: emp.department || '—' },
+          { label: 'Días asignados',       value: String(parseInt(balance.daysEntitled)  || 0) },
+          { label: 'Días usados',          value: String(parseInt(balance.daysUsed)      || 0) },
+          { label: 'Días disponibles',     value: String(parseInt(balance.daysRemaining) || 0) }
         ],
         actions: [
           { label: '✅ Aprobar vacaciones', url: approveUrl(request.id, mgr.id) }
@@ -599,6 +605,7 @@ async function _notifyManagerApproval(managerId, request) {
 
 async function _notifyHRTeam(emp, request) {
   try {
+    var balance = await _getOrCreateBalance(emp.id)
     var allRoles = await DB.getAll(CONFIG.SHEETS.ROLES)
     var hrRoleIds = allRoles.filter(function(r) {
       try {
@@ -626,10 +633,15 @@ async function _notifyHRTeam(emp, request) {
             (emp.department ? ' <span style="color:#94A3B8">· ' + emp.department + '</span>' : '') +
             ' ha solicitado vacaciones y está pendiente de aprobación.</p>',
           details: [
-            { label: 'Empleado',      value: emp.firstName + ' ' + emp.lastName },
-            { label: 'Fecha inicio',  value: request.startDate },
-            { label: 'Fecha fin',     value: request.endDate },
-            { label: 'Días hábiles',  value: String(request.workingDays) }
+            { label: 'Empleado',              value: emp.firstName + ' ' + emp.lastName },
+            { label: 'Fecha inicio',          value: request.startDate },
+            { label: 'Fecha fin',             value: request.endDate },
+            { label: 'Días hábiles',          value: String(request.workingDays) },
+            { label: 'Políticas Aplicables',  value: emp.hierarchyLevel || 'Sin asignar' },
+            { label: 'Departamento',          value: emp.department || '—' },
+            { label: 'Días asignados',        value: String(parseInt(balance.daysEntitled)  || 0) },
+            { label: 'Días usados',           value: String(parseInt(balance.daysUsed)      || 0) },
+            { label: 'Días disponibles',      value: String(parseInt(balance.daysRemaining) || 0) }
           ],
           actions: [
             { label: '✅ Aprobar solicitud', url: approveUrl(request.id, hr.id) }
@@ -644,6 +656,7 @@ async function _notifyManagerRequest(managerId, emp, request) {
   try {
     var mgr = await DB.getById(CONFIG.SHEETS.EMPLOYEES, managerId)
     if (!mgr) return
+    var balance = await _getOrCreateBalance(emp.id)
     await MailService.send({
       to:      mgr.email,
       subject: '[IKAN HR] Solicitud de vacaciones — ' + emp.firstName + ' ' + emp.lastName,
@@ -654,10 +667,15 @@ async function _notifyManagerRequest(managerId, emp, request) {
           '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + mgr.firstName + '</strong>,</p>' +
           '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu colaborador <strong style="color:#1E293B">' + emp.firstName + ' ' + emp.lastName + '</strong> ha enviado una solicitud de vacaciones que requiere tu aprobación.</p>',
         details: [
-          { label: 'Empleado',      value: emp.firstName + ' ' + emp.lastName },
-          { label: 'Fecha inicio',  value: request.startDate },
-          { label: 'Fecha fin',     value: request.endDate },
-          { label: 'Días hábiles',  value: String(request.workingDays) }
+          { label: 'Empleado',             value: emp.firstName + ' ' + emp.lastName },
+          { label: 'Fecha inicio',         value: request.startDate },
+          { label: 'Fecha fin',            value: request.endDate },
+          { label: 'Días hábiles',         value: String(request.workingDays) },
+          { label: 'Políticas Aplicables', value: emp.hierarchyLevel || 'Sin asignar' },
+          { label: 'Departamento',         value: emp.department || '—' },
+          { label: 'Días asignados',       value: String(parseInt(balance.daysEntitled)  || 0) },
+          { label: 'Días usados',          value: String(parseInt(balance.daysUsed)      || 0) },
+          { label: 'Días disponibles',     value: String(parseInt(balance.daysRemaining) || 0) }
         ]
       })
     })
