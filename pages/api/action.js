@@ -225,7 +225,17 @@ async function _sendTestScenario(scenario, user) {
         icon: '📋', title: 'Solicitud de vacaciones pendiente',
         bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
                   '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Tu colaborador <strong style="color:#1E293B">' + name + '</strong> ha enviado una solicitud de vacaciones que requiere tu aprobación.</p>',
-        details: [{ label:'Empleado', value: name }, { label:'Fecha inicio', value: today }, { label:'Fecha fin', value: nextWk }, { label:'Días hábiles', value:'5' }]
+        details: [
+          { label:'Empleado',             value: name },
+          { label:'Fecha inicio',         value: today },
+          { label:'Fecha fin',            value: nextWk },
+          { label:'Días hábiles',         value:'5' },
+          { label:'Políticas Aplicables', value:'Managers' },
+          { label:'Departamento',         value:'Departamento Ejemplo' },
+          { label:'Días asignados',       value:'14' },
+          { label:'Días usados',          value:'5' },
+          { label:'Días disponibles',     value:'9' }
+        ]
       })
     },
     'vacation_request_hr': {
@@ -234,7 +244,17 @@ async function _sendTestScenario(scenario, user) {
         icon: '🏖️', title: 'Nueva solicitud de vacaciones',
         bodyHTML: '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + fn + '</strong>,</p>' +
                   '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6"><strong style="color:#1E293B">' + name + '</strong> <span style="color:#94A3B8">· Departamento Ejemplo</span> ha solicitado vacaciones y está pendiente de aprobación.</p>',
-        details: [{ label:'Empleado', value: name }, { label:'Fecha inicio', value: today }, { label:'Fecha fin', value: nextWk }, { label:'Días hábiles', value:'5' }]
+        details: [
+          { label:'Empleado',             value: name },
+          { label:'Fecha inicio',         value: today },
+          { label:'Fecha fin',            value: nextWk },
+          { label:'Días hábiles',         value:'5' },
+          { label:'Políticas Aplicables', value:'Operativo y Administrativo' },
+          { label:'Departamento',         value:'Departamento Ejemplo' },
+          { label:'Días asignados',       value:'12' },
+          { label:'Días usados',          value:'3' },
+          { label:'Días disponibles',     value:'9' }
+        ]
       })
     },
     'vacation_approved': {
