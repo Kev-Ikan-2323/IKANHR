@@ -3392,7 +3392,7 @@ var PoliciesView = {
     var deptColor = { 'General': '#6366f1' };
     var color = deptColor[p.department] || '#0ea5e9';
     return '<div class="card" style="display:flex;flex-direction:column;gap:0;padding:20px">' +
-      '<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">' +
+      '<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;flex:1">' +
         '<div style="width:48px;height:48px;flex-shrink:0;background:#fee2e2;border-radius:10px;display:flex;align-items:center;justify-content:center">' +
           '<span class="material-icons-round" style="color:#ef4444;font-size:26px">picture_as_pdf</span>' +
         '</div>' +
