@@ -521,9 +521,10 @@ async function _getHolidayDates(year, country) {
 function _calcVacationEntitlement(hireDate, hierarchyLevel) {
   if (hierarchyLevel === 'CEO') return 365
   var base = { 'Heads': 16, 'Managers': 16, 'Supervisores': 14, 'Operativo y Administrativo': 12 }[hierarchyLevel] || 12
-  if (!hireDate) return base
+  if (!hireDate) return 0
   var years = Math.floor((new Date() - new Date(hireDate)) / (365.25 * 86400000))
-  return base + Math.max(0, years) * 2
+  if (years < 1) return 0
+  return base + (years - 1) * 2
 }
 
 function _getRequestOrFail(requestId) {
