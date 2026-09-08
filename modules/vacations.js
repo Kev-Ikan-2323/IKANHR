@@ -443,8 +443,10 @@ export var VacationsModule = {
     var balance = await _getOrCreateBalance(data.employeeId)
 
     var newRemaining = (parseInt(balance.daysRemaining) || 0) + delta
-    var newEntitled  = (parseInt(balance.daysEntitled)  || 0) + delta
-    // Days removed (negative delta) are recorded as used days
+    // Positive delta = add entitled days; negative delta only moves remaining → used
+    var newEntitled = delta > 0
+      ? (parseInt(balance.daysEntitled) || 0) + delta
+      : (parseInt(balance.daysEntitled) || 0)
     var newUsed = delta < 0
       ? (parseInt(balance.daysUsed) || 0) + Math.abs(delta)
       : (parseInt(balance.daysUsed) || 0)
