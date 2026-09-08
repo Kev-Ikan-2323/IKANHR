@@ -444,10 +444,15 @@ export var VacationsModule = {
 
     var newRemaining = (parseInt(balance.daysRemaining) || 0) + delta
     var newEntitled  = (parseInt(balance.daysEntitled)  || 0) + delta
+    // Days removed (negative delta) are recorded as used days
+    var newUsed = delta < 0
+      ? (parseInt(balance.daysUsed) || 0) + Math.abs(delta)
+      : (parseInt(balance.daysUsed) || 0)
 
     await DB.update(CONFIG.SHEETS.VACATION_BALANCE, balance.id, {
       daysEntitled:  Math.max(0, newEntitled),
-      daysRemaining: Math.max(0, newRemaining)
+      daysRemaining: Math.max(0, newRemaining),
+      daysUsed:      newUsed
     })
 
     return { ok: true, delta: delta, newRemaining: Math.max(0, newRemaining) }
