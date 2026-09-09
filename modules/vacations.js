@@ -414,12 +414,17 @@ export var VacationsModule = {
       })
       .map(function(emp) {
         var bal = balances.find(function(b) { return b.employeeId === emp.id && String(b.year) === String(year) }) || {}
+        var yearsOfService = emp.hireDate
+          ? Math.floor((new Date() - new Date(emp.hireDate)) / (365.25 * 86400000))
+          : null
         return {
           employeeId:     emp.id,
           employeeName:   (emp.firstName || '') + ' ' + (emp.lastName || ''),
           department:     emp.department || '—',
           jobTitle:       emp.jobTitle || '—',
           hierarchyLevel: emp.hierarchyLevel || '—',
+          hireDate:       emp.hireDate || null,
+          yearsOfService: yearsOfService,
           year:           year,
           daysEntitled:   parseInt(bal.daysEntitled)  || 0,
           daysUsed:       parseInt(bal.daysUsed)      || 0,

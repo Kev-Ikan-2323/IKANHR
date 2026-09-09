@@ -1807,6 +1807,8 @@ var VacBalanceView = {
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Empleado</th>' +
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Nivel Jerárquico</th>' +
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Departamento</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Fecha<br>de ingreso</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Antigüedad</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Días<br>asignados</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Usados</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Pendientes</th>' +
@@ -1817,6 +1819,12 @@ var VacBalanceView = {
         var pct = r.daysEntitled > 0 ? Math.round(r.daysUsed / r.daysEntitled * 100) : 0;
         var barColor = r.daysRemaining <= 2 ? '#DC2626' : r.daysRemaining <= 5 ? '#D97706' : '#16A34A';
         var hierColor = { 'CEO': '#6366f1', 'Heads': '#8b5cf6', 'Managers': '#0ea5e9', 'Supervisores': '#10b981', 'Operativo y Administrativo': '#64748b' }[r.hierarchyLevel] || '#94a3b8';
+        var hireFmt = r.hireDate ? r.hireDate.split('T')[0] : '—';
+        var seniority = r.yearsOfService === null || r.yearsOfService === undefined
+          ? '—'
+          : r.yearsOfService === 0 ? '< 1 año'
+          : r.yearsOfService === 1 ? '1 año'
+          : r.yearsOfService + ' años';
         return '<tr style="border-bottom:1px solid var(--border)">' +
           '<td style="padding:10px 14px">' +
             '<div style="display:flex;align-items:center;gap:8px">' +
@@ -1829,6 +1837,8 @@ var VacBalanceView = {
             (r.hierarchyLevel && r.hierarchyLevel !== '—' ? '<span style="font-size:11px;font-weight:600;color:' + hierColor + ';background:' + hierColor + '18;border-radius:4px;padding:2px 8px;white-space:nowrap">' + r.hierarchyLevel + '</span>' : '<span style="font-size:12px;color:var(--text-muted)">Sin asignar</span>') +
           '</td>' +
           '<td style="padding:10px 14px;font-size:13px;color:var(--text-muted)">' + r.department + '</td>' +
+          '<td style="padding:10px 14px;text-align:center;font-size:13px;color:var(--text-muted);white-space:nowrap">' + hireFmt + '</td>' +
+          '<td style="padding:10px 14px;text-align:center;font-size:13px;white-space:nowrap">' + seniority + '</td>' +
           '<td style="padding:10px 14px;text-align:center;font-size:13px;font-weight:600">' + r.daysEntitled + '</td>' +
           '<td style="padding:10px 14px;text-align:center;font-size:13px">' + r.daysUsed + '</td>' +
           '<td style="padding:10px 14px;text-align:center;font-size:13px;color:var(--warning)">' + (r.daysPending > 0 ? r.daysPending : '—') + '</td>' +
