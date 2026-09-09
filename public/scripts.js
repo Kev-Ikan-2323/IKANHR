@@ -1858,7 +1858,12 @@ var VacBalanceView = {
     el.innerHTML = html;
   },
 
-  _onSearch: function(val) { VacBalanceView._search = val; VacBalanceView._render(); },
+  _onSearch: function(val) {
+    VacBalanceView._search = val;
+    VacBalanceView._render();
+    var inp = document.querySelector('#vac-balance-content input');
+    if (inp) { inp.value = val; inp.focus(); inp.setSelectionRange(val.length, val.length); }
+  },
 
   recalcAll: function() {
     if (!confirm('¿Recalcular los balances de vacaciones de todos los empleados según su nivel jerárquico actual?')) return;
