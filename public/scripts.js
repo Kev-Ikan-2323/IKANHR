@@ -620,10 +620,105 @@ var OrgChartView = {
       if (err) { APP.toast(err,'error'); return; }
       var t = document.getElementById('org-tree');
       if (!t) return;
-      t.className = 'org-tree';
-      t.innerHTML = OrgChartView.renderNodes(data.nodes, 0);
+      t.className = '';
+      t.style.cssText = 'position:relative;min-width:max-content';
+
+      // Flatten tree, capturing chain depth as fallback level
+      var flat = [];
+      OrgChartView._flattenTree(data.nodes, 0, flat);
+
+      // Group nodes by effective level (orgLevel ?? chainDepth)
+      var grouped = {};
+      var maxLevel = 0;
+      flat.forEach(function(item) {
+        var lvl = (item.node.orgLevel !== null && item.node.orgLevel !== undefined)
+          ? item.node.orgLevel : item.chainDepth;
+        item.effectiveLevel = lvl;
+        if (!grouped[lvl]) grouped[lvl] = [];
+        grouped[lvl].push(item.node);
+        if (lvl > maxLevel) maxLevel = lvl;
+      });
+
+      var canEdit = APP.user && (APP.user.isAdmin || APP.user.isHR);
+      var html = '<div style="display:flex;flex-direction:column;align-items:center;padding:32px 40px;gap:0">';
+      for (var lvl = 0; lvl <= maxLevel; lvl++) {
+        var nodes = grouped[lvl] || [];
+        html += '<div style="display:flex;justify-content:center;gap:24px;margin-bottom:60px">';
+        nodes.forEach(function(n) { html += OrgChartView._renderLevelCard(n, lvl, canEdit); });
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '<canvas id="org-lines-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0"></canvas>';
+      t.innerHTML = html;
+
       var inner = document.getElementById('org-zoom-inner');
-      if (inner) inner.style.width = '100%';
+      if (inner) inner.style.width = 'max-content';
+      OrgChartView._flatCache = flat;
+      setTimeout(function() { OrgChartView._drawLevelLines(flat); }, 60);
+    });
+  },
+  _flattenTree: function(nodes, depth, flat) {
+    (nodes || []).forEach(function(n) {
+      flat.push({ node: n, chainDepth: depth });
+      if (n.children && n.children.length) OrgChartView._flattenTree(n.children, depth + 1, flat);
+    });
+  },
+  _renderLevelCard: function(n, lvl, canEdit) {
+    return '<div class="org-card' + (n.isLeader ? ' leader' : '') + '" data-emp-id="' + n.id + '" style="position:relative;z-index:1;flex-shrink:0">' +
+      '<div class="oa">' + APP.initials(n.fullName) + '</div>' +
+      '<div class="on">' + n.fullName + '</div>' +
+      '<div class="ot">' + (n.jobTitle || '') + '</div>' +
+      (n.isLeader   ? '<div class="org-badge" style="color:var(--primary)">👑 Líder</div>' : '') +
+      (n.isCoLeader ? '<div class="org-badge" style="color:var(--warning)">⭐ Co-líder</div>' : '') +
+      (n.department ? '<div class="org-dept">' + n.department + '</div>' : '') +
+      (canEdit
+        ? '<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:8px;border-top:1px solid var(--border);padding-top:6px" onclick="event.stopPropagation()">' +
+            '<button class="btn btn-outline" style="padding:1px 7px;font-size:11px;min-width:0;height:22px;line-height:1" onclick="OrgChartView.changeLevel(\'' + n.id + '\',' + (lvl - 1) + ')"' + (lvl === 0 ? ' disabled' : '') + '>↑</button>' +
+            '<span style="font-size:10px;color:var(--text-muted);min-width:44px;text-align:center">Nivel ' + lvl + '</span>' +
+            '<button class="btn btn-outline" style="padding:1px 7px;font-size:11px;min-width:0;height:22px;line-height:1" onclick="OrgChartView.changeLevel(\'' + n.id + '\',' + (lvl + 1) + ')">↓</button>' +
+          '</div>'
+        : '') +
+    '</div>';
+  },
+  _drawLevelLines: function(flat) {
+    var treeEl = document.getElementById('org-tree');
+    var canvas = document.getElementById('org-lines-canvas');
+    if (!treeEl || !canvas) return;
+    var w = treeEl.offsetWidth, h = treeEl.offsetHeight;
+    canvas.width = w; canvas.height = h;
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    var treeRect = treeEl.getBoundingClientRect();
+    var scaleX = w / (treeRect.width || w);
+    var scaleY = h / (treeRect.height || h);
+    flat.forEach(function(item) {
+      var n = item.node;
+      if (!n.managerId) return;
+      var childEl  = treeEl.querySelector('[data-emp-id="' + n.id + '"]');
+      var parentEl = treeEl.querySelector('[data-emp-id="' + n.managerId + '"]');
+      if (!childEl || !parentEl) return;
+      var cr = childEl.getBoundingClientRect();
+      var pr = parentEl.getBoundingClientRect();
+      var fromX = (pr.left + pr.width / 2 - treeRect.left) * scaleX;
+      var fromY = (pr.bottom - treeRect.top) * scaleY;
+      var toX   = (cr.left + cr.width / 2 - treeRect.left) * scaleX;
+      var toY   = (cr.top - treeRect.top) * scaleY;
+      if (fromY >= toY) return;
+      var midY = (fromY + toY) / 2;
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY); ctx.lineTo(fromX, midY);
+      ctx.lineTo(toX, midY);   ctx.lineTo(toX, toY);
+      ctx.stroke();
+    });
+  },
+  changeLevel: function(empId, newLevel) {
+    if (newLevel < 0) return;
+    APP.api('orgchart.setLevel', { employeeId: empId, level: newLevel }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      OrgChartView._loadTree();
     });
   },
   _loadPyramid: function() {
@@ -857,31 +952,6 @@ var OrgChartView = {
     svgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none';
     svgEl.innerHTML = paths.join('');
     scrollEl.insertBefore(svgEl, scrollEl.firstChild);
-  },
-  renderNodes: function(nodes, depth) {
-    depth = depth || 0;
-    if (!nodes || !nodes.length) return '';
-    return nodes.map(function(n) {
-      var hasChildren = n.children && n.children.length > 0;
-      var collapsed = depth >= 2;
-      var toggleBtn = hasChildren
-        ? '<button class="org-toggle-btn" onclick="OrgChartView.toggle(this)">' + (collapsed ? '▼ ' + n.children.length : '▲') + '</button>'
-        : '';
-      var card = '<div class="org-card' + (n.isLeader ? ' leader' : '') + '">' +
-        '<div class="oa">' + APP.initials(n.fullName) + '</div>' +
-        '<div class="on">' + n.fullName + '</div>' +
-        '<div class="ot">' + (n.jobTitle || '') + '</div>' +
-        (n.isLeader   ? '<div class="org-badge" style="color:var(--primary)">👑 Líder</div>'    : '') +
-        (n.isCoLeader ? '<div class="org-badge" style="color:var(--warning)">⭐ Co-líder</div>' : '') +
-        (n.department ? '<div class="org-dept">' + n.department + '</div>' : '') +
-        toggleBtn + '</div>';
-      var children = hasChildren
-        ? '<div class="org-vline"></div>' +
-          '<div class="org-children"' + (collapsed ? ' style="display:none"' : '') + '>' +
-          OrgChartView.renderNodes(n.children, depth + 1) + '</div>'
-        : '';
-      return '<div class="org-node">' + card + children + '</div>';
-    }).join('');
   },
   toggle: function(btn) {
     var orgNode = btn.parentNode.parentNode;

@@ -65,6 +65,7 @@ async function dispatch(action, data, user) {
     'orgchart.update':     function() { return OrgChartModule.updateRelation(data, user) },
     'orgchart.chain':      function() { return OrgChartModule.getChainOfCommand(data.employeeId, user) },
     'orgchart.allReports': function() { return OrgChartModule.getAllReports(data.managerId, user) },
+    'orgchart.setLevel':   function() { return OrgChartModule.setLevel(data, user) },
 
     // ── TEAMS ──────────────────────────────────────────────────
     'teams.list':           function() { return TeamsModule.list(user) },

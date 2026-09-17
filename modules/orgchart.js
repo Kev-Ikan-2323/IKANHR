@@ -24,6 +24,7 @@ export var OrgChartModule = {
         managerId:      e.managerId,
         hireDate:       e.hireDate,
         hierarchyLevel: e.hierarchyLevel || null,
+        orgLevel:       (e.orgLevel !== undefined && e.orgLevel !== null) ? parseInt(e.orgLevel) : null,
         children:       [],
         isLeader:       false,
         isCoLeader:     false
@@ -123,6 +124,13 @@ export var OrgChartModule = {
     }
 
     return chain
+  },
+
+  async setLevel(data, user) {
+    if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere rol admin o hr.')
+    if (!data.employeeId) throw new Error('employeeId es requerido.')
+    var level = (data.level !== undefined && data.level !== null) ? parseInt(data.level) : null
+    return DB.update(CONFIG.SHEETS.EMPLOYEES, data.employeeId, { orgLevel: level })
   },
 
   async getAllReports(managerId, user) {
