@@ -50,6 +50,7 @@ var ClientCache = (function() {
     'announcements.update':    ['announcements.list'],
     'announcements.remove':    ['announcements.list'],
     'orgchart.update':         ['orgchart.flat','orgchart.get'],
+    'orgchart.setLevel':       ['orgchart.flat','orgchart.get'],
     'vacations.addHoliday':    ['vacations.holidays'],
     'vacations.removeHoliday': ['vacations.holidays'],
     'kpi.reviews.selfSubmit':  ['kpi.reports.overview'],
