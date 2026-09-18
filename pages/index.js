@@ -55,13 +55,6 @@ var SHELL = `
       </div>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-label">Mi Equipo</div>
-      <div class="nav-item" data-view="team" onclick="APP.navigate('team')">
-        <span class="material-icons-round">group</span><span>Mi Equipo</span>
-      </div>
-    </div>
-
     <div id="approver-section" style="display:none">
       <div class="nav-section">
         <div class="nav-label">Aprobaciones</div>
@@ -124,7 +117,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v10.1</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v10.2</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -245,12 +238,6 @@ var SHELL = `
     <div id="view-birthdays" class="view">
       <div class="view-title"><span class="material-icons-round">cake</span>Calendario de Cumpleaños</div>
       <div id="bday-content"></div>
-    </div>
-
-    <!-- TEAM -->
-    <div id="view-team" class="view">
-      <div class="view-title"><span class="material-icons-round">group</span>Mi Equipo</div>
-      <div id="team-content"></div>
     </div>
 
     <!-- POLICIES -->
