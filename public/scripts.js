@@ -662,12 +662,41 @@ var OrgChartView = {
       var totalH = PAD_Y + (maxLevel + 1) * ROW_H;
 
       var canEdit = APP.user && (APP.user.isAdmin || APP.user.isHR);
+
+      // ── Hierarchy bands ──
+      var BANDS_CFG = [
+        { label: 'CEO',                        minLvl: 0, maxLvl: 1, color: '#6366f1' },
+        { label: 'Heads',                      minLvl: 2, maxLvl: 2, color: '#8b5cf6' },
+        { label: 'Managers',                   minLvl: 3, maxLvl: 3, color: '#0ea5e9' },
+        { label: 'Operativo y Administrativo', minLvl: 4, maxLvl: 999, color: '#64748b' },
+      ];
+      var activeBands = [];
+      BANDS_CFG.forEach(function(b) {
+        var nodes = flat.filter(function(item) {
+          return item.effectiveLevel >= b.minLvl && item.effectiveLevel <= b.maxLvl;
+        });
+        if (!nodes.length) return;
+        var minL = Math.min.apply(null, nodes.map(function(i) { return i.effectiveLevel; }));
+        var maxL = Math.max.apply(null, nodes.map(function(i) { return i.effectiveLevel; }));
+        activeBands.push({ label: b.label, color: b.color, minL: minL, maxL: maxL });
+      });
+      var bandsHtml = '';
+      activeBands.forEach(function(b, bi) {
+        var top = bi === 0 ? 0 : PAD_Y + b.minL * ROW_H;
+        var bot = bi === activeBands.length - 1 ? totalH : PAD_Y + (b.maxL + 1) * ROW_H;
+        bandsHtml +=
+          '<div style="position:absolute;left:0;top:' + top + 'px;width:100%;height:' + (bot - top) + 'px;' +
+          'background:' + b.color + '0d;border-top:2px solid ' + b.color + '28;z-index:0;pointer-events:none;box-sizing:border-box">' +
+          '<span style="position:absolute;left:10px;top:6px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:' + b.color + ';opacity:.7">' + b.label + '</span>' +
+          '</div>';
+      });
+
       var cardsHtml = '';
       flat.forEach(function(item) {
         var n = item.node;
         var x = PAD_X + n._xUnit * CARD_W;
         var y = PAD_Y + item.effectiveLevel * ROW_H;
-        cardsHtml += '<div style="position:absolute;left:' + Math.round(x) + 'px;top:' + Math.round(y) + 'px">' +
+        cardsHtml += '<div style="position:absolute;left:' + Math.round(x) + 'px;top:' + Math.round(y) + 'px;z-index:2">' +
           OrgChartView._renderLevelCard(n, item.effectiveLevel, canEdit) +
         '</div>';
       });
@@ -676,7 +705,8 @@ var OrgChartView = {
       t.style.cssText = 'position:relative;min-width:max-content';
       t.innerHTML =
         '<div id="org-tree-layout" style="position:relative;width:' + totalW + 'px;height:' + totalH + 'px;display:inline-block">' +
-          '<canvas id="org-lines-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0"></canvas>' +
+          bandsHtml +
+          '<canvas id="org-lines-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:1"></canvas>' +
           cardsHtml +
         '</div>';
 
@@ -735,9 +765,11 @@ var OrgChartView = {
       };
     }
 
-    // Group children by parent
+    // Build level map and group children by parent
+    var levelMap = {};
     var byParent = {};
     flat.forEach(function(item) {
+      levelMap[item.node.id] = item.effectiveLevel;
       var n = item.node;
       if (!n.managerId) return;
       if (!byParent[n.managerId]) byParent[n.managerId] = [];
@@ -747,31 +779,46 @@ var OrgChartView = {
     Object.keys(byParent).forEach(function(parentId) {
       var parentEl = layoutEl.querySelector('[data-emp-id="' + parentId + '"]');
       if (!parentEl) return;
-      var childEls = byParent[parentId]
-        .map(function(id) { return layoutEl.querySelector('[data-emp-id="' + id + '"]'); })
-        .filter(Boolean);
-      if (!childEls.length) return;
+      var parentLevel = levelMap[parentId] !== undefined ? levelMap[parentId] : 0;
+      var pp = pos(parentEl);
 
-      var pp  = pos(parentEl);
-      var cps = childEls.map(pos);
+      // Split children: below parent (vertical T) vs same/above level (lateral dashed)
+      var below = [], lateral = [];
+      byParent[parentId].forEach(function(id) {
+        var el = layoutEl.querySelector('[data-emp-id="' + id + '"]');
+        if (!el) return;
+        var cl = levelMap[id] !== undefined ? levelMap[id] : 0;
+        if (cl > parentLevel) below.push({ el: el, p: pos(el) });
+        else                  lateral.push({ el: el, p: pos(el) });
+      });
 
-      // Bar is placed 28px below the parent card — always at the same vertical distance
-      var barY = pp.bot + 28 * sy;
-
-      // Vertical stem: parent bottom → bar
-      ctx.beginPath(); ctx.moveTo(pp.cx, pp.bot); ctx.lineTo(pp.cx, barY); ctx.stroke();
-
-      // Horizontal bar spanning leftmost → rightmost child center
-      var xs = cps.map(function(c) { return c.cx; });
-      var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
-      if (minX < maxX) {
-        ctx.beginPath(); ctx.moveTo(minX, barY); ctx.lineTo(maxX, barY); ctx.stroke();
+      // ── T-connector for children below ──
+      if (below.length) {
+        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2; ctx.setLineDash([]);
+        var barY = pp.bot + 28 * sy;
+        ctx.beginPath(); ctx.moveTo(pp.cx, pp.bot); ctx.lineTo(pp.cx, barY); ctx.stroke();
+        var xs = below.map(function(c) { return c.p.cx; });
+        var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+        if (minX < maxX) {
+          ctx.beginPath(); ctx.moveTo(minX, barY); ctx.lineTo(maxX, barY); ctx.stroke();
+        }
+        below.forEach(function(c) {
+          ctx.beginPath(); ctx.moveTo(c.p.cx, barY); ctx.lineTo(c.p.cx, c.p.top); ctx.stroke();
+        });
       }
 
-      // Vertical drop: bar → each child top
-      cps.forEach(function(c) {
-        ctx.beginPath(); ctx.moveTo(c.cx, barY); ctx.lineTo(c.cx, c.top); ctx.stroke();
-      });
+      // ── Dashed U-connector for same-level or above children ──
+      if (lateral.length) {
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+        lateral.forEach(function(c) {
+          var dip = Math.max(pp.bot, c.p.bot) + 32 * sy;
+          ctx.beginPath();
+          ctx.moveTo(pp.cx, pp.bot); ctx.lineTo(pp.cx, dip);
+          ctx.lineTo(c.p.cx, dip);  ctx.lineTo(c.p.cx, c.p.bot);
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+      }
     });
   },
   changeLevel: function(empId, newLevel) {
