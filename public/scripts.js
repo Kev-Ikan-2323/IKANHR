@@ -668,7 +668,8 @@ var OrgChartView = {
         { label: 'CEO',                        minLvl: 0, maxLvl: 1, color: '#6366f1' },
         { label: 'Heads',                      minLvl: 2, maxLvl: 2, color: '#8b5cf6' },
         { label: 'Managers',                   minLvl: 3, maxLvl: 3, color: '#0ea5e9' },
-        { label: 'Operativo y Administrativo', minLvl: 4, maxLvl: 999, color: '#64748b' },
+        { label: 'Supervisores',               minLvl: 4, maxLvl: 4, color: '#10b981' },
+        { label: 'Operativo y Administrativo', minLvl: 5, maxLvl: 999, color: '#64748b' },
       ];
       var activeBands = [];
       BANDS_CFG.forEach(function(b) {
