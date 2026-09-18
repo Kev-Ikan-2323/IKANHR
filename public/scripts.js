@@ -640,11 +640,28 @@ var OrgChartView = {
         if (lvl > maxLevel) maxLevel = lvl;
       });
 
+      // Sort each level so children appear grouped under their manager
+      var levelPos = {}; // nodeId -> visual position within its level
+      for (var sortLvl = 0; sortLvl <= maxLevel; sortLvl++) {
+        var sortNodes = grouped[sortLvl] || [];
+        if (sortLvl > 0) {
+          sortNodes.sort(function(a, b) {
+            var pa = levelPos[a.managerId] !== undefined ? levelPos[a.managerId] : 9999;
+            var pb = levelPos[b.managerId] !== undefined ? levelPos[b.managerId] : 9999;
+            if (pa !== pb) return pa - pb;
+            return (a.fullName || '').localeCompare(b.fullName || '');
+          });
+          grouped[sortLvl] = sortNodes;
+        }
+        sortNodes.forEach(function(n, i) { levelPos[n.id] = i; });
+      }
+
       var canEdit = APP.user && (APP.user.isAdmin || APP.user.isHR);
+      // Card height ~170px + 60px gap between rows; empty rows keep same height so level gaps are visible
       var html = '<div style="display:flex;flex-direction:column;align-items:center;padding:32px 40px;gap:0">';
       for (var lvl = 0; lvl <= maxLevel; lvl++) {
         var nodes = grouped[lvl] || [];
-        html += '<div style="display:flex;justify-content:center;gap:24px;margin-bottom:60px">';
+        html += '<div style="display:flex;justify-content:center;align-items:flex-start;gap:24px;margin-bottom:60px;min-height:170px">';
         nodes.forEach(function(n) { html += OrgChartView._renderLevelCard(n, lvl, canEdit); });
         html += '</div>';
       }
@@ -690,29 +707,58 @@ var OrgChartView = {
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, w, h);
-    ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
     var treeRect = treeEl.getBoundingClientRect();
     var scaleX = w / (treeRect.width || w);
     var scaleY = h / (treeRect.height || h);
+
+    function px(el) {
+      var r = el.getBoundingClientRect();
+      return {
+        cx:  (r.left + r.width / 2 - treeRect.left) * scaleX,
+        top: (r.top  - treeRect.top)  * scaleY,
+        bot: (r.bottom - treeRect.top) * scaleY
+      };
+    }
+
+    // Group children by parent so we can draw T-connectors per parent
+    var byParent = {};
     flat.forEach(function(item) {
       var n = item.node;
       if (!n.managerId) return;
-      var childEl  = treeEl.querySelector('[data-emp-id="' + n.id + '"]');
-      var parentEl = treeEl.querySelector('[data-emp-id="' + n.managerId + '"]');
-      if (!childEl || !parentEl) return;
-      var cr = childEl.getBoundingClientRect();
-      var pr = parentEl.getBoundingClientRect();
-      var fromX = (pr.left + pr.width / 2 - treeRect.left) * scaleX;
-      var fromY = (pr.bottom - treeRect.top) * scaleY;
-      var toX   = (cr.left + cr.width / 2 - treeRect.left) * scaleX;
-      var toY   = (cr.top - treeRect.top) * scaleY;
-      if (fromY >= toY) return;
-      var midY = (fromY + toY) / 2;
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.beginPath();
-      ctx.moveTo(fromX, fromY); ctx.lineTo(fromX, midY);
-      ctx.lineTo(toX, midY);   ctx.lineTo(toX, toY);
-      ctx.stroke();
+      if (!byParent[n.managerId]) byParent[n.managerId] = [];
+      byParent[n.managerId].push(n.id);
+    });
+
+    Object.keys(byParent).forEach(function(parentId) {
+      var parentEl = treeEl.querySelector('[data-emp-id="' + parentId + '"]');
+      if (!parentEl) return;
+      var childIds = byParent[parentId];
+      var childEls = childIds.map(function(id) { return treeEl.querySelector('[data-emp-id="' + id + '"]'); }).filter(Boolean);
+      if (!childEls.length) return;
+
+      var pp = px(parentEl);
+      var cps = childEls.map(px);
+      // Bar sits halfway between parent bottom and average child top
+      var avgChildTop = cps.reduce(function(s, c) { return s + c.top; }, 0) / cps.length;
+      var barY = (pp.bot + avgChildTop) / 2;
+
+      // Vertical stem from parent down to bar
+      ctx.beginPath(); ctx.moveTo(pp.cx, pp.bot); ctx.lineTo(pp.cx, barY); ctx.stroke();
+
+      // Horizontal bar spanning all children
+      if (cps.length > 1) {
+        var xs = cps.map(function(c) { return c.cx; });
+        ctx.beginPath();
+        ctx.moveTo(Math.min.apply(null, xs), barY);
+        ctx.lineTo(Math.max.apply(null, xs), barY);
+        ctx.stroke();
+      }
+
+      // Vertical drop from bar to each child
+      cps.forEach(function(c) {
+        ctx.beginPath(); ctx.moveTo(c.cx, barY); ctx.lineTo(c.cx, c.top); ctx.stroke();
+      });
     });
   },
   changeLevel: function(empId, newLevel) {
