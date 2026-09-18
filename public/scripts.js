@@ -621,58 +621,69 @@ var OrgChartView = {
       if (err) { APP.toast(err,'error'); return; }
       var t = document.getElementById('org-tree');
       if (!t) return;
-      t.className = '';
-      t.style.cssText = 'position:relative;min-width:max-content';
 
-      // Flatten tree, capturing chain depth as fallback level
+      // ── Step 1: compute subtree widths (structural, not level-based) ──
+      function calcWidth(n) {
+        if (!n.children || !n.children.length) { n._w = 1; return 1; }
+        var w = 0;
+        n.children.forEach(function(c) { w += calcWidth(c); });
+        n._w = Math.max(1, w);
+        return n._w;
+      }
+      (data.nodes || []).forEach(calcWidth);
+
+      // ── Step 2: assign X positions (in slot units) ──
+      function assignX(n, start) {
+        n._xUnit = start + (n._w - 1) / 2;
+        var cx = start;
+        (n.children || []).forEach(function(c) { assignX(c, cx); cx += c._w; });
+      }
+      var xOff = 0;
+      (data.nodes || []).forEach(function(r) { assignX(r, xOff); xOff += r._w; });
+
+      // ── Step 3: flatten and compute effective levels ──
       var flat = [];
       OrgChartView._flattenTree(data.nodes, 0, flat);
-
-      // Group nodes by effective level (orgLevel ?? chainDepth)
-      var grouped = {};
       var maxLevel = 0;
       flat.forEach(function(item) {
-        var lvl = (item.node.orgLevel !== null && item.node.orgLevel !== undefined)
-          ? item.node.orgLevel : item.chainDepth;
+        var n = item.node;
+        var lvl = (n.orgLevel !== null && n.orgLevel !== undefined) ? n.orgLevel : item.chainDepth;
         item.effectiveLevel = lvl;
-        if (!grouped[lvl]) grouped[lvl] = [];
-        grouped[lvl].push(item.node);
+        n._effectiveLevel = lvl;
         if (lvl > maxLevel) maxLevel = lvl;
       });
 
-      // Sort each level so children appear grouped under their manager
-      var levelPos = {}; // nodeId -> visual position within its level
-      for (var sortLvl = 0; sortLvl <= maxLevel; sortLvl++) {
-        var sortNodes = grouped[sortLvl] || [];
-        if (sortLvl > 0) {
-          sortNodes.sort(function(a, b) {
-            var pa = levelPos[a.managerId] !== undefined ? levelPos[a.managerId] : 9999;
-            var pb = levelPos[b.managerId] !== undefined ? levelPos[b.managerId] : 9999;
-            if (pa !== pb) return pa - pb;
-            return (a.fullName || '').localeCompare(b.fullName || '');
-          });
-          grouped[sortLvl] = sortNodes;
-        }
-        sortNodes.forEach(function(n, i) { levelPos[n.id] = i; });
-      }
+      // ── Step 4: render cards with absolute positioning ──
+      var CARD_W = 174; // 150px card + 24px gap
+      var ROW_H  = 230; // ~170px card + 60px gap
+      var PAD_X  = 48;
+      var PAD_Y  = 32;
+      var totalW = Math.max(600, xOff * CARD_W - 24 + PAD_X * 2);
+      var totalH = PAD_Y + (maxLevel + 1) * ROW_H;
 
       var canEdit = APP.user && (APP.user.isAdmin || APP.user.isHR);
-      // Card height ~170px + 60px gap between rows; empty rows keep same height so level gaps are visible
-      var html = '<div style="display:flex;flex-direction:column;align-items:center;padding:32px 40px;gap:0">';
-      for (var lvl = 0; lvl <= maxLevel; lvl++) {
-        var nodes = grouped[lvl] || [];
-        html += '<div style="display:flex;justify-content:center;align-items:flex-start;gap:24px;margin-bottom:60px;min-height:170px">';
-        nodes.forEach(function(n) { html += OrgChartView._renderLevelCard(n, lvl, canEdit); });
-        html += '</div>';
-      }
-      html += '</div>';
-      html += '<canvas id="org-lines-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0"></canvas>';
-      t.innerHTML = html;
+      var cardsHtml = '';
+      flat.forEach(function(item) {
+        var n = item.node;
+        var x = PAD_X + n._xUnit * CARD_W;
+        var y = PAD_Y + item.effectiveLevel * ROW_H;
+        cardsHtml += '<div style="position:absolute;left:' + Math.round(x) + 'px;top:' + Math.round(y) + 'px">' +
+          OrgChartView._renderLevelCard(n, item.effectiveLevel, canEdit) +
+        '</div>';
+      });
+
+      t.className = '';
+      t.style.cssText = 'position:relative;min-width:max-content';
+      t.innerHTML =
+        '<div id="org-tree-layout" style="position:relative;width:' + totalW + 'px;height:' + totalH + 'px;display:inline-block">' +
+          '<canvas id="org-lines-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0"></canvas>' +
+          cardsHtml +
+        '</div>';
 
       var inner = document.getElementById('org-zoom-inner');
       if (inner) inner.style.width = 'max-content';
       OrgChartView._flatCache = flat;
-      setTimeout(function() { OrgChartView._drawLevelLines(flat); }, 60);
+      setTimeout(function() { OrgChartView._drawLevelLines(flat); }, 80);
     });
   },
   _flattenTree: function(nodes, depth, flat) {
@@ -699,29 +710,32 @@ var OrgChartView = {
     '</div>';
   },
   _drawLevelLines: function(flat) {
-    var treeEl = document.getElementById('org-tree');
-    var canvas = document.getElementById('org-lines-canvas');
-    if (!treeEl || !canvas) return;
-    var w = treeEl.offsetWidth, h = treeEl.offsetHeight;
+    var layoutEl = document.getElementById('org-tree-layout');
+    var canvas   = document.getElementById('org-lines-canvas');
+    if (!layoutEl || !canvas) return;
+
+    var w = layoutEl.offsetWidth, h = layoutEl.offsetHeight;
     canvas.width = w; canvas.height = h;
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, w, h);
     ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-    var treeRect = treeEl.getBoundingClientRect();
-    var scaleX = w / (treeRect.width || w);
-    var scaleY = h / (treeRect.height || h);
 
-    function px(el) {
+    var ref = layoutEl.getBoundingClientRect();
+    var sx = w / (ref.width  || w);
+    var sy = h / (ref.height || h);
+
+    function pos(el) {
       var r = el.getBoundingClientRect();
       return {
-        cx:  (r.left + r.width / 2 - treeRect.left) * scaleX,
-        top: (r.top  - treeRect.top)  * scaleY,
-        bot: (r.bottom - treeRect.top) * scaleY
+        cx:  (r.left + r.width / 2 - ref.left) * sx,
+        top: (r.top    - ref.top) * sy,
+        bot: (r.bottom - ref.top) * sy
       };
     }
 
-    // Group children by parent so we can draw T-connectors per parent
+    // Group children by parent
     var byParent = {};
     flat.forEach(function(item) {
       var n = item.node;
@@ -731,31 +745,30 @@ var OrgChartView = {
     });
 
     Object.keys(byParent).forEach(function(parentId) {
-      var parentEl = treeEl.querySelector('[data-emp-id="' + parentId + '"]');
+      var parentEl = layoutEl.querySelector('[data-emp-id="' + parentId + '"]');
       if (!parentEl) return;
-      var childIds = byParent[parentId];
-      var childEls = childIds.map(function(id) { return treeEl.querySelector('[data-emp-id="' + id + '"]'); }).filter(Boolean);
+      var childEls = byParent[parentId]
+        .map(function(id) { return layoutEl.querySelector('[data-emp-id="' + id + '"]'); })
+        .filter(Boolean);
       if (!childEls.length) return;
 
-      var pp = px(parentEl);
-      var cps = childEls.map(px);
-      // Bar sits halfway between parent bottom and average child top
-      var avgChildTop = cps.reduce(function(s, c) { return s + c.top; }, 0) / cps.length;
-      var barY = (pp.bot + avgChildTop) / 2;
+      var pp  = pos(parentEl);
+      var cps = childEls.map(pos);
 
-      // Vertical stem from parent down to bar
+      // Bar is placed 28px below the parent card — always at the same vertical distance
+      var barY = pp.bot + 28 * sy;
+
+      // Vertical stem: parent bottom → bar
       ctx.beginPath(); ctx.moveTo(pp.cx, pp.bot); ctx.lineTo(pp.cx, barY); ctx.stroke();
 
-      // Horizontal bar spanning all children
-      if (cps.length > 1) {
-        var xs = cps.map(function(c) { return c.cx; });
-        ctx.beginPath();
-        ctx.moveTo(Math.min.apply(null, xs), barY);
-        ctx.lineTo(Math.max.apply(null, xs), barY);
-        ctx.stroke();
+      // Horizontal bar spanning leftmost → rightmost child center
+      var xs = cps.map(function(c) { return c.cx; });
+      var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+      if (minX < maxX) {
+        ctx.beginPath(); ctx.moveTo(minX, barY); ctx.lineTo(maxX, barY); ctx.stroke();
       }
 
-      // Vertical drop from bar to each child
+      // Vertical drop: bar → each child top
       cps.forEach(function(c) {
         ctx.beginPath(); ctx.moveTo(c.cx, barY); ctx.lineTo(c.cx, c.top); ctx.stroke();
       });
