@@ -844,21 +844,28 @@ async function _notifyPeriodOpen(period) {
     if (period.positionId) {
       employees = employees.filter(function(e) { return e.positionId === period.positionId })
     }
+    var deadline = period.selfAssessmentDeadline || period.endDate || ''
+    var platformUrl = (process.env.APP_URL || '').replace(/\/$/, '')
     for (var i = 0; i < employees.length; i++) {
       var emp = employees[i]
       await MailService.send({
         to:      emp.email,
-        subject: '[IKAN HR] Nuevo período de evaluación: ' + period.name,
+        subject: '¡Período de evaluación abierto! Llena tus KPIs 📊 — ' + period.name,
         htmlBody: buildEmail({
-          icon:  '📅',
-          title: 'Nuevo período de evaluación disponible',
+          icon:  '📊',
+          title: '¡Es momento de evaluar tu desempeño!',
           bodyHTML:
-            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + emp.firstName + '</strong>,</p>' +
-            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Se ha abierto un nuevo período de evaluación de KPIs. Ingresa a la plataforma para completar tu autocalificación antes de la fecha límite.</p>',
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + (emp.firstName || 'colaborador') + '</strong>,</p>' +
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Se ha abierto un nuevo período de evaluación de KPIs. Entra a la plataforma y completa tu autoevaluación antes de que cierre el período.</p>' +
+            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Solo toma unos minutos y es importante para tu retroalimentación y crecimiento. 🚀</p>',
           details: [
-            { label: 'Período',         value: period.name },
-            { label: 'Fecha límite',    value: period.selfAssessmentDeadline || period.endDate }
-          ]
+            { label: 'Período',      value: period.name },
+            { label: 'Tipo',         value: period.periodType || '' },
+            { label: 'Fecha límite', value: deadline, highlight: '#DC2626' }
+          ].filter(function(d) { return d.value }),
+          actions: platformUrl ? [
+            { label: 'Ver mis KPIs →', url: platformUrl, primary: true }
+          ] : []
         })
       })
     }
