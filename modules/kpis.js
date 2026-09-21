@@ -83,7 +83,7 @@ export var KPIModule = {
     if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere rol admin o hr.')
     var period = await DB.getById(CONFIG.SHEETS.KPI_PERIODS, periodId)
     if (!period) throw new Error('Período no encontrado.')
-    if (period.status === CONFIG.STATUS.COMPLETED) throw new Error('No se puede prorrogar un período ya cerrado.')
+    if (period.status === CONFIG.STATUS.COMPLETED) throw new Error('No se pueden editar las fechas de un período ya cerrado.')
 
     var updates = {}
     if (data.endDate) {

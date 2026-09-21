@@ -93,6 +93,78 @@ var ClientCache = (function() {
   };
 })();
 
+// ── MINI CALENDAR ────────────────────────────────────────────
+var MiniCal = {
+  _el: null, _onSelect: null, _year: null, _month: null, _selected: null,
+  show: function(anchorEl, dateStr, onSelect) {
+    MiniCal._onSelect = onSelect;
+    MiniCal._selected = dateStr || '';
+    var d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+    MiniCal._year = d.getFullYear(); MiniCal._month = d.getMonth();
+    MiniCal._render(); MiniCal._position(anchorEl);
+    setTimeout(function() { document.addEventListener('click', MiniCal._outside, true); }, 10);
+  },
+  hide: function() {
+    if (MiniCal._el) { MiniCal._el.remove(); MiniCal._el = null; }
+    document.removeEventListener('click', MiniCal._outside, true);
+  },
+  _outside: function(e) { if (MiniCal._el && !MiniCal._el.contains(e.target)) MiniCal.hide(); },
+  _nav: function(dir) {
+    MiniCal._month += dir;
+    if (MiniCal._month > 11) { MiniCal._month = 0; MiniCal._year++; }
+    if (MiniCal._month < 0)  { MiniCal._month = 11; MiniCal._year--; }
+    MiniCal._render();
+  },
+  _pick: function(ds) {
+    MiniCal._selected = ds;
+    if (MiniCal._onSelect) MiniCal._onSelect(ds);
+    MiniCal.hide();
+  },
+  _render: function() {
+    if (!MiniCal._el) {
+      MiniCal._el = document.createElement('div');
+      MiniCal._el.onclick = function(e) { e.stopPropagation(); };
+      MiniCal._el.style.cssText = 'position:fixed;z-index:10000;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:12px;width:232px';
+      document.body.appendChild(MiniCal._el);
+    }
+    var y = MiniCal._year, m = MiniCal._month;
+    var MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var DAYS = ['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
+    var first = new Date(y, m, 1);
+    var startDow = (first.getDay() + 6) % 7;
+    var dim = new Date(y, m + 1, 0).getDate();
+    var today = new Date(); today.setHours(0,0,0,0);
+    var fmt2 = function(n) { return String(n).padStart(2,'0'); };
+    var todayStr = today.getFullYear()+'-'+fmt2(today.getMonth()+1)+'-'+fmt2(today.getDate());
+    var cells = DAYS.map(function(d) {
+      return '<div style="font-size:10px;font-weight:700;color:var(--text-muted);text-align:center;padding:3px 0">' + d + '</div>';
+    }).join('');
+    for (var i = 0; i < startDow; i++) cells += '<div></div>';
+    for (var day = 1; day <= dim; day++) {
+      var ds = y+'-'+fmt2(m+1)+'-'+fmt2(day);
+      var sel = ds === MiniCal._selected, tod = ds === todayStr;
+      var bg = sel ? 'var(--primary)' : 'transparent';
+      var color = sel ? '#fff' : 'var(--text)';
+      var border = (tod && !sel) ? '1px solid var(--primary)' : '1px solid transparent';
+      cells += '<div onclick="MiniCal._pick(\''+ds+'\')" style="cursor:pointer;text-align:center;border-radius:6px;padding:5px 2px;font-size:13px;font-weight:'+(sel?'700':'400')+';background:'+bg+';color:'+color+';border:'+border+'">'+day+'</div>';
+    }
+    MiniCal._el.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<button onclick="MiniCal._nav(-1)" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:0 4px">‹</button>' +
+        '<span style="font-size:13px;font-weight:700;color:var(--text)">'+MONTHS[m]+' '+y+'</span>' +
+        '<button onclick="MiniCal._nav(1)"  style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:0 4px">›</button>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">'+cells+'</div>';
+  },
+  _position: function(anchor) {
+    var r = anchor.getBoundingClientRect();
+    var top = r.bottom + 6, left = r.left;
+    if (left + 232 > window.innerWidth - 8) left = window.innerWidth - 240;
+    if (top + 290 > window.innerHeight - 8) top = r.top - 296;
+    MiniCal._el.style.top = top + 'px'; MiniCal._el.style.left = left + 'px';
+  }
+};
+
 // ── APP CORE ─────────────────────────────────────────────────
 var APP = {
   user: null,
@@ -2556,7 +2628,7 @@ var AdminHR = {
           var actions = '';
           if (p.status==='borrador') actions='<button class="btn btn-primary btn-sm" onclick="AdminHR.openPeriod(\''+p.id+'\')">Abrir</button>';
           else if (p.status==='activo') actions=
-            '<button class="btn btn-outline btn-sm" onclick="AdminHR.openExtendPeriod(\''+p.id+'\',\''+(p.endDate||'')+'\',\''+(p.selfAssessmentDeadline||'')+'\',\''+(p.managerReviewDeadline||'')+'\')">Prorrogar</button> ' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.openExtendPeriod(\''+p.id+'\',\''+(p.endDate||'')+'\',\''+(p.selfAssessmentDeadline||'')+'\',\''+(p.managerReviewDeadline||'')+'\')"><span class="material-icons-round" style="font-size:14px;vertical-align:middle">edit_calendar</span> Editar fechas</button> ' +
             '<button class="btn btn-outline btn-sm" onclick="AdminHR.closePeriod(\''+p.id+'\')">Cerrar</button>';
           return '<tr><td><strong>'+p.name+'</strong></td><td>'+p.periodType+'</td>' +
             '<td class="text-sm">'+APP.fmtDate(p.startDate)+' → '+APP.fmtDate(p.endDate)+'</td>' +
@@ -2634,30 +2706,51 @@ var AdminHR = {
     });
   },
   openExtendPeriod: function(id, currentEnd, currentSelfDl, currentMgrDl) {
-    APP.modal('📅 Prorrogar Período',
-      '<div class="alert info mb-16">Solo modifica los campos que quieras extender. Las fechas nuevas deben ser posteriores a las actuales.</div>' +
-      '<div class="form-group"><label>Nueva fecha de fin <span class="text-muted text-sm">(actual: '+APP.fmtDate(currentEnd)+')</span></label>' +
-      '<input type="date" id="ext-end" value="'+currentEnd+'"></div>' +
-      '<div class="form-group"><label>Nuevo límite autocalificación <span class="text-muted text-sm">(actual: '+(currentSelfDl?APP.fmtDate(currentSelfDl):'—')+')</span></label>' +
-      '<input type="date" id="ext-self" value="'+(currentSelfDl||'')+'"></div>' +
-      '<div class="form-group"><label>Nuevo límite revisión manager <span class="text-muted text-sm">(actual: '+(currentMgrDl?APP.fmtDate(currentMgrDl):'—')+')</span></label>' +
-      '<input type="date" id="ext-mgr" value="'+(currentMgrDl||'')+'"></div>',
-      '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
-      '<button class="btn btn-primary" onclick="AdminHR.saveExtendPeriod(\''+id+'\',\''+currentEnd+'\')"><span class="material-icons-round">update</span>Guardar prórroga</button>');
+    function dateBtn(fieldId, label, dateStr) {
+      var parts = dateStr ? dateStr.split('-') : [];
+      var display = parts.length === 3 ? parts[2]+'/'+parts[1]+'/'+parts[0] : '— seleccionar —';
+      return '<div class="form-group">' +
+        '<label style="margin-bottom:5px">' + label + '</label>' +
+        '<button id="'+fieldId+'" data-orig="'+(dateStr||'')+'" data-value="'+(dateStr||'')+'" ' +
+          'onclick="AdminHR._pickExtDate(\''+fieldId+'\')" ' +
+          'style="width:100%;text-align:left;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px">' +
+          '<span class="material-icons-round" style="font-size:16px;color:var(--primary)">event</span>' +
+          '<span id="'+fieldId+'-txt">'+display+'</span>' +
+        '</button>' +
+      '</div>';
+    }
+    APP.modal('📅 Editar fechas del período',
+      dateBtn('epick-end',  'Fecha de fin del período', currentEnd) +
+      dateBtn('epick-self', 'Límite autocalificación',  currentSelfDl) +
+      dateBtn('epick-mgr',  'Límite revisión manager',  currentMgrDl),
+      '<button class="btn btn-outline" onclick="APP.closeModal();MiniCal.hide()">Cancelar</button>' +
+      '<button class="btn btn-primary" onclick="AdminHR.saveExtendPeriod(\''+id+'\',\''+currentEnd+'\')"><span class="material-icons-round">save</span>Guardar cambios</button>');
+  },
+  _pickExtDate: function(fieldId) {
+    var btn = document.getElementById(fieldId);
+    if (!btn) return;
+    MiniCal.show(btn, btn.dataset.value || '', function(ds) {
+      btn.dataset.value = ds;
+      var parts = ds.split('-');
+      var txt = document.getElementById(fieldId + '-txt');
+      if (txt) txt.textContent = parts[2]+'/'+parts[1]+'/'+parts[0];
+    });
   },
   saveExtendPeriod: function(id, originalEnd) {
-    var endDate = (document.getElementById('ext-end')||{value:''}).value;
-    var selfDl  = (document.getElementById('ext-self')||{value:''}).value;
-    var mgrDl   = (document.getElementById('ext-mgr')||{value:''}).value;
+    function val(fid) { var b = document.getElementById(fid); return b ? b.dataset.value : ''; }
+    var endDate = val('epick-end'), selfDl = val('epick-self'), mgrDl = val('epick-mgr');
     if (endDate && endDate <= originalEnd) { APP.toast('La nueva fecha de fin debe ser posterior a '+APP.fmtDate(originalEnd),'error'); return; }
     var data = { periodId: id };
-    if (endDate && endDate!==originalEnd) data.endDate = endDate;
-    if (selfDl) data.selfAssessmentDeadline = selfDl;
-    if (mgrDl)  data.managerReviewDeadline  = mgrDl;
+    var endOrig  = (document.getElementById('epick-end')  ||{dataset:{}}).dataset.orig  || '';
+    var selfOrig = (document.getElementById('epick-self') ||{dataset:{}}).dataset.orig || '';
+    var mgrOrig  = (document.getElementById('epick-mgr')  ||{dataset:{}}).dataset.orig  || '';
+    if (endDate  && endDate  !== endOrig)  data.endDate               = endDate;
+    if (selfDl   && selfDl   !== selfOrig) data.selfAssessmentDeadline = selfDl;
+    if (mgrDl    && mgrDl    !== mgrOrig)  data.managerReviewDeadline  = mgrDl;
     if (!data.endDate && !data.selfAssessmentDeadline && !data.managerReviewDeadline) { APP.toast('No hay cambios para guardar','error'); return; }
     APP.api('kpi.periods.extend', data, function(err) {
       if (err) { APP.toast(err,'error'); return; }
-      APP.closeModal(); APP.toast('✅ Período prorrogado','success'); AdminHR.openKPIAdmin('periods');
+      APP.closeModal(); APP.toast('✅ Fechas actualizadas','success'); AdminHR.openKPIAdmin('evaluaciones');
     });
   },
   closePeriod: function(id) {
