@@ -653,32 +653,12 @@ var OrgChartView = {
         if (lvl > maxLevel) maxLevel = lvl;
       });
 
-      // ── Step 3.5: reorder nodes within each level by jobTitle ──
-      var levelGroups = {};
-      flat.forEach(function(item) {
-        var lvl = item.effectiveLevel;
-        if (!levelGroups[lvl]) levelGroups[lvl] = [];
-        levelGroups[lvl].push(item);
-      });
-      var maxCount = 0;
-      Object.keys(levelGroups).forEach(function(lvl) {
-        var grp = levelGroups[lvl];
-        grp.sort(function(a, b) {
-          var jA = (a.node.jobTitle || '').toLowerCase();
-          var jB = (b.node.jobTitle || '').toLowerCase();
-          if (jA !== jB) return jA < jB ? -1 : 1;
-          return (a.node.fullName || '').localeCompare(b.node.fullName || '');
-        });
-        grp.forEach(function(item, idx) { item.node._xUnit = idx; });
-        if (grp.length > maxCount) maxCount = grp.length;
-      });
-
       // ── Step 4: render cards with absolute positioning ──
       var CARD_W = 174; // 150px card + 24px gap
       var ROW_H  = 230; // ~170px card + 60px gap
       var PAD_X  = 48;
       var PAD_Y  = 32;
-      var totalW = Math.max(600, maxCount * CARD_W + PAD_X * 2);
+      var totalW = Math.max(600, xOff * CARD_W - 24 + PAD_X * 2);
       var totalH = PAD_Y + (maxLevel + 1) * ROW_H;
 
       var canEdit = APP.user && (APP.user.isAdmin || APP.user.isHR);
