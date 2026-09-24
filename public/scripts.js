@@ -253,7 +253,8 @@ var APP = {
     dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
     kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
     vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones', 'vac-balance': 'Concentrado de Vacaciones',
-    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración', policies: 'Políticas'
+    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración', policies: 'Políticas',
+    announcements: 'Comunicados'
   },
 
   loadView: function(view) {
@@ -270,6 +271,7 @@ var APP = {
       birthdays:      BirthdaysView.load,
       team:           TeamView.load,
       policies:       PoliciesView.load,
+      announcements:  AnnouncementsView.load,
     };
     if (fns[view]) fns[view]();
   },
@@ -520,9 +522,11 @@ var DashboardView = {
     var ann = (d.announcements || []).slice(0, 4);
     document.getElementById('dash-announcements').innerHTML = ann.length
       ? ann.map(function(a) {
-          return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">' +
+          var eid = 'ann-' + a.id;
+          window['_ann_' + a.id] = a;
+          return '<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="AnnouncementsView.openModal(window[\'_ann_\' + \'' + a.id + '\'])">' +
             (a.pinned ? '<span style="color:var(--warning)">📌 </span>' : '') +
-            '<span class="font-600 text-sm">' + a.title + '</span>' +
+            '<span class="font-600 text-sm" style="color:var(--primary)">' + a.title + '</span>' +
             '<p class="text-xs text-muted mt-4">' + (a.body || '').substring(0, 100) + (a.body && a.body.length > 100 ? '...' : '') + '</p>' +
             '<p class="text-xs text-muted mt-4">' + APP.fmtDate((a.publishedAt || '').split('T')[0]) + ' · ' + a.authorName + '</p></div>';
         }).join('')
@@ -3825,6 +3829,47 @@ var PoliciesView = {
       APP.toast('Política eliminada', 'success');
       PoliciesView.load();
     });
+  }
+};
+
+// ── ANNOUNCEMENTS VIEW ────────────────────────────────────────
+var AnnouncementsView = {
+  load: function() {
+    var el = document.getElementById('ann-content'); if (!el) return;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('announcements.list', {}, function(err, items) {
+      if (err) { el.innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>No se pudo cargar</p></div>'; return; }
+      if (!items || items.length === 0) {
+        el.innerHTML = '<div class="empty-state"><span class="material-icons-round">campaign</span><p>No hay comunicados activos</p></div>';
+        return;
+      }
+      el.innerHTML = items.map(function(a) {
+        window['_ann_' + a.id] = a;
+        return '<div class="card" style="margin-bottom:12px;cursor:pointer" onclick="AnnouncementsView.openModal(window[\'_ann_\' + \'' + a.id + '\'])">' +
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
+            '<div>' +
+              (a.pinned ? '<span style="color:var(--warning);margin-right:4px">📌</span>' : '') +
+              '<span class="font-600" style="color:var(--primary)">' + a.title + '</span>' +
+            '</div>' +
+            '<span class="text-xs text-muted" style="flex-shrink:0">' + APP.fmtDate((a.publishedAt || '').split('T')[0]) + '</span>' +
+          '</div>' +
+          '<p class="text-sm text-muted mt-8">' + (a.body || '').substring(0, 160) + (a.body && a.body.length > 160 ? '…' : '') + '</p>' +
+          '<p class="text-xs text-muted mt-4">' + (a.authorName || 'HR') + ' · <span style="color:var(--primary)">Leer más →</span></p>' +
+        '</div>';
+      }).join('');
+    });
+  },
+
+  openModal: function(a) {
+    if (!a) return;
+    var bodyHtml = (a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    var date = APP.fmtDate((a.publishedAt || '').split('T')[0]);
+    APP.modal(
+      (a.pinned ? '📌 ' : '📢 ') + a.title,
+      '<p class="text-xs text-muted" style="margin-bottom:16px">' + date + ' · ' + (a.authorName || 'HR') + '</p>' +
+      '<div style="color:var(--text-secondary);font-size:15px;line-height:1.75;border-top:1px solid var(--border);padding-top:16px">' + bodyHtml + '</div>',
+      '<button class="btn btn-primary" onclick="APP.closeModal()">Cerrar</button>'
+    );
   }
 };
 

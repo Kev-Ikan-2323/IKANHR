@@ -87,7 +87,9 @@ async function _notifyEmployees(announcement, author) {
 
     var authorName = author ? (author.firstName || '') + ' ' + (author.lastName || '') : 'IKAN HR'
     var date       = new Date().toLocaleDateString('es-MX', { day:'numeric', month:'long', year:'numeric' })
-    var bodyText   = (announcement.body || '').replace(/<[^>]+>/g, ' ').trim()
+    var bodyHtml   = (announcement.body || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>')
 
     for (var i = 0; i < recipients.length; i++) {
       var emp = recipients[i]
@@ -100,7 +102,7 @@ async function _notifyEmployees(announcement, author) {
             title: announcement.title,
             bodyHTML:
               '<p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6">Hola <strong style="color:#1E293B">' + (emp.firstName || '') + '</strong>,</p>' +
-              '<div style="color:#334155;font-size:15px;line-height:1.7;border-top:1px solid #E2E8F0;padding-top:16px">' + (announcement.body || bodyText) + '</div>',
+              '<div style="color:#334155;font-size:15px;line-height:1.7;border-top:1px solid #E2E8F0;padding-top:16px">' + bodyHtml + '</div>',
             details: [
               { label: 'Publicado por', value: authorName },
               { label: 'Fecha',         value: date }
