@@ -2475,15 +2475,20 @@ var AdminHR = {
       '<div class="form-group"><label>País</label>' + sel('ef-country', countryOpts, v.country||'MX') + '</div>' +
       '<div class="form-group"><label>Status</label>' + sel('ef-status', [{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}], v.status||'activo') + '</div>' +
       '</div>' +
-      '<div class="form-group" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px">' +
-      '<label class="switch" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">' +
-      '<input type="checkbox" id="ef-remote" style="opacity:0;width:0;height:0;position:absolute"' + (v.isRemote===true||v.isRemote==='true'?' checked':'') + ' onchange="var p=document.getElementById(\'ef-pin-wrap\');p.style.opacity=this.checked?\'0.4\':\'1\';p.querySelector(\'input\').disabled=this.checked">' +
-      '<span style="position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:22px;transition:.2s" onclick=""></span>' +
-      '<span style="position:absolute;content:\'\';height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none"></span>' +
-      '</label>' +
-      '<div><strong style="font-size:13px">Empleado remoto</strong><br><span style="font-size:11px;color:var(--muted)">No usa el checador físico</span></div>' +
-      '</div>' +
-      '<style>#ef-remote:checked+span{background:#3b82f6!important}#ef-remote:checked~span{transform:translateX(18px)}</style>' +
+      (function() {
+        var rem = v.isRemote===true||v.isRemote==='true';
+        var trackBg = rem ? '#3b82f6' : 'var(--border)';
+        var knobLeft = rem ? '21px' : '3px';
+        var onChange = "var c=this.checked,t=document.getElementById('ef-rt'),k=document.getElementById('ef-rk'),p=document.getElementById('ef-pin-wrap');t.style.background=c?'#3b82f6':'var(--border)';k.style.left=c?'21px':'3px';p.style.opacity=c?'0.4':'1';p.querySelector('input').disabled=c;";
+        return '<div class="form-group" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px;cursor:pointer" onclick="document.getElementById(\'ef-remote\').click()">' +
+          '<div style="position:relative;width:40px;height:22px;flex-shrink:0;pointer-events:none">' +
+          '<input type="checkbox" id="ef-remote" style="position:absolute;opacity:0;width:0;height:0"' + (rem?' checked':'') + ' onchange="' + onChange + '">' +
+          '<div id="ef-rt" style="position:absolute;inset:0;background:' + trackBg + ';border-radius:22px;transition:.2s"></div>' +
+          '<div id="ef-rk" style="position:absolute;height:16px;width:16px;left:' + knobLeft + ';bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>' +
+          '</div>' +
+          '<div><strong style="font-size:13px">Empleado remoto</strong><br><span style="font-size:11px;color:var(--muted)">No usa el checador físico</span></div>' +
+          '</div>';
+      })() +
       '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
       '<div class="form-group"><label>PIN Checador</label><input id="ef-pin" placeholder="Número de ID en el checador" value="' + (v.checadorPin||'') + '"' + (v.isRemote===true||v.isRemote==='true'?' disabled':'') + '></div>' +
       '</div>' +
