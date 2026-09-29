@@ -2475,8 +2475,17 @@ var AdminHR = {
       '<div class="form-group"><label>País</label>' + sel('ef-country', countryOpts, v.country||'MX') + '</div>' +
       '<div class="form-group"><label>Status</label>' + sel('ef-status', [{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}], v.status||'activo') + '</div>' +
       '</div>' +
-      '<div class="form-row">' +
-      '<div class="form-group"><label>PIN Checador</label><input id="ef-pin" placeholder="Número de ID en el checador" value="' + (v.checadorPin||'') + '"></div>' +
+      '<div class="form-group" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px">' +
+      '<label class="switch" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">' +
+      '<input type="checkbox" id="ef-remote" style="opacity:0;width:0;height:0;position:absolute"' + (v.isRemote===true||v.isRemote==='true'?' checked':'') + ' onchange="var p=document.getElementById(\'ef-pin-wrap\');p.style.opacity=this.checked?\'0.4\':\'1\';p.querySelector(\'input\').disabled=this.checked">' +
+      '<span style="position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:22px;transition:.2s" onclick=""></span>' +
+      '<span style="position:absolute;content:\'\';height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none"></span>' +
+      '</label>' +
+      '<div><strong style="font-size:13px">Empleado remoto</strong><br><span style="font-size:11px;color:var(--muted)">No usa el checador físico</span></div>' +
+      '</div>' +
+      '<style>#ef-remote:checked+span{background:#3b82f6!important}#ef-remote:checked~span{transform:translateX(18px)}</style>' +
+      '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
+      '<div class="form-group"><label>PIN Checador</label><input id="ef-pin" placeholder="Número de ID en el checador" value="' + (v.checadorPin||'') + '"' + (v.isRemote===true||v.isRemote==='true'?' disabled':'') + '></div>' +
       '</div>' +
       '<div class="form-group"><label>Notas internas</label><textarea id="ef-notes" placeholder="Notas...">' + (v.notes||'') + '</textarea></div>' +
       '<div class="form-group" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg);border-radius:6px">' +
@@ -2501,6 +2510,7 @@ var AdminHR = {
       country:        (document.getElementById('ef-country') ||{value:'MX'}).value,
       status:    (document.getElementById('ef-status')  ||{value:''}).value,
       notes:     (document.getElementById('ef-notes')||{value:''}).value,
+      isRemote:    !!(document.getElementById('ef-remote')&&document.getElementById('ef-remote').checked),
       checadorPin: (document.getElementById('ef-pin')||{value:''}).value.trim() || null,
       canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked)
     };
@@ -3921,7 +3931,7 @@ var AttendanceView = {
     var retardo = withPin.filter(function(r) { return r.status === 'retardo'; }).length;
     var absent  = withPin.filter(function(r) { return r.status === 'ausente'; }).length;
     var pend    = withPin.filter(function(r) { return r.status === 'pendiente'; }).length;
-    var sinPin  = rows.length - withPin.length;
+    var sinPin  = rows.filter(function(r) { return !r.checadorPin && !r.isRemote; }).length;
 
     var html = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">';
     html += '<input type="date" value="' + date + '" max="' + today + '" ';
@@ -3943,11 +3953,11 @@ var AttendanceView = {
     if (sinPin > 0) html += AttendanceView._pill(sinPin + ' sin huella', '#94a3b8');
     html += '</div>';
 
-    // Sort: a_tiempo → retardo → pendiente → ausente → sin huella
+    // Sort: a_tiempo → retardo → pendiente → ausente → remoto → sin huella
     var order = { a_tiempo: 0, retardo: 1, pendiente: 2, ausente: 3 };
     rows = rows.slice().sort(function(a, b) {
-      var oa = !a.checadorPin ? 4 : (order[a.status] !== undefined ? order[a.status] : 3);
-      var ob = !b.checadorPin ? 4 : (order[b.status] !== undefined ? order[b.status] : 3);
+      var oa = !a.checadorPin ? (a.isRemote ? 4 : 5) : (order[a.status] !== undefined ? order[a.status] : 3);
+      var ob = !b.checadorPin ? (b.isRemote ? 4 : 5) : (order[b.status] !== undefined ? order[b.status] : 3);
       if (oa !== ob) return oa - ob;
       return ((a.firstName || '') + (a.lastName || '')).localeCompare((b.firstName || '') + (b.lastName || ''));
     });
@@ -3972,7 +3982,9 @@ var AttendanceView = {
       html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + co + '</td>';
       var estadoCell = r.checadorPin
         ? AttendanceView._badge(r.status)
-        : '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0">Sin huella</span>';
+        : r.isRemote
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe">Remoto</span>'
+          : '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0">Sin huella</span>';
       html += '<td style="padding:8px 10px">' + estadoCell + '</td>';
       html += '</tr>';
     });

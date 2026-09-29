@@ -103,6 +103,7 @@ async function _getAllDay(date) {
       lastName:    emp.lastName  || '',
       department:  emp.department || '',
       checadorPin: emp.checadorPin || '',
+      isRemote:    emp.isRemote === true || emp.isRemote === 'true',
       checkIn:     fl.checkIn,
       checkOut:    fl.checkOut,
       status:      toStatus(fl.checkIn, date),
