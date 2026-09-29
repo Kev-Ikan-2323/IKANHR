@@ -254,7 +254,8 @@ var APP = {
     kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
     vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones', 'vac-balance': 'Concentrado de Vacaciones',
     birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración', policies: 'Políticas',
-    announcements: 'Comunicados'
+    announcements: 'Comunicados',
+    attendance:    'Asistencia'
   },
 
   loadView: function(view) {
@@ -272,6 +273,7 @@ var APP = {
       team:           TeamView.load,
       policies:       PoliciesView.load,
       announcements:  AnnouncementsView.load,
+      attendance:     AttendanceView.load,
     };
     if (fns[view]) fns[view]();
   },
@@ -3876,6 +3878,207 @@ var AnnouncementsView = {
       '<div style="color:var(--text-secondary);font-size:15px;line-height:1.75;border-top:1px solid var(--border);padding-top:16px">' + bodyHtml + '</div>',
       '<button class="btn btn-primary" onclick="APP.closeModal()">Cerrar</button>'
     );
+  }
+};
+
+// ── ATTENDANCE VIEW ───────────────────────────────────────────
+var AttendanceView = {
+  _timer: null,
+
+  load: function() {
+    var el = document.getElementById('att-content'); if (!el) return;
+    if (AttendanceView._timer) { clearInterval(AttendanceView._timer); AttendanceView._timer = null; }
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    var today = AttendanceView._todayCdmx();
+    if (APP.user && (APP.user.isAdmin || APP.user.isHR)) {
+      AttendanceView._loadAdmin(today);
+    } else {
+      AttendanceView._loadEmployee();
+    }
+  },
+
+  _loadAdmin: function(date) {
+    var el = document.getElementById('att-content'); if (!el) return;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('attendance.getDay', { date: date }, function(err, rows) {
+      if (err) { el.innerHTML = '<div class="empty-state"><span class="material-icons-round">error_outline</span><p>' + err + '</p></div>'; return; }
+      el.innerHTML = AttendanceView._renderAdmin(rows || [], date);
+      AttendanceView._scheduleRefresh(date);
+    });
+  },
+
+  _renderAdmin: function(rows, date) {
+    var today = AttendanceView._todayCdmx();
+    var isToday = date === today;
+
+    var present = rows.filter(function(r) { return r.status === 'a_tiempo' || r.status === 'retardo'; }).length;
+    var aTime   = rows.filter(function(r) { return r.status === 'a_tiempo'; }).length;
+    var retardo = rows.filter(function(r) { return r.status === 'retardo'; }).length;
+    var absent  = rows.filter(function(r) { return r.status === 'ausente'; }).length;
+    var pend    = rows.filter(function(r) { return r.status === 'pendiente'; }).length;
+
+    var html = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">';
+    html += '<input type="date" value="' + date + '" max="' + today + '" ';
+    html += 'onchange="AttendanceView._loadAdmin(this.value)" ';
+    html += 'style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">';
+    if (!isToday) {
+      html += '<button onclick="AttendanceView._loadAdmin(\'' + today + '\')" ';
+      html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">Hoy</button>';
+    }
+    if (isToday) html += '<span style="font-size:12px;color:var(--muted)">Actualiza cada 60s</span>';
+    html += '</div>';
+
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+    html += AttendanceView._pill(present + ' presentes', '#16a34a');
+    html += AttendanceView._pill(aTime + ' a tiempo', '#3b82f6');
+    html += AttendanceView._pill(retardo + ' retardo' + (retardo !== 1 ? 's' : ''), '#f59e0b');
+    html += AttendanceView._pill(absent + ' ausente' + (absent !== 1 ? 's' : ''), '#ef4444');
+    if (isToday && pend > 0) html += AttendanceView._pill(pend + ' pendiente' + (pend !== 1 ? 's' : ''), '#94a3b8');
+    html += '</div>';
+
+    // Sort: a_tiempo → retardo → pendiente → ausente
+    var order = { a_tiempo: 0, retardo: 1, pendiente: 2, ausente: 3 };
+    rows = rows.slice().sort(function(a, b) {
+      var oa = order[a.status] !== undefined ? order[a.status] : 4;
+      var ob = order[b.status] !== undefined ? order[b.status] : 4;
+      if (oa !== ob) return oa - ob;
+      return ((a.firstName || '') + (a.lastName || '')).localeCompare((b.firstName || '') + (b.lastName || ''));
+    });
+
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left">';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Empleado</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Depto.</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Entrada</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Salida</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Estado</th>';
+    html += '</tr></thead><tbody>';
+
+    rows.forEach(function(r) {
+      var name = (r.firstName || '') + ' ' + (r.lastName || '');
+      var ci = r.checkIn  ? AttendanceView._fmtTime(r.checkIn)  + (r.source === 'remoto' ? ' 🏠' : '') : '—';
+      var co = r.checkOut ? AttendanceView._fmtTime(r.checkOut) : '—';
+      html += '<tr style="border-bottom:1px solid var(--border)">';
+      html += '<td style="padding:8px 10px">' + name + '</td>';
+      html += '<td style="padding:8px 10px;color:var(--muted)">' + (r.department || '—') + '</td>';
+      html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + ci + '</td>';
+      html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + co + '</td>';
+      html += '<td style="padding:8px 10px">' + AttendanceView._badge(r.status) + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    return html;
+  },
+
+  _loadEmployee: function() {
+    var el = document.getElementById('att-content'); if (!el) return;
+    var today = AttendanceView._todayCdmx();
+    Promise.all([
+      new Promise(function(res) { APP.api('attendance.getDay', { date: today }, function(e, d) { res(e ? [] : (d || [])); }); }),
+      new Promise(function(res) { APP.api('attendance.getHistory', {}, function(e, d) { res(e ? [] : (d || [])); }); })
+    ]).then(function(results) {
+      var todayRec = results[0][0] || null;
+      var history  = results[1];
+      el.innerHTML = AttendanceView._renderEmployee(todayRec, history);
+    });
+  },
+
+  _renderEmployee: function(today, history) {
+    var status = today ? today.status : 'pendiente';
+    var ci = today && today.checkIn  ? AttendanceView._fmtTime(today.checkIn)  : '—';
+    var co = today && today.checkOut ? AttendanceView._fmtTime(today.checkOut) : '—';
+    var colors = {
+      a_tiempo:  { bg: '#ecfdf5', color: '#16a34a', label: 'A tiempo' },
+      retardo:   { bg: '#fffbeb', color: '#d97706', label: 'Retardo' },
+      ausente:   { bg: '#fef2f2', color: '#dc2626', label: 'Ausente hoy' },
+      pendiente: { bg: '#f8fafc', color: '#64748b', label: 'Sin registro aún' }
+    };
+    var c = colors[status] || colors.pendiente;
+
+    var html = '<div class="card" style="margin-bottom:16px;background:' + c.bg + ';border-color:' + c.color + '33">';
+    html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + c.color + ';margin-bottom:4px">Hoy</div>';
+    html += '<div style="font-size:26px;font-weight:700;color:' + c.color + ';margin-bottom:12px">' + c.label + '</div>';
+    html += '<div style="display:flex;gap:28px">';
+    html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>';
+    html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>';
+    html += '</div></div>';
+
+    if (!history || history.length === 0) {
+      html += '<div class="empty-state"><span class="material-icons-round">fingerprint</span><p>Sin registros en los últimos 30 días</p></div>';
+      return html;
+    }
+
+    html += '<div class="card" style="padding:0;overflow:hidden">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<thead><tr style="border-bottom:1px solid var(--border)">';
+    html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Fecha</th>';
+    html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Entrada</th>';
+    html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Salida</th>';
+    html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Estado</th>';
+    html += '</tr></thead><tbody>';
+    history.forEach(function(r) {
+      var ciStr = r.checkIn  ? AttendanceView._fmtTime(r.checkIn)  + (r.source === 'remoto' ? ' 🏠' : '') : '—';
+      var coStr = r.checkOut ? AttendanceView._fmtTime(r.checkOut) : '—';
+      html += '<tr style="border-bottom:1px solid var(--border)">';
+      html += '<td style="padding:8px 14px">' + AttendanceView._fmtDate(r.date) + '</td>';
+      html += '<td style="padding:8px 14px;font-variant-numeric:tabular-nums">' + ciStr + '</td>';
+      html += '<td style="padding:8px 14px;font-variant-numeric:tabular-nums">' + coStr + '</td>';
+      html += '<td style="padding:8px 14px">' + AttendanceView._badge(r.status) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+  },
+
+  _scheduleRefresh: function(date) {
+    if (AttendanceView._timer) clearInterval(AttendanceView._timer);
+    if (date !== AttendanceView._todayCdmx()) return;
+    AttendanceView._timer = setInterval(function() {
+      var viewEl = document.getElementById('view-attendance');
+      if (viewEl && viewEl.classList.contains('active')) {
+        AttendanceView._loadAdmin(AttendanceView._todayCdmx());
+      } else {
+        clearInterval(AttendanceView._timer);
+        AttendanceView._timer = null;
+      }
+    }, 60000);
+  },
+
+  _todayCdmx: function() {
+    var d = new Date(new Date().getTime() - 6 * 3600 * 1000);
+    return d.toISOString().split('T')[0];
+  },
+
+  _fmtTime: function(utcTs) {
+    try {
+      return new Date(utcTs).toLocaleTimeString('es-MX', {
+        timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit'
+      });
+    } catch(e) { return '—'; }
+  },
+
+  _fmtDate: function(dateStr) {
+    try {
+      return new Date(dateStr + 'T12:00:00').toLocaleDateString('es-MX', {
+        weekday: 'short', day: 'numeric', month: 'short'
+      });
+    } catch(e) { return dateStr; }
+  },
+
+  _pill: function(text, color) {
+    return '<div style="padding:4px 12px;border-radius:20px;background:' + color + '20;color:' + color + ';font-size:12px;font-weight:600">' + text + '</div>';
+  },
+
+  _badge: function(status) {
+    var map = {
+      a_tiempo:  ['#ecfdf5', '#16a34a', 'A tiempo'],
+      retardo:   ['#fffbeb', '#d97706', 'Retardo'],
+      ausente:   ['#fef2f2', '#dc2626', 'Ausente'],
+      pendiente: ['#f8fafc', '#64748b', 'Pendiente']
+    };
+    var s = map[status] || ['#f8fafc', '#64748b', status];
+    return '<span style="padding:2px 8px;border-radius:4px;background:' + s[0] + ';color:' + s[1] + ';font-size:12px;font-weight:600">' + s[2] + '</span>';
   }
 };
 

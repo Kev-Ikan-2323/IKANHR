@@ -56,6 +56,9 @@ var SHELL = `
       <div class="nav-item" data-view="announcements" onclick="APP.navigate('announcements')">
         <span class="material-icons-round">campaign</span><span>Comunicados</span>
       </div>
+      <div class="nav-item" data-view="attendance" onclick="APP.navigate('attendance')">
+        <span class="material-icons-round">fingerprint</span><span>Asistencia</span>
+      </div>
     </div>
 
     <div id="approver-section" style="display:none">
@@ -120,7 +123,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v10.8</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v10.9</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -252,6 +255,12 @@ var SHELL = `
     <div id="view-announcements" class="view">
       <div class="view-title"><span class="material-icons-round">campaign</span>Comunicados</div>
       <div id="ann-content"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ATTENDANCE -->
+    <div id="view-attendance" class="view">
+      <div class="view-title"><span class="material-icons-round">fingerprint</span>Asistencia</div>
+      <div id="att-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
   </div>

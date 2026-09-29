@@ -20,6 +20,7 @@ import { PoliciesModule }     from '../../modules/policies.js'
 import { MailService }        from '../../lib/email.js'
 import { buildEmail }        from '../../lib/email-template.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
+import { AttendanceModule }   from '../../modules/attendance.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -205,7 +206,11 @@ async function dispatch(action, data, user) {
     'kpi.schedules.create': function() { return KPISchedulesModule.create(data, user) },
     'kpi.schedules.update': function() { return KPISchedulesModule.update(data.id, data, user) },
     'kpi.schedules.remove': function() { return KPISchedulesModule.remove(data.id, user) },
-    'kpi.schedules.runNow': function() { return KPISchedulesModule.runNow(data.id, user) }
+    'kpi.schedules.runNow': function() { return KPISchedulesModule.runNow(data.id, user) },
+
+    // ── ATTENDANCE ─────────────────────────────────────────────
+    'attendance.getDay':     function() { return AttendanceModule.getDay(data, user) },
+    'attendance.getHistory': function() { return AttendanceModule.getHistory(data, user) }
   }
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)
