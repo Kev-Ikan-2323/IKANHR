@@ -2475,6 +2475,9 @@ var AdminHR = {
       '<div class="form-group"><label>País</label>' + sel('ef-country', countryOpts, v.country||'MX') + '</div>' +
       '<div class="form-group"><label>Status</label>' + sel('ef-status', [{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}], v.status||'activo') + '</div>' +
       '</div>' +
+      '<div class="form-row">' +
+      '<div class="form-group"><label>PIN Checador</label><input id="ef-pin" placeholder="Número de ID en el checador" value="' + (v.checadorPin||'') + '"></div>' +
+      '</div>' +
       '<div class="form-group"><label>Notas internas</label><textarea id="ef-notes" placeholder="Notas...">' + (v.notes||'') + '</textarea></div>' +
       '<div class="form-group" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg);border-radius:6px">' +
       '<input type="checkbox" id="ef-cap" style="width:auto;margin:0"' + (String(v.canApproveVacations)==='true'?' checked':'') + '>' +
@@ -2498,6 +2501,7 @@ var AdminHR = {
       country:        (document.getElementById('ef-country') ||{value:'MX'}).value,
       status:    (document.getElementById('ef-status')  ||{value:''}).value,
       notes:     (document.getElementById('ef-notes')||{value:''}).value,
+      checadorPin: (document.getElementById('ef-pin')||{value:''}).value.trim() || null,
       canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked)
     };
     if (!data.firstName||!data.lastName||!data.email||!data.roleId||!data.hireDate) {
