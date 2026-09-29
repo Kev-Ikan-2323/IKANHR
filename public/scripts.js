@@ -3915,11 +3915,13 @@ var AttendanceView = {
     var today = AttendanceView._todayCdmx();
     var isToday = date === today;
 
-    var present = rows.filter(function(r) { return r.status === 'a_tiempo' || r.status === 'retardo'; }).length;
-    var aTime   = rows.filter(function(r) { return r.status === 'a_tiempo'; }).length;
-    var retardo = rows.filter(function(r) { return r.status === 'retardo'; }).length;
-    var absent  = rows.filter(function(r) { return r.status === 'ausente'; }).length;
-    var pend    = rows.filter(function(r) { return r.status === 'pendiente'; }).length;
+    var withPin = rows.filter(function(r) { return !!r.checadorPin; });
+    var present = withPin.filter(function(r) { return r.status === 'a_tiempo' || r.status === 'retardo'; }).length;
+    var aTime   = withPin.filter(function(r) { return r.status === 'a_tiempo'; }).length;
+    var retardo = withPin.filter(function(r) { return r.status === 'retardo'; }).length;
+    var absent  = withPin.filter(function(r) { return r.status === 'ausente'; }).length;
+    var pend    = withPin.filter(function(r) { return r.status === 'pendiente'; }).length;
+    var sinPin  = rows.length - withPin.length;
 
     var html = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">';
     html += '<input type="date" value="' + date + '" max="' + today + '" ';
@@ -3938,13 +3940,14 @@ var AttendanceView = {
     html += AttendanceView._pill(retardo + ' retardo' + (retardo !== 1 ? 's' : ''), '#f59e0b');
     html += AttendanceView._pill(absent + ' ausente' + (absent !== 1 ? 's' : ''), '#ef4444');
     if (isToday && pend > 0) html += AttendanceView._pill(pend + ' pendiente' + (pend !== 1 ? 's' : ''), '#94a3b8');
+    if (sinPin > 0) html += AttendanceView._pill(sinPin + ' sin huella', '#94a3b8');
     html += '</div>';
 
-    // Sort: a_tiempo → retardo → pendiente → ausente
+    // Sort: a_tiempo → retardo → pendiente → ausente → sin huella
     var order = { a_tiempo: 0, retardo: 1, pendiente: 2, ausente: 3 };
     rows = rows.slice().sort(function(a, b) {
-      var oa = order[a.status] !== undefined ? order[a.status] : 4;
-      var ob = order[b.status] !== undefined ? order[b.status] : 4;
+      var oa = !a.checadorPin ? 4 : (order[a.status] !== undefined ? order[a.status] : 3);
+      var ob = !b.checadorPin ? 4 : (order[b.status] !== undefined ? order[b.status] : 3);
       if (oa !== ob) return oa - ob;
       return ((a.firstName || '') + (a.lastName || '')).localeCompare((b.firstName || '') + (b.lastName || ''));
     });
@@ -3967,7 +3970,10 @@ var AttendanceView = {
       html += '<td style="padding:8px 10px;color:var(--muted)">' + (r.department || '—') + '</td>';
       html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + ci + '</td>';
       html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + co + '</td>';
-      html += '<td style="padding:8px 10px">' + AttendanceView._badge(r.status) + '</td>';
+      var estadoCell = r.checadorPin
+        ? AttendanceView._badge(r.status)
+        : '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0">Sin huella</span>';
+      html += '<td style="padding:8px 10px">' + estadoCell + '</td>';
       html += '</tr>';
     });
 
