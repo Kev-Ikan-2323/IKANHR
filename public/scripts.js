@@ -2670,7 +2670,13 @@ var AdminHR = {
     if (posId && posEl) { var opt = posEl.options[posEl.selectedIndex]; posName = opt ? opt.text : ''; }
     var MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     var now = new Date();
-    var name = 'Evaluación ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear() + (posName && posName.indexOf('Todos')===-1 ? ' — ' + posName : '');
+    var prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    var evalLabel = type === 'Bimestral'
+      ? MONTHS[new Date(now.getFullYear(), now.getMonth()-2, 1).getMonth()] + ' - ' + MONTHS[prevM.getMonth()] + ' ' + prevM.getFullYear()
+      : type === 'Semestral'
+      ? MONTHS[new Date(now.getFullYear(), now.getMonth()-6, 1).getMonth()] + ' - ' + MONTHS[prevM.getMonth()] + ' ' + prevM.getFullYear()
+      : MONTHS[prevM.getMonth()] + ' ' + prevM.getFullYear();
+    var name = 'Evaluación ' + evalLabel + (posName && posName.indexOf('Todos')===-1 ? ' — ' + posName : '');
     var d = AdminHR._calcLaunchDates(type);
     var fmtShort = function(s){ var p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
     prev.innerHTML =

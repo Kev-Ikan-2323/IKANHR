@@ -121,14 +121,11 @@ function _alreadyActivatedInCycle(schedule, today) {
 }
 
 async function _activateSchedule(schedule, today) {
-  var monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-
   var startDate    = _fmtDate(today)
   var endDate      = _periodEndDate(today, schedule.periodType)
   var selfDeadline = _fmtDate(_addDays(today, parseInt(schedule.selfAssessmentDays) || 25))
   var mgrDeadline  = _fmtDate(_addDays(today, parseInt(schedule.managerReviewDays)  || 30))
-  var periodName   = schedule.name + ' — ' + monthNames[today.getMonth()] + ' ' + today.getFullYear()
+  var periodName   = schedule.name + ' — ' + _evaluatedPeriodLabel(today, schedule.periodType)
 
   var period = await DB.insert(CONFIG.SHEETS.KPI_PERIODS, {
     name:                   periodName,
@@ -210,6 +207,22 @@ async function _notifyEmployee(emp, periodName, deadline) {
   } catch (e) {
     console.error('Email error (' + emp.email + '):', e.message)
   }
+}
+
+// Returns the label of the period being evaluated (previous month/s relative to activation date)
+function _evaluatedPeriodLabel(today, periodType) {
+  var M = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  var prev = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  if (periodType === 'Bimestral') {
+    var prev2 = new Date(today.getFullYear(), today.getMonth() - 2, 1)
+    return M[prev2.getMonth()] + ' - ' + M[prev.getMonth()] + ' ' + prev.getFullYear()
+  }
+  if (periodType === 'Semestral') {
+    var prev6 = new Date(today.getFullYear(), today.getMonth() - 6, 1)
+    return M[prev6.getMonth()] + ' - ' + M[prev.getMonth()] + ' ' + prev.getFullYear()
+  }
+  return M[prev.getMonth()] + ' ' + prev.getFullYear()
 }
 
 function _fmtDate(d) {
