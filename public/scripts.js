@@ -3903,6 +3903,7 @@ var AnnouncementsView = {
 // ── ATTENDANCE VIEW ───────────────────────────────────────────
 var AttendanceView = {
   _timer: null,
+  _empView: 'calendar',
 
   load: function() {
     var el = document.getElementById('att-content'); if (!el) return;
@@ -4027,6 +4028,8 @@ var AttendanceView = {
       var monthData = results[0];
       var todayRec  = isCurrentMonth ? (results[1] || [])[0] || null : null;
       if (!monthData) { el.innerHTML = '<div class="empty-state"><p>Error cargando datos</p></div>'; return; }
+      AttendanceView._empMonthData = monthData;
+      AttendanceView._empTodayRec  = todayRec;
       el.innerHTML = AttendanceView._renderEmployee(monthData, todayRec);
     });
   },
@@ -4067,9 +4070,11 @@ var AttendanceView = {
       html += '</div></div>';
     }
 
-    // Month navigation
-    html += '<div style="display:flex;justify-content:center;margin-bottom:12px">';
-    html += '<div style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+    // Month navigation + view toggle
+    var isCal  = AttendanceView._empView === 'calendar';
+    var btnBase = 'padding:5px 8px;border:none;cursor:pointer;font-size:13px;display:flex;align-items:center';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+    html += '<div style="display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden">';
     html += '<button onclick="AttendanceView._loadEmployeeMonth(' + prevYear + ',' + prevMonth + ')" ';
     html += 'style="padding:6px 14px;border:none;border-right:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
     html += '<span style="padding:6px 18px;font-weight:600;font-size:14px;background:var(--surface)">' + MONTHS_ES[month - 1] + ' ' + year + '</span>';
@@ -4079,6 +4084,15 @@ var AttendanceView = {
     } else {
       html += '<button disabled style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
     }
+    html += '</div>';
+    html += '<div style="flex:1"></div>';
+    html += '<div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+    html += '<button id="att-v-cal" onclick="AttendanceView._switchEmpView(\'calendar\')" title="Vista calendario" ';
+    html += 'style="' + btnBase + ';border-right:1px solid var(--border);background:' + (isCal ? 'var(--primary)' : 'var(--surface)') + ';color:' + (isCal ? '#fff' : 'var(--muted)') + '">';
+    html += '<span class="material-icons-round" style="font-size:16px">calendar_month</span></button>';
+    html += '<button id="att-v-list" onclick="AttendanceView._switchEmpView(\'list\')" title="Vista lista" ';
+    html += 'style="' + btnBase + ';background:' + (!isCal ? 'var(--primary)' : 'var(--surface)') + ';color:' + (!isCal ? '#fff' : 'var(--muted)') + '">';
+    html += '<span class="material-icons-round" style="font-size:16px">view_list</span></button>';
     html += '</div></div>';
 
     // Summary pills
@@ -4090,12 +4104,33 @@ var AttendanceView = {
     if (s.ausente > 0) html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
     html += '</div>';
 
-    if (!monthData.days || monthData.days.length === 0) {
-      html += '<div class="empty-state"><span class="material-icons-round">fingerprint</span><p>Sin registros este mes</p></div>';
-      return html;
-    }
+    html += '<div id="att-emp-body">';
+    html += isCal
+      ? AttendanceView._renderEmployeeCalendar(monthData)
+      : AttendanceView._renderEmployeeList(monthData);
+    html += '</div>';
+    return html;
+  },
 
-    html += '<div class="card" style="padding:0;overflow:hidden">';
+  _switchEmpView: function(view) {
+    AttendanceView._empView = view;
+    var body = document.getElementById('att-emp-body');
+    if (body && AttendanceView._empMonthData) {
+      body.innerHTML = view === 'calendar'
+        ? AttendanceView._renderEmployeeCalendar(AttendanceView._empMonthData)
+        : AttendanceView._renderEmployeeList(AttendanceView._empMonthData);
+    }
+    var calBtn  = document.getElementById('att-v-cal');
+    var listBtn = document.getElementById('att-v-list');
+    if (calBtn)  { calBtn.style.background  = view === 'calendar' ? 'var(--primary)' : 'var(--surface)'; calBtn.style.color  = view === 'calendar' ? '#fff' : 'var(--muted)'; }
+    if (listBtn) { listBtn.style.background = view === 'list'     ? 'var(--primary)' : 'var(--surface)'; listBtn.style.color = view === 'list'     ? '#fff' : 'var(--muted)'; }
+  },
+
+  _renderEmployeeList: function(monthData) {
+    if (!monthData.days || monthData.days.length === 0) {
+      return '<div class="empty-state"><span class="material-icons-round">fingerprint</span><p>Sin registros este mes</p></div>';
+    }
+    var html = '<div class="card" style="padding:0;overflow:hidden">';
     html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<thead><tr style="border-bottom:1px solid var(--border)">';
     html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Fecha</th>';
@@ -4114,6 +4149,78 @@ var AttendanceView = {
       html += '</tr>';
     });
     html += '</tbody></table></div>';
+    return html;
+  },
+
+  _renderEmployeeCalendar: function(monthData) {
+    var year  = monthData.year;
+    var month = monthData.month;
+    var today = AttendanceView._todayCdmx();
+    var mon   = String(month).padStart(2, '0');
+
+    // Build lookup by date
+    var byDate = {};
+    monthData.days.forEach(function(d) { byDate[d.date] = d; });
+
+    var DAYS_ES = ['Lu','Ma','Mi','Ju','Vi','Sa','Do'];
+    var firstDow = new Date(year, month - 1, 1).getDay(); // 0=Sun
+    var startPad = (firstDow + 6) % 7; // empty cells before day 1 (Mon-first)
+    var lastDay  = new Date(year, month, 0).getDate();
+
+    var ST = {
+      a_tiempo:  { bg: '#ecfdf5', fg: '#16a34a', brd: '#bbf7d0' },
+      retardo:   { bg: '#fffbeb', fg: '#d97706', brd: '#fde68a' },
+      ausente:   { bg: '#fef2f2', fg: '#dc2626', brd: '#fecaca' }
+    };
+
+    var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
+
+    // Day headers
+    DAYS_ES.forEach(function(d, i) {
+      html += '<div style="text-align:center;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--muted);padding:4px 0;text-transform:uppercase">' + d + '</div>';
+    });
+
+    // Empty cells before day 1
+    for (var p = 0; p < startPad; p++) html += '<div></div>';
+
+    // Day cells
+    for (var d = 1; d <= lastDay; d++) {
+      var dateStr  = year + '-' + mon + '-' + String(d).padStart(2, '0');
+      var dow      = new Date(dateStr + 'T12:00:00').getDay();
+      var isWeekend = dow === 0 || dow === 6;
+      var isFuture  = dateStr > today;
+      var isToday   = dateStr === today;
+      var rec       = byDate[dateStr];
+
+      if (isWeekend) {
+        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;opacity:0.3;text-align:center">';
+        html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
+      } else if (isFuture) {
+        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;opacity:0.25;text-align:center">';
+        html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
+      } else if (rec) {
+        var c  = ST[rec.status] || { bg: 'var(--surface)', fg: 'var(--muted)', brd: 'var(--border)' };
+        var ci = rec.checkIn ? AttendanceView._fmtTime(rec.checkIn) : '';
+        var ring = isToday ? ';box-shadow:0 0 0 2px ' + c.fg : '';
+        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;background:' + c.bg + ';border:1px solid ' + c.brd + ring + ';text-align:center">';
+        html += '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + ';color:' + c.fg + '">' + d + '</div>';
+        if (ci) html += '<div style="font-size:10px;color:' + c.fg + ';margin-top:3px;font-variant-numeric:tabular-nums">' + ci + '</div>';
+        if (rec.source === 'remoto') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
+        html += '</div>';
+      } else {
+        var ring2 = isToday ? ';box-shadow:0 0 0 2px var(--primary)' : '';
+        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;background:var(--surface);border:1px solid var(--border)' + ring2 + ';text-align:center">';
+        html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
+      }
+    }
+    html += '</div>';
+
+    // Legend
+    html += '<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfdf5;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">A tiempo</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fffbeb;border:1px solid #fde68a"></div><span style="font-size:12px;color:var(--muted)">Retardo</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca"></div><span style="font-size:12px;color:var(--muted)">Ausente</span></div>';
+    html += '</div>';
     return html;
   },
 
