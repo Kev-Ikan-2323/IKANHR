@@ -3949,6 +3949,8 @@ var AttendanceView = {
     }
     if (isToday) html += '<span style="font-size:12px;color:var(--muted)">Actualiza cada 60s</span>';
     html += '<div style="flex:1"></div>';
+    html += '<button onclick="AttendanceView._loadEmployee()" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">Mi asistencia →</button>';
     html += '<button onclick="AttendanceView._loadDashboard()" ';
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-size:13px;font-weight:500">Dashboard →</button>';
     html += '</div>';
@@ -4057,6 +4059,10 @@ var AttendanceView = {
     var isCal  = AttendanceView._empView === 'calendar';
     var btnBase = 'padding:5px 8px;border:none;cursor:pointer;font-size:13px;display:flex;align-items:center';
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+    if (APP.user && (APP.user.isAdmin || APP.user.isHR)) {
+      html += '<button onclick="AttendanceView._loadAdmin(AttendanceView._todayCdmx())" ';
+      html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">← Empresa</button>';
+    }
     html += '<div style="display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden">';
     html += '<button onclick="AttendanceView._loadEmployeeMonth(' + prevYear + ',' + prevMonth + ')" ';
     html += 'style="padding:6px 14px;border:none;border-right:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
