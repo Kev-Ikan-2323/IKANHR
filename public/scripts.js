@@ -4014,6 +4014,8 @@ var AttendanceView = {
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">Mi asistencia →</button>';
     html += '<button onclick="AttendanceView._loadDashboard()" ';
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-size:13px;font-weight:500">Dashboard →</button>';
+    html += '<button onclick="AttendanceView._loadTardinessReport()" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #dc2626;background:#dc2626;color:#fff;cursor:pointer;font-size:13px;font-weight:500">Retardos →</button>';
     html += '</div>';
 
     html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
@@ -4099,6 +4101,7 @@ var AttendanceView = {
       AttendanceView._empMonthData = monthData;
       AttendanceView._empTodayRec  = todayRec;
       el.innerHTML = AttendanceView._renderEmployee(monthData, todayRec);
+      AttendanceView._loadTardinessBanner();
     });
   },
 
@@ -4155,6 +4158,8 @@ var AttendanceView = {
     if (s.ausente > 0)    html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
     if (s.vacaciones > 0) html += AttendanceView._pill(s.vacaciones + ' día' + (s.vacaciones !== 1 ? 's' : '') + ' vacaciones', '#0ea5e9');
     html += '</div>';
+
+    html += '<div id="att-tardiness-banner" style="margin-bottom:14px"></div>';
 
     html += '<div id="att-emp-body">';
     html += isCal
@@ -5185,6 +5190,106 @@ var AttendanceView = {
       var popup = document.getElementById('att-appeals-popup');
       if (popup && !popup.querySelector('[id^="appeal-item-"]')) popup.remove();
     });
+  },
+
+  _loadTardinessBanner: function() {
+    var el = document.getElementById('att-tardiness-banner');
+    if (!el) return;
+    APP.api('tardiness.getStatus', {}, function(err, d) {
+      var bannerEl = document.getElementById('att-tardiness-banner');
+      if (!bannerEl || err || !d) return;
+      var count = d.count || 0;
+      if (count === 0) return;
+      bannerEl.innerHTML =
+        '<div style="background:' + d.bg + ';color:' + d.fg + ';border-radius:8px;padding:10px 14px;font-size:13px;display:flex;align-items:center;gap:10px">' +
+        '<strong style="font-size:22px;line-height:1;min-width:24px;text-align:center">' + count + '</strong>' +
+        '<div>' +
+        '<div style="font-weight:700;font-size:13px">Retardo' + (count !== 1 ? 's' : '') + ' en los últimos 6 meses (desde oct 2026)</div>' +
+        '<div style="opacity:.85;font-size:12px;margin-top:2px">' + d.label + '</div>' +
+        '</div></div>';
+    });
+  },
+
+  _loadTardinessReport: function() {
+    var el = document.getElementById('att-content'); if (!el) return;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('tardiness.getAllStatus', {}, function(err, data) {
+      if (err) { el.innerHTML = '<div class="empty-state"><p>' + err + '</p></div>'; return; }
+      el.innerHTML = AttendanceView._renderTardinessReport(data);
+    });
+  },
+
+  _renderTardinessReport: function(data) {
+    var items = data.items || [];
+    var windowStart = data.windowStart || '2026-10-01';
+    var html = '';
+
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">';
+    html += '<button onclick="AttendanceView._loadAdmin(AttendanceView._todayCdmx())" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">← Hoy</button>';
+    html += '<h3 style="margin:0;font-size:16px;font-weight:700">Reporte de Retardos</h3>';
+    html += '<span style="font-size:12px;color:var(--muted)">Ventana: ' + windowStart + ' → hoy (6 meses)</span>';
+    html += '</div>';
+
+    // Tier legend
+    var TIERS = [
+      { min: 17, label: 'Rescisión de la relación laboral',              bg: '#450a0a', fg: '#fca5a5' },
+      { min: 16, label: 'Suspensión 3 días sin goce',                    bg: '#7f1d1d', fg: '#fecaca' },
+      { min: 15, label: 'Suspensión hasta 3 días + instrucción formal',  bg: '#991b1b', fg: '#fecaca' },
+      { min: 12, label: 'Descuento 1 día + exhorto por escrito',         bg: '#dc2626', fg: '#fff' },
+      { min:  9, label: 'Descuento 3 días + llamada de atención',        bg: '#ea580c', fg: '#fff' },
+      { min:  6, label: 'Descuento 2 días de salario',                   bg: '#f97316', fg: '#fff' },
+      { min:  3, label: 'Descuento 1 día de salario',                    bg: '#f59e0b', fg: '#fff' }
+    ];
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">';
+    TIERS.forEach(function(t) {
+      html += '<span style="padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600;background:' + t.bg + ';color:' + t.fg + '">' + t.min + '+ retardos: ' + t.label + '</span>';
+    });
+    html += '</div>';
+
+    if (items.length === 0) {
+      html += '<div class="empty-state"><p>No hay empleados con seguimiento de retardos.</p></div>';
+      return html;
+    }
+
+    // Summary counts
+    var sinCons = items.filter(function(i) { return i.severity === 'ok'; }).length;
+    var conCons  = items.length - sinCons;
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+    html += AttendanceView._pill(items.length + ' empleados', '#475569');
+    if (conCons > 0) html += AttendanceView._pill(conCons + ' con consecuencia', '#dc2626');
+    html += AttendanceView._pill(sinCons + ' sin consecuencia', '#16a34a');
+    html += '</div>';
+
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<thead><tr style="border-bottom:2px solid var(--border)">';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:left">Empleado</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:left">Depto.</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Retardos</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:left">Consecuencia</th>';
+    html += '</tr></thead><tbody>';
+
+    items.forEach(function(item) {
+      html += '<tr style="border-bottom:1px solid var(--border)">';
+      html += '<td style="padding:8px 10px;font-weight:500">' + item.name + '</td>';
+      html += '<td style="padding:8px 10px;color:var(--muted)">' + (item.department || '—') + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums;font-weight:700;color:' + (item.count > 0 ? item.fg : 'var(--muted)') + '">';
+      if (item.count > 0) {
+        html += '<span style="display:inline-block;min-width:28px;padding:2px 8px;border-radius:12px;background:' + item.bg + ';color:' + item.fg + '">' + item.count + '</span>';
+      } else {
+        html += '0';
+      }
+      html += '</td>';
+      if (item.severity === 'ok') {
+        html += '<td style="padding:8px 10px;color:#16a34a;font-size:12px">Sin consecuencias</td>';
+      } else {
+        html += '<td style="padding:8px 10px"><span style="padding:2px 8px;border-radius:4px;background:' + item.bg + ';color:' + item.fg + ';font-size:11px;font-weight:600">' + item.label + '</span></td>';
+      }
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    return html;
   },
 
   _badge: function(status) {

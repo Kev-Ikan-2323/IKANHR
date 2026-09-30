@@ -22,7 +22,8 @@ import { buildEmail }        from '../../lib/email-template.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
 import { AttendanceModule }    from '../../modules/attendance.js'
 import { RemoteCheckinModule }   from '../../modules/remote-checkin.js'
-import { TardinessAppealModule } from '../../modules/tardiness-appeal.js'
+import { TardinessAppealModule }  from '../../modules/tardiness-appeal.js'
+import { TardinessPolicyModule } from '../../modules/tardiness-policy.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -221,7 +222,11 @@ async function dispatch(action, data, user) {
     'remote.getConfig':      function() { return RemoteCheckinModule.getConfig() },
     'appeal.request':        function() { return TardinessAppealModule.request(data, user) },
     'appeal.review':         function() { return TardinessAppealModule.review(data, user) },
-    'appeal.getPending':     function() { return TardinessAppealModule.getPending(data, user) }
+    'appeal.getPending':     function() { return TardinessAppealModule.getPending(data, user) },
+
+    // ── TARDINESS POLICY ───────────────────────────────────────
+    'tardiness.getStatus':   function() { return TardinessPolicyModule.getStatus(data, user) },
+    'tardiness.getAllStatus': function() { return TardinessPolicyModule.getAllStatus(data, user) }
   }
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)
