@@ -3985,21 +3985,27 @@ var AttendanceView = {
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Estado</th>';
     html += '</tr></thead><tbody>';
 
+    var canOverride = APP.user && (APP.user.isAdmin || APP.user.isHR);
+    var isPastDate  = date !== AttendanceView._todayCdmx();
     rows.forEach(function(r) {
       var name = (r.firstName || '') + ' ' + (r.lastName || '');
-      var ci = r.checkIn  ? AttendanceView._fmtTime(r.checkIn)  + (r.source === 'remoto' ? ' 🏠' : '') : '—';
+      var ci = r.checkIn  ? AttendanceView._fmtTime(r.checkIn)  + (r.status === 'remoto' || r.source === 'remoto' ? ' 🏠' : '') : '—';
       var co = r.checkOut ? AttendanceView._fmtTime(r.checkOut) : '—';
       html += '<tr style="border-bottom:1px solid var(--border)">';
       html += '<td style="padding:8px 10px">' + name + '</td>';
       html += '<td style="padding:8px 10px;color:var(--muted)">' + (r.department || '—') + '</td>';
       html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + ci + '</td>';
       html += '<td style="padding:8px 10px;font-variant-numeric:tabular-nums">' + co + '</td>';
-      var estadoCell = r.checadorPin
+      var badge = (r.checadorPin || r.isRemote)
         ? AttendanceView._badge(r.status)
-        : r.isRemote
-          ? '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe">Remoto</span>'
-          : '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0">Sin huella</span>';
-      html += '<td style="padding:8px 10px">' + estadoCell + '</td>';
+        : '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0">Sin huella</span>';
+      var overrideBtn = (canOverride && isPastDate && r.status === 'ausente')
+        ? '<button onclick="AttendanceView._openOverrideModal(' +
+            '\'' + r.employeeId + '\',\'' + date + '\',\'' + (r.rcId || '') + '\',' +
+            '\'' + name.replace(/'/g, '') + '\'' +
+          ')" style="margin-left:6px;padding:2px 7px;border-radius:4px;border:1px solid #94a3b8;background:none;cursor:pointer;font-size:11px;color:#64748b;vertical-align:middle">⚙ Corregir</button>'
+        : '';
+      html += '<td style="padding:8px 10px">' + badge + overrideBtn + '</td>';
       html += '</tr>';
     });
 
@@ -4521,6 +4527,77 @@ var AttendanceView = {
 
   _pill: function(text, color) {
     return '<div style="padding:4px 12px;border-radius:20px;background:' + color + '20;color:' + color + ';font-size:12px;font-weight:600">' + text + '</div>';
+  },
+
+  // ── Override ausencia (HR/Admin) ──────────────────────────────
+
+  _openOverrideModal: function(employeeId, date, rcId, empName) {
+    var existing = document.getElementById('att-override-modal');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'att-override-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9200;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+    var html = '<div style="background:var(--card);border-radius:16px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">';
+    html += '<div><div style="font-weight:700;font-size:15px">Corregir ausencia</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-top:1px">Esta acción queda registrada con tu nombre</div></div>';
+    html += '<button onclick="document.getElementById(\'att-override-modal\').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px">×</button>';
+    html += '</div><div style="padding:20px">';
+    html += '<div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px">';
+    html += '<div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Empleado</div>';
+    html += '<strong>' + empName + '</strong>';
+    html += '<div style="color:var(--muted);font-size:11px;margin-top:4px">' + date + '</div>';
+    html += '</div>';
+    html += '<div style="margin-bottom:16px">';
+    html += '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">Justificación <span style="color:#dc2626">*</span></label>';
+    html += '<textarea id="att-override-notes" rows="3" placeholder="Describe la razón por la que se corrige esta ausencia…" ';
+    html += 'oninput="AttendanceView._onOverrideInput()" ';
+    html += 'style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);resize:vertical"></textarea>';
+    html += '</div>';
+    html += '<button id="att-override-submit" onclick="AttendanceView._submitOverride(\'' + employeeId + '\',\'' + date + '\',\'' + (rcId || '') + '\')" disabled ';
+    html += 'style="width:100%;padding:10px;border-radius:8px;border:none;background:#cbd5e1;color:#fff;cursor:default;font-weight:600;font-size:14px">Confirmar corrección</button>';
+    html += '<p style="font-size:11px;color:var(--muted);margin:10px 0 0;text-align:center">El día quedará registrado como <strong>Remoto ✓</strong> en el historial de asistencia</p>';
+    html += '</div></div>';
+
+    overlay.innerHTML = html;
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    setTimeout(function() { var t = document.getElementById('att-override-notes'); if (t) t.focus(); }, 50);
+  },
+
+  _onOverrideInput: function() {
+    var ta  = document.getElementById('att-override-notes');
+    var btn = document.getElementById('att-override-submit');
+    if (!ta || !btn) return;
+    var hasText = ta.value.trim().length > 0;
+    btn.disabled   = !hasText;
+    btn.style.background = hasText ? '#dc2626' : '#cbd5e1';
+    btn.style.cursor     = hasText ? 'pointer'  : 'default';
+  },
+
+  _submitOverride: function(employeeId, date, rcId) {
+    var ta  = document.getElementById('att-override-notes');
+    var btn = document.getElementById('att-override-submit');
+    if (!ta || !ta.value.trim()) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+    var payload = { notes: ta.value.trim() };
+    if (rcId) payload.id         = rcId;
+    else      { payload.employeeId = employeeId; payload.date = date; }
+
+    APP.api('remote.override', payload, function(err) {
+      if (err) {
+        APP.toast(err, 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Confirmar corrección'; }
+        return;
+      }
+      APP.toast('Ausencia corregida ✓', 'success');
+      var m = document.getElementById('att-override-modal');
+      if (m) m.remove();
+      AttendanceView._loadAdmin(date);
+    });
   },
 
   // ── Manager pending-approval popup ────────────────────────────

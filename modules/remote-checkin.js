@@ -171,20 +171,43 @@ export var RemoteCheckinModule = {
     })
   },
 
-  // HR/Admin overrides a denied/auto-closed absence (must include justification)
+  // HR/Admin overrides a denied/auto-closed absence (requires written justification)
   async override(data, user) {
     if (!user.isAdmin && !user.isHR) throw new Error('Solo RH o administradores pueden hacer esto.')
-    if (!data.notes || !data.notes.trim()) throw new Error('Debes proporcionar una justificación para la corrección.')
-    var sb = sbClient()
+    if (!data.notes || !data.notes.trim()) throw new Error('Debes proporcionar una justificación escrita.')
+
+    var sb  = sbClient()
     var now = new Date().toISOString()
-    var { error } = await sb.from('remote_checkins').update({
-      status:         'aprobado',
-      override_by:    user.id,
-      override_at:    now,
-      override_notes: data.notes.trim(),
-      updated_at:     now
-    }).eq('id', data.id)
-    if (error) throw new Error('Error: ' + error.message)
+
+    if (data.id) {
+      // Update an existing record (auto-denied or manually denied)
+      var { error } = await sb.from('remote_checkins').update({
+        status:         'aprobado',
+        override_by:    user.id,
+        override_at:    now,
+        override_notes: data.notes.trim(),
+        updated_at:     now
+      }).eq('id', data.id)
+      if (error) throw new Error('Error: ' + error.message)
+    } else {
+      // No prior record — employee never submitted anything; create an approved entry
+      if (!data.employeeId || !data.date) throw new Error('Faltan datos para la corrección.')
+      var { error: insErr } = await sb.from('remote_checkins').insert({
+        employee_id:    data.employeeId,
+        date:           data.date,
+        type:           'remoto',
+        reason:         'Corrección manual por RH/Administrador',
+        status:         'aprobado',
+        override_by:    user.id,
+        override_at:    now,
+        override_notes: data.notes.trim(),
+        requested_at:   now,
+        created_at:     now,
+        updated_at:     now
+      })
+      if (insErr) throw new Error('Error: ' + insErr.message)
+    }
+
     return { ok: true }
   },
 

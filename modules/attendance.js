@@ -87,12 +87,15 @@ async function _getAllDay(date) {
   var dayStart = date + 'T00:00:00-06:00'
   var dayEnd   = date + 'T23:59:59-06:00'
 
-  var [employees, punchRes] = await Promise.all([
+  var [employees, punchRes, rcRes] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
     sb.from('attendance_punches')
       .select('employee_id, punched_at, source')
       .gte('punched_at', dayStart)
-      .lte('punched_at', dayEnd)
+      .lte('punched_at', dayEnd),
+    sb.from('remote_checkins')
+      .select('id, employee_id, type, status')
+      .eq('date', date)
   ])
 
   if (punchRes.error) throw new Error('Error obteniendo checadas: ' + punchRes.error.message)
@@ -105,21 +108,45 @@ async function _getAllDay(date) {
     byEmp[p.employee_id].push(p)
   })
 
+  // Index remote check-ins by employee_id (aprobado > pendiente > denegado)
+  var rcByEmp = {}
+  ;(rcRes.data || []).forEach(function(rc) {
+    var cur = rcByEmp[rc.employee_id]
+    var rank = { aprobado: 3, pendiente: 2, denegado: 1 }
+    if (!cur || (rank[rc.status] || 0) > (rank[cur.status] || 0)) {
+      rcByEmp[rc.employee_id] = rc
+    }
+  })
+
   return employees.map(function(emp) {
     var punches = byEmp[emp.id] || []
     var fl      = firstLast(punches)
+    var rc      = rcByEmp[emp.id] || null
+
+    var status
+    if (fl.checkIn) {
+      status = toStatus(fl.checkIn, date)
+    } else if (rc && rc.status === 'aprobado') {
+      status = rc.type === 'remoto' ? 'remoto' : 'justificada'
+    } else if (rc && rc.status === 'pendiente') {
+      status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
+    } else {
+      status = toStatus(null, date)
+    }
+
     return {
-      employeeId:  emp.id,
-      firstName:   emp.firstName || '',
-      lastName:    emp.lastName  || '',
-      department:  emp.department || '',
-      checadorPin: emp.checadorPin || '',
-      isRemote:    emp.isRemote === true || emp.isRemote === 'true',
-      checkIn:     fl.checkIn,
-      checkOut:    fl.checkOut,
-      status:      toStatus(fl.checkIn, date),
-      source:      punches.length > 0 ? punches[0].source : null,
-      punchCount:  punches.length
+      employeeId:   emp.id,
+      firstName:    emp.firstName || '',
+      lastName:     emp.lastName  || '',
+      department:   emp.department || '',
+      checadorPin:  emp.checadorPin || '',
+      isRemote:     emp.isRemote === true || emp.isRemote === 'true',
+      checkIn:      fl.checkIn,
+      checkOut:     fl.checkOut,
+      status:       status,
+      source:       punches.length > 0 ? punches[0].source : null,
+      punchCount:   punches.length,
+      rcId:         rc ? rc.id : null
     }
   })
 }
@@ -129,22 +156,42 @@ async function _getEmployeeDay(employeeId, date) {
   var dayStart = date + 'T00:00:00-06:00'
   var dayEnd   = date + 'T23:59:59-06:00'
 
-  var { data: punches, error } = await sb
-    .from('attendance_punches')
-    .select('punched_at, source')
-    .eq('employee_id', employeeId)
-    .gte('punched_at', dayStart)
-    .lte('punched_at', dayEnd)
+  var [punchRes, rcRes] = await Promise.all([
+    sb.from('attendance_punches')
+      .select('punched_at, source')
+      .eq('employee_id', employeeId)
+      .gte('punched_at', dayStart)
+      .lte('punched_at', dayEnd),
+    sb.from('remote_checkins')
+      .select('id, type, status')
+      .eq('employee_id', employeeId)
+      .eq('date', date)
+  ])
 
-  if (error) throw new Error('Error: ' + error.message)
+  if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
 
+  var punches = punchRes.data || []
   var fl = firstLast(punches)
+  var rc = (rcRes.data || [])[0] || null
+
+  var status
+  if (fl.checkIn) {
+    status = toStatus(fl.checkIn, date)
+  } else if (rc && rc.status === 'aprobado') {
+    status = rc.type === 'remoto' ? 'remoto' : 'justificada'
+  } else if (rc && rc.status === 'pendiente') {
+    status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
+  } else {
+    status = toStatus(null, date)
+  }
+
   return [{
     checkIn:    fl.checkIn,
     checkOut:   fl.checkOut,
-    status:     toStatus(fl.checkIn, date),
-    source:     punches && punches[0] ? punches[0].source : null,
-    punchCount: (punches || []).length
+    status:     status,
+    source:     punches[0] ? punches[0].source : null,
+    punchCount: punches.length,
+    rcId:       rc ? rc.id : null
   }]
 }
 
