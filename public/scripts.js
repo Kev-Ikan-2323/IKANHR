@@ -4299,8 +4299,14 @@ var AttendanceView = {
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
     html += '<button onclick="AttendanceView._loadAdmin(AttendanceView._todayCdmx())" ';
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">← Hoy</button>';
-    html += '<button onclick="AttendanceView._exportDashboard()" ';
-    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #16a34a;background:#16a34a;color:#fff;cursor:pointer;font-size:13px;font-weight:500">↓ Exportar CSV</button>';
+    html += '<div style="position:relative;display:inline-block">';
+    html += '<button onclick="AttendanceView._toggleExportMenu()" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #16a34a;background:#16a34a;color:#fff;cursor:pointer;font-size:13px;font-weight:500">↓ Exportar CSV ▾</button>';
+    html += '<div id="att-export-menu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:200px;z-index:200;overflow:hidden">';
+    html += '<div onclick="AttendanceView._exportDashboard(null)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'" style="padding:10px 16px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">📅 Mes completo</div>';
+    html += '<div onclick="AttendanceView._exportDashboard(1)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'" style="padding:10px 16px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">1ª quincena (días 1-15)</div>';
+    html += '<div onclick="AttendanceView._exportDashboard(2)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'" style="padding:10px 16px;cursor:pointer;font-size:13px">2ª quincena (días 16-fin)</div>';
+    html += '</div></div>';
     html += '<div style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto">';
     html += '<button onclick="AttendanceView._loadDashboard(' + prevYear + ',' + prevMonth + ')" ';
     html += 'style="padding:6px 14px;border:none;border-right:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
@@ -4359,46 +4365,80 @@ var AttendanceView = {
     return html;
   },
 
-  _exportDashboard: function() {
+  _toggleExportMenu: function() {
+    var menu = document.getElementById('att-export-menu');
+    if (!menu) return;
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (menu.style.display === 'block') {
+      function closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.style.display = 'none';
+          document.removeEventListener('click', closeMenu);
+        }
+      }
+      setTimeout(function() { document.addEventListener('click', closeMenu); }, 0);
+    }
+  },
+
+  _exportDashboard: function(quincena) {
+    var menu = document.getElementById('att-export-menu');
+    if (menu) menu.style.display = 'none';
+
     var d = AttendanceView._dashData;
-    if (!d || !d.data || !d.data.employees) return;
-    var rows = [
-      ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Vacaciones', '% Puntualidad']
-    ];
-    d.data.employees.forEach(function(e) {
-      var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
-      rows.push([
-        (e.firstName + ' ' + e.lastName).trim(),
-        e.department || '',
-        e.workdays,
-        e.aTime,
-        e.retardo,
-        e.ausente,
-        e.vacaciones || 0,
-        pct + '%'
-      ]);
+    if (!d || !d.data) return;
+
+    function doExport(data, periodLabel) {
+      var rows = [
+        ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Vacaciones', '% Puntualidad']
+      ];
+      data.employees.forEach(function(e) {
+        var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
+        rows.push([
+          (e.firstName + ' ' + e.lastName).trim(),
+          e.department || '',
+          e.workdays,
+          e.aTime,
+          e.retardo,
+          e.ausente,
+          e.vacaciones || 0,
+          pct + '%'
+        ]);
+      });
+      var s = data.summary;
+      var n = (data.workdays || 0) * (s.total || 1);
+      var pctTotal = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
+      rows.push(['TOTAL', s.total + ' empleados', data.workdays, s.aTime, s.retardo, s.ausente, s.vacaciones || 0, pctTotal + '%']);
+
+      var csv = '﻿' + rows.map(function(r) {
+        return r.map(function(v) {
+          var str = String(v);
+          return str.indexOf(',') > -1 || str.indexOf('"') > -1 ? '"' + str.replace(/"/g, '""') + '"' : str;
+        }).join(',');
+      }).join('\r\n');
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href   = url;
+      a.download = 'asistencia-' + periodLabel + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // If full month, use cached data
+    if (!quincena) {
+      doExport(d.data, d.label.toLowerCase().replace(/ /g, '-'));
+      return;
+    }
+
+    // Quincena: re-fetch from API with the quincena parameter
+    var qLabel = (quincena === 1 ? '1q-' : '2q-') + d.label.toLowerCase().replace(/ /g, '-');
+    APP.api('attendance.getMonth', { year: d.year, month: d.month, quincena: quincena }, function(err, data) {
+      if (err) { APP.toast('Error al obtener datos: ' + err, 'error'); return; }
+      doExport(data, qLabel);
     });
-    var s = d.data.summary;
-    var n = (d.data.workdays || 0) * (s.total || 1);
-    var pctTotal = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
-    rows.push(['TOTAL', s.total + ' empleados', d.data.workdays, s.aTime, s.retardo, s.ausente, s.vacaciones || 0, pctTotal + '%']);
-
-    var csv = '﻿' + rows.map(function(r) {
-      return r.map(function(v) {
-        var str = String(v);
-        return str.indexOf(',') > -1 || str.indexOf('"') > -1 ? '"' + str.replace(/"/g, '""') + '"' : str;
-      }).join(',');
-    }).join('\r\n');
-
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement('a');
-    a.href   = url;
-    a.download = 'asistencia-' + d.label.toLowerCase().replace(/ /g, '-') + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   },
 
   _tile: function(value, label, color) {

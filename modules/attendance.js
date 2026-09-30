@@ -71,12 +71,14 @@ export var AttendanceModule = {
   },
 
   // Monthly summary — employee sees own record, admin/HR sees all employees
+  // data.quincena: null=full month, 1=days 1-15, 2=days 16-end
   async getMonth(data, user) {
     var todayParts = todayCdmx().split('-')
-    var year  = parseInt(data.year)  || parseInt(todayParts[0])
-    var month = parseInt(data.month) || parseInt(todayParts[1])
-    if (!data.personal && (user.isAdmin || user.isHR)) return _getAllMonth(year, month)
-    return _getEmployeeMonth(user.id, year, month)
+    var year     = parseInt(data.year)     || parseInt(todayParts[0])
+    var month    = parseInt(data.month)    || parseInt(todayParts[1])
+    var quincena = parseInt(data.quincena) || null
+    if (!data.personal && (user.isAdmin || user.isHR)) return _getAllMonth(year, month, quincena)
+    return _getEmployeeMonth(user.id, year, month, quincena)
   }
 }
 
@@ -202,12 +204,15 @@ function _buildVacationSet(requests, year, month) {
 }
 
 // Weekdays (Mon–Fri) in a month up to today in CDMX
-function workdaysInMonth(year, month) {
+// quincena: null=full month, 1=days 1-15, 2=days 16-end
+function workdaysInMonth(year, month, quincena) {
   var today   = todayCdmx()
   var lastDay = new Date(year, month, 0).getDate()
   var mon     = String(month).padStart(2, '0')
+  var minDay  = quincena === 2 ? 16 : 1
+  var maxDay  = quincena === 1 ? 15 : lastDay
   var days    = []
-  for (var d = 1; d <= lastDay; d++) {
+  for (var d = minDay; d <= maxDay; d++) {
     var dateStr = year + '-' + mon + '-' + String(d).padStart(2, '0')
     var dow     = new Date(dateStr + 'T12:00:00').getDay()
     if (dow === 0 || dow === 6) continue
@@ -217,7 +222,7 @@ function workdaysInMonth(year, month) {
   return days
 }
 
-async function _getEmployeeMonth(employeeId, year, month) {
+async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var sb      = sbClient()
   var mon     = String(month).padStart(2, '0')
   var lastDay = new Date(year, month, 0).getDate()
@@ -244,7 +249,7 @@ async function _getEmployeeMonth(employeeId, year, month) {
 
   var vacDates = _buildVacationSet(vacRequests, year, month)
 
-  var wdays   = workdaysInMonth(year, month)
+  var wdays   = workdaysInMonth(year, month, quincena)
   var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
     var fl  = firstLast(byDate[dateStr] || [])
@@ -270,14 +275,14 @@ async function _getEmployeeMonth(employeeId, year, month) {
   return { year: year, month: month, summary: summary, days: records }
 }
 
-async function _getAllMonth(year, month) {
+async function _getAllMonth(year, month, quincena) {
   var sb      = sbClient()
   var mon     = String(month).padStart(2, '0')
   var lastDay = new Date(year, month, 0).getDate()
   var dayStart = year + '-' + mon + '-01T00:00:00-06:00'
   var dayEnd   = year + '-' + mon + '-' + String(lastDay).padStart(2, '0') + 'T23:59:59-06:00'
 
-  var wdays = workdaysInMonth(year, month)
+  var wdays = workdaysInMonth(year, month, quincena)
 
   var [employees, punchRes, vacAll] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
