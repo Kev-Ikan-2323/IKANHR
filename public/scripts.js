@@ -2492,19 +2492,31 @@ var AdminHR = {
       (function() {
         var remDays = Array.isArray(v.remoteDays) ? v.remoteDays : [];
         var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:6,l:'Sáb'}];
+        var canEditHoDays = APP.user && (APP.user.isAdmin || APP.user.isHR || v.managerId === APP.user.id);
         var pillsHtml = '';
-        dayList.forEach(function(item) {
-          var sel = remDays.indexOf(item.d) > -1;
-          pillsHtml += '<button type="button" data-day="' + item.d + '" onclick="AdminHR._toggleRemoteDay(this,' + item.d + ')" ' +
-            'style="padding:5px 11px;border-radius:20px;font-size:12px;cursor:pointer;transition:.15s;border:1px solid ' +
-            (sel ? '#93c5fd;background:#dbeafe;color:#1d4ed8;font-weight:600' : 'var(--border);background:var(--surface);color:var(--fg);font-weight:400') + '">' +
-            item.l + '</button>';
-        });
+        if (canEditHoDays) {
+          dayList.forEach(function(item) {
+            var sel = remDays.indexOf(item.d) > -1;
+            pillsHtml += '<button type="button" data-day="' + item.d + '" onclick="AdminHR._toggleRemoteDay(this,' + item.d + ')" ' +
+              'style="padding:5px 11px;border-radius:20px;font-size:12px;cursor:pointer;transition:.15s;border:1px solid ' +
+              (sel ? '#93c5fd;background:#dbeafe;color:#1d4ed8;font-weight:600' : 'var(--border);background:var(--surface);color:var(--fg);font-weight:400') + '">' +
+              item.l + '</button>';
+          });
+        } else {
+          var dayLabels = {2:'Mar',3:'Mié',4:'Jue',6:'Sáb'};
+          if (remDays.length > 0) {
+            remDays.forEach(function(d) {
+              pillsHtml += '<span style="padding:5px 11px;border-radius:20px;font-size:12px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-weight:600">' + (dayLabels[d] || d) + '</span>';
+            });
+          } else {
+            pillsHtml = '<span style="font-size:12px;color:var(--muted)">Sin días asignados</span>';
+          }
+        }
         return '<input type="hidden" id="ef-remote-days-val" value="' + JSON.stringify(remDays) + '">' +
           '<div id="ef-remote-days-wrap" style="margin-bottom:12px">' +
           '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">Días de home office autorizados</label>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' + pillsHtml + '</div>' +
-          '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = sin restricción de días. Check-in en día no autorizado requiere aprobación del manager.</p>' +
+          (canEditHoDays ? '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = sin restricción de días. Check-in en día no autorizado requiere aprobación del manager.</p>' : '') +
           '</div>';
       })() +
       '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
@@ -4262,6 +4274,7 @@ var AttendanceView = {
     var month = monthData.month;
     var today = AttendanceView._todayCdmx();
     var mon   = String(month).padStart(2, '0');
+    var userHoDays = (APP.user && Array.isArray(APP.user.remoteDays)) ? APP.user.remoteDays : [];
 
     // Build lookup by date
     var byDate = {};
@@ -4283,7 +4296,14 @@ var AttendanceView = {
       pendiente_justificada: { bg: '#fdf4ff', fg: '#c026d3', brd: '#f0abfc' }
     };
 
-    var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
+    var hoDayNames = {1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb',0:'Dom'};
+    var html = '';
+    if (userHoDays.length > 0) {
+      var hoPills = userHoDays.map(function(d){ return '<span style="padding:3px 9px;border-radius:12px;font-size:11px;background:#ecfeff;color:#0891b2;border:1px solid #a5f3fc;font-weight:600">' + (hoDayNames[d]||d) + '</span>'; }).join(' ');
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;font-size:12px;color:#0e7490">';
+      html += '🏠 <strong>Días de home office:</strong> ' + hoPills + '</div>';
+    }
+    html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
 
     // Day headers
     DAYS_ES.forEach(function(d, i) {
@@ -4302,19 +4322,28 @@ var AttendanceView = {
       var isToday   = dateStr === today;
       var rec       = byDate[dateStr];
 
+      var isHoDay = userHoDays.length > 0 && userHoDays.indexOf(dow) > -1;
+
       if (isWeekend) {
         html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;opacity:0.3;text-align:center">';
         html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
       } else if (isFuture) {
-        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;opacity:0.25;text-align:center">';
-        html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
+        if (isHoDay) {
+          html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;text-align:center;background:#ecfeff;border:1px solid #a5f3fc;border-top:3px solid #0891b2">';
+          html += '<div style="font-size:12px;color:#0891b2;font-weight:500">' + d + '</div>';
+          html += '<div style="font-size:10px;margin-top:3px">🏠</div></div>';
+        } else {
+          html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;opacity:0.25;text-align:center">';
+          html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
+        }
       } else if (rec) {
         var c   = ST[rec.status] || { bg: 'var(--surface)', fg: 'var(--muted)', brd: 'var(--border)' };
         var ci  = rec.checkIn ? AttendanceView._fmtTime(rec.checkIn) : '';
         var sel = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
         var cid = 'att-cd-' + dateStr.replace(/-/g, '');
+        var hoTop = isHoDay ? 'border-top:3px solid #0891b2;' : 'border-top:1px solid ' + c.brd + ';';
         html += '<div id="' + cid + '" onclick="AttendanceView._selectDay(\'' + dateStr + '\')" ';
-        html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:' + c.bg + ';border:1px solid ' + c.brd + sel + ';text-align:center;cursor:pointer">';
+        html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:' + c.bg + ';' + hoTop + 'border-right:1px solid ' + c.brd + ';border-bottom:1px solid ' + c.brd + ';border-left:1px solid ' + c.brd + sel + ';text-align:center;cursor:pointer">';
         html += '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + ';color:' + c.fg + '">' + d + '</div>';
         if (ci) html += '<div style="font-size:10px;color:' + c.fg + ';margin-top:3px;font-variant-numeric:tabular-nums">' + ci + '</div>';
         if (rec.status === 'remoto' || rec.source === 'remoto') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
@@ -4325,8 +4354,9 @@ var AttendanceView = {
       } else {
         var sel2 = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
         var cid2 = 'att-cd-' + dateStr.replace(/-/g, '');
+        var hoTop2 = isHoDay ? 'border-top:3px solid #0891b2;' : 'border-top:1px solid var(--border);';
         html += '<div id="' + cid2 + '" onclick="AttendanceView._selectDay(\'' + dateStr + '\')" ';
-        html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:var(--surface);border:1px solid var(--border)' + sel2 + ';text-align:center;cursor:pointer">';
+        html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:var(--surface);' + hoTop2 + 'border-right:1px solid var(--border);border-bottom:1px solid var(--border);border-left:1px solid var(--border)' + sel2 + ';text-align:center;cursor:pointer">';
         html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
       }
     }
@@ -4339,6 +4369,9 @@ var AttendanceView = {
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca"></div><span style="font-size:12px;color:var(--muted)">Ausente</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#eff6ff;border:1px solid #bfdbfe"></div><span style="font-size:12px;color:var(--muted)">Remoto</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#f5f3ff;border:1px solid #ddd6fe"></div><span style="font-size:12px;color:var(--muted)">Justificada</span></div>';
+    if (userHoDays.length > 0) {
+      html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfeff;border-top:3px solid #0891b2;border-right:1px solid #a5f3fc;border-bottom:1px solid #a5f3fc;border-left:1px solid #a5f3fc"></div><span style="font-size:12px;color:var(--muted)">Día home office</span></div>';
+    }
     html += '</div>';
     return html;
   },
