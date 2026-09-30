@@ -52,6 +52,7 @@ function buildCsv(employees, tardMap) {
   var dataRows = filtered.map(function(e) {
     var pct  = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0
     var tard = tardMap[e.employeeId] || null
+    var daysDesc = (tard ? tard.daysToDeduct : 0) + e.ausente
     return [
       ((e.firstName || '') + ' ' + (e.lastName || '')).trim(),
       e.department || '',
@@ -59,14 +60,15 @@ function buildCsv(employees, tardMap) {
       e.aTime,
       e.retardo,
       e.ausente,
-      tard ? tard.count        : '',
-      tard ? tard.daysToDeduct : '',
+      tard ? tard.count : '',
+      daysDesc || '',
       pct + '%'
     ]
   })
 
-  var totalDesc = Object.values(tardMap).reduce(function(a, t) {
-    return a + (t.daysToDeduct || 0)
+  var totalDesc = filtered.reduce(function(a, e) {
+    var tard = tardMap[e.employeeId] || null
+    return a + (tard ? tard.daysToDeduct : 0) + e.ausente
   }, 0)
   var totalRetPeriod  = filtered.reduce(function(a, e) { return a + e.retardo }, 0)
   var totalAusPeriod  = filtered.reduce(function(a, e) { return a + e.ausente }, 0)
@@ -120,9 +122,12 @@ export var PayrollReportModule = {
     var tardMap   = {}
     ;(tardData.items || []).forEach(function(t) { tardMap[t.employeeId] = t })
 
-    var csvContent = buildCsv(employees, tardMap)
-    var totalDesc  = Object.values(tardMap).reduce(function(a, t) { return a + (t.daysToDeduct || 0) }, 0)
     var filtered   = employees.filter(function(e) { return e.retardo > 0 || e.ausente > 0 })
+    var csvContent = buildCsv(employees, tardMap)
+    var totalDesc  = filtered.reduce(function(a, e) {
+      var t = tardMap[e.employeeId] || null
+      return a + (t ? t.daysToDeduct : 0) + e.ausente
+    }, 0)
 
     var htmlBody = buildEmail({
       icon:  '📊',
@@ -130,7 +135,7 @@ export var PayrollReportModule = {
       bodyHTML:
         '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola,</p>' +
         '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Se adjunta el reporte de asistencia de la <strong>' + periodLabel + '</strong>. Solo se incluyen empleados con retardos o ausencias en el período.</p>' +
-        '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Días a descontar por retardos acumulados (6 meses): <strong>' + totalDesc + ' día' + (totalDesc !== 1 ? 's' : '') + '</strong>.</p>',
+        '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Total días a descontar (retardos acum. + ausencias): <strong>' + totalDesc + ' día' + (totalDesc !== 1 ? 's' : '') + '</strong>.</p>',
       details: [
         { label: 'Período',               value: periodLabel },
         { label: 'Días laborables',        value: String(attData.workdays || '') },

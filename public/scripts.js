@@ -4613,6 +4613,7 @@ var AttendanceView = {
       filtered.forEach(function(e) {
         var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
         var tard = tardMap[e.employeeId] || tardMap[e.id] || null;
+        var daysDesc = (tard ? tard.daysToDeduct : 0) + e.ausente;
         rows.push([
           (e.firstName + ' ' + e.lastName).trim(),
           e.department || '',
@@ -4620,8 +4621,8 @@ var AttendanceView = {
           e.aTime,
           e.retardo,
           e.ausente,
-          tard ? tard.count       : '',
-          tard ? tard.daysToDeduct : '',
+          tard ? tard.count : '',
+          daysDesc || '',
           pct + '%'
         ]);
       });
@@ -4631,7 +4632,10 @@ var AttendanceView = {
       var pctTotal = n > 0 ? Math.round(
         filtered.reduce(function(acc, e) { return acc + e.aTime; }, 0) / n * 100
       ) : 0;
-      var totalDesc = tardItems.reduce(function(acc, t) { return acc + (t.daysToDeduct || 0); }, 0);
+      var totalDesc = filtered.reduce(function(acc, e) {
+        var tard = tardMap[e.employeeId] || tardMap[e.id] || null;
+        return acc + (tard ? tard.daysToDeduct : 0) + e.ausente;
+      }, 0);
       rows.push(['TOTAL', filtered.length + ' empleados', data.workdays, s.aTime, s.retardo, s.ausente, '', totalDesc + ' días', pctTotal + '%']);
 
       var csv = '﻿' + rows.map(function(r) {
