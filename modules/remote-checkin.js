@@ -62,7 +62,7 @@ export var RemoteCheckinModule = {
     var cdmxNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
     var todayDow = cdmxNow.getDay()
     var isAuthorizedDay = remoteDays.length === 0 || remoteDays.indexOf(todayDow) > -1
-    var autoApprove = type === 'remoto' && isAuthorizedDay && (isRemoteEmp || remoteDays.length > 0)
+    var autoApprove = type === 'remoto' && (isRemoteEmp || (remoteDays.length > 0 && isAuthorizedDay))
     var now = new Date().toISOString()
 
     var { data: inserted, error } = await sb.from('remote_checkins').insert({

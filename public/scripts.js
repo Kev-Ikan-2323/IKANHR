@@ -2491,7 +2491,7 @@ var AdminHR = {
       })() +
       (function() {
         var remDays = Array.isArray(v.remoteDays) ? v.remoteDays : [];
-        var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'},{d:6,l:'Sáb'}];
+        var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:6,l:'Sáb'}];
         var pillsHtml = '';
         dayList.forEach(function(item) {
           var sel = remDays.indexOf(item.d) > -1;
