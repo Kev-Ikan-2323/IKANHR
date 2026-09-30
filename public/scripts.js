@@ -4132,12 +4132,8 @@ var AttendanceView = {
     html += '<button onclick="AttendanceView._loadEmployeeMonth(' + prevYear + ',' + prevMonth + ')" ';
     html += 'style="padding:6px 14px;border:none;border-right:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
     html += '<span style="padding:6px 18px;font-weight:600;font-size:14px;background:var(--surface)">' + MONTHS_ES[month - 1] + ' ' + year + '</span>';
-    if (!isCurrentMonth) {
-      html += '<button onclick="AttendanceView._loadEmployeeMonth(' + nextYear + ',' + nextMonth + ')" ';
-      html += 'style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
-    } else {
-      html += '<button disabled style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
-    }
+    html += '<button onclick="AttendanceView._loadEmployeeMonth(' + nextYear + ',' + nextMonth + ')" ';
+    html += 'style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
     html += '</div>';
     html += '<div style="flex:1"></div>';
     html += '<div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">';
@@ -4274,7 +4270,8 @@ var AttendanceView = {
     var month = monthData.month;
     var today = AttendanceView._todayCdmx();
     var mon   = String(month).padStart(2, '0');
-    var userHoDays = (APP.user && Array.isArray(APP.user.remoteDays)) ? APP.user.remoteDays : [];
+    var userHoDays = Array.isArray(monthData.remoteDays) ? monthData.remoteDays
+                   : (APP.user && Array.isArray(APP.user.remoteDays)) ? APP.user.remoteDays : [];
 
     // Build lookup by date
     var byDate = {};

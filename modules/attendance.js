@@ -278,7 +278,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var dateMin  = year + '-' + mon + '-01'
   var dateMax  = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [punchRes, vacRequests, remotoRes] = await Promise.all([
+  var [punchRes, vacRequests, remotoRes, empRow] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
@@ -289,7 +289,8 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
       .select('*')
       .eq('employee_id', employeeId)
       .gte('date', dateMin)
-      .lte('date', dateMax)
+      .lte('date', dateMax),
+    DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -352,7 +353,8 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     }
   })
 
-  return { year: year, month: month, summary: summary, days: records }
+  var remoteDays = (empRow && Array.isArray(empRow.remoteDays)) ? empRow.remoteDays : []
+  return { year: year, month: month, summary: summary, days: records, remoteDays: remoteDays }
 }
 
 async function _getAllMonth(year, month, quincena) {
