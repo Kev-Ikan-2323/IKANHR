@@ -75,7 +75,7 @@ export var AttendanceModule = {
     var todayParts = todayCdmx().split('-')
     var year  = parseInt(data.year)  || parseInt(todayParts[0])
     var month = parseInt(data.month) || parseInt(todayParts[1])
-    if (user.isAdmin || user.isHR) return _getAllMonth(year, month)
+    if (!data.personal && (user.isAdmin || user.isHR)) return _getAllMonth(year, month)
     return _getEmployeeMonth(user.id, year, month)
   }
 }

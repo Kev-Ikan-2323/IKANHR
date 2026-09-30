@@ -4020,7 +4020,7 @@ var AttendanceView = {
     var cm = AttendanceView._currentMonthCdmx();
     var isCurrentMonth = (year === cm.year && month === cm.month);
     var reqs = [
-      new Promise(function(res) { APP.api('attendance.getMonth', { year: year, month: month }, function(e, d) { res(e ? null : d); }); })
+      new Promise(function(res) { APP.api('attendance.getMonth', { year: year, month: month, personal: true }, function(e, d) { res(e ? null : d); }); })
     ];
     if (isCurrentMonth) {
       var today = AttendanceView._todayCdmx();
