@@ -4068,17 +4068,18 @@ var AttendanceView = {
     }
 
     // Month navigation
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+    html += '<div style="display:flex;justify-content:center;margin-bottom:12px">';
+    html += '<div style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">';
     html += '<button onclick="AttendanceView._loadEmployeeMonth(' + prevYear + ',' + prevMonth + ')" ';
-    html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
-    html += '<div style="flex:1;text-align:center;font-weight:600;font-size:15px">' + MONTHS_ES[month - 1] + ' ' + year + '</div>';
+    html += 'style="padding:6px 14px;border:none;border-right:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
+    html += '<span style="padding:6px 18px;font-weight:600;font-size:14px;background:var(--surface)">' + MONTHS_ES[month - 1] + ' ' + year + '</span>';
     if (!isCurrentMonth) {
       html += '<button onclick="AttendanceView._loadEmployeeMonth(' + nextYear + ',' + nextMonth + ')" ';
-      html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
+      html += 'style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
     } else {
-      html += '<button disabled style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
+      html += '<button disabled style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // Summary pills
     var s = monthData.summary;
@@ -4152,17 +4153,17 @@ var AttendanceView = {
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">← Hoy</button>';
     html += '<button onclick="AttendanceView._exportDashboard()" ';
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #16a34a;background:#16a34a;color:#fff;cursor:pointer;font-size:13px;font-weight:500">↓ Exportar CSV</button>';
-    html += '<div style="flex:1"></div>';
+    html += '<div style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto">';
     html += '<button onclick="AttendanceView._loadDashboard(' + prevYear + ',' + prevMonth + ')" ';
-    html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
-    html += '<div style="font-weight:600;font-size:15px;min-width:160px;text-align:center">' + MONTHS_ES[month - 1] + ' ' + year + '</div>';
+    html += 'style="padding:6px 14px;border:none;border-right:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
+    html += '<span style="padding:6px 18px;font-weight:600;font-size:14px;background:var(--surface)">' + MONTHS_ES[month - 1] + ' ' + year + '</span>';
     if (!isCurrentMonth) {
       html += '<button onclick="AttendanceView._loadDashboard(' + nextYear + ',' + nextMonth + ')" ';
-      html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
+      html += 'style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
     } else {
-      html += '<button disabled style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
+      html += '<button disabled style="padding:6px 14px;border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // Summary tiles
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px">';
