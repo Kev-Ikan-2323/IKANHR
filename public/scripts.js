@@ -3947,6 +3947,9 @@ var AttendanceView = {
       html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">Hoy</button>';
     }
     if (isToday) html += '<span style="font-size:12px;color:var(--muted)">Actualiza cada 60s</span>';
+    html += '<div style="flex:1"></div>';
+    html += '<button onclick="AttendanceView._loadDashboard()" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-size:13px;font-weight:500">Dashboard →</button>';
     html += '</div>';
 
     html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
@@ -3999,40 +4002,95 @@ var AttendanceView = {
   },
 
   _loadEmployee: function() {
+    var cm = AttendanceView._currentMonthCdmx();
+    AttendanceView._loadEmployeeMonth(cm.year, cm.month);
+  },
+
+  _currentMonthCdmx: function() {
+    var d = new Date(new Date().getTime() - 6 * 3600 * 1000);
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+  },
+
+  _loadEmployeeMonth: function(year, month) {
     var el = document.getElementById('att-content'); if (!el) return;
-    var today = AttendanceView._todayCdmx();
-    Promise.all([
-      new Promise(function(res) { APP.api('attendance.getDay', { date: today }, function(e, d) { res(e ? [] : (d || [])); }); }),
-      new Promise(function(res) { APP.api('attendance.getHistory', {}, function(e, d) { res(e ? [] : (d || [])); }); })
-    ]).then(function(results) {
-      var todayRec = results[0][0] || null;
-      var history  = results[1];
-      el.innerHTML = AttendanceView._renderEmployee(todayRec, history);
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    var cm = AttendanceView._currentMonthCdmx();
+    var isCurrentMonth = (year === cm.year && month === cm.month);
+    var reqs = [
+      new Promise(function(res) { APP.api('attendance.getMonth', { year: year, month: month }, function(e, d) { res(e ? null : d); }); })
+    ];
+    if (isCurrentMonth) {
+      var today = AttendanceView._todayCdmx();
+      reqs.push(new Promise(function(res) { APP.api('attendance.getDay', { date: today }, function(e, d) { res(e ? [] : (d || [])); }); }));
+    }
+    Promise.all(reqs).then(function(results) {
+      var monthData = results[0];
+      var todayRec  = isCurrentMonth ? (results[1] || [])[0] || null : null;
+      if (!monthData) { el.innerHTML = '<div class="empty-state"><p>Error cargando datos</p></div>'; return; }
+      el.innerHTML = AttendanceView._renderEmployee(monthData, todayRec);
     });
   },
 
-  _renderEmployee: function(today, history) {
-    var status = today ? today.status : 'pendiente';
-    var ci = today && today.checkIn  ? AttendanceView._fmtTime(today.checkIn)  : '—';
-    var co = today && today.checkOut ? AttendanceView._fmtTime(today.checkOut) : '—';
-    var colors = {
-      a_tiempo:  { bg: '#ecfdf5', color: '#16a34a', label: 'A tiempo' },
-      retardo:   { bg: '#fffbeb', color: '#d97706', label: 'Retardo' },
-      ausente:   { bg: '#fef2f2', color: '#dc2626', label: 'Ausente hoy' },
-      pendiente: { bg: '#f8fafc', color: '#64748b', label: 'Sin registro aún' }
-    };
-    var c = colors[status] || colors.pendiente;
+  _renderEmployee: function(monthData, todayRec) {
+    var MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var year  = monthData.year;
+    var month = monthData.month;
+    var cm    = AttendanceView._currentMonthCdmx();
+    var isCurrentMonth = (year === cm.year && month === cm.month);
 
-    var html = '<div class="card" style="margin-bottom:16px;background:' + c.bg + ';border-color:' + c.color + '33">';
-    html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + c.color + ';margin-bottom:4px">Hoy</div>';
-    html += '<div style="font-size:26px;font-weight:700;color:' + c.color + ';margin-bottom:12px">' + c.label + '</div>';
-    html += '<div style="display:flex;gap:28px">';
-    html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>';
-    html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>';
-    html += '</div></div>';
+    var prevYear  = month === 1 ? year - 1 : year;
+    var prevMonth = month === 1 ? 12 : month - 1;
+    var nextYear  = month === 12 ? year + 1 : year;
+    var nextMonth = month === 12 ? 1 : month + 1;
 
-    if (!history || history.length === 0) {
-      html += '<div class="empty-state"><span class="material-icons-round">fingerprint</span><p>Sin registros en los últimos 30 días</p></div>';
+    var html = '';
+
+    // Today card
+    if (isCurrentMonth) {
+      var tr = todayRec || {};
+      var status = tr.status || 'pendiente';
+      var ci = tr.checkIn  ? AttendanceView._fmtTime(tr.checkIn)  : '—';
+      var co = tr.checkOut ? AttendanceView._fmtTime(tr.checkOut) : '—';
+      var colors = {
+        a_tiempo:  { bg: '#ecfdf5', color: '#16a34a', label: 'A tiempo' },
+        retardo:   { bg: '#fffbeb', color: '#d97706', label: 'Retardo' },
+        ausente:   { bg: '#fef2f2', color: '#dc2626', label: 'Ausente hoy' },
+        pendiente: { bg: '#f8fafc', color: '#64748b', label: 'Sin registro aún' }
+      };
+      var c = colors[status] || colors.pendiente;
+      html += '<div class="card" style="margin-bottom:16px;background:' + c.bg + ';border-color:' + c.color + '33">';
+      html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + c.color + ';margin-bottom:4px">Hoy</div>';
+      html += '<div style="font-size:26px;font-weight:700;color:' + c.color + ';margin-bottom:12px">' + c.label + '</div>';
+      html += '<div style="display:flex;gap:28px">';
+      html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>';
+      html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>';
+      html += '</div></div>';
+    }
+
+    // Month navigation
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+    html += '<button onclick="AttendanceView._loadEmployeeMonth(' + prevYear + ',' + prevMonth + ')" ';
+    html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
+    html += '<div style="flex:1;text-align:center;font-weight:600;font-size:15px">' + MONTHS_ES[month - 1] + ' ' + year + '</div>';
+    if (!isCurrentMonth) {
+      html += '<button onclick="AttendanceView._loadEmployeeMonth(' + nextYear + ',' + nextMonth + ')" ';
+      html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
+    } else {
+      html += '<button disabled style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
+    }
+    html += '</div>';
+
+    // Summary pills
+    var s = monthData.summary;
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+    html += AttendanceView._pill(s.workdays + ' laborable' + (s.workdays !== 1 ? 's' : ''), '#475569');
+    html += AttendanceView._pill(s.aTime + ' a tiempo', '#3b82f6');
+    if (s.retardo > 0) html += AttendanceView._pill(s.retardo + ' retardo' + (s.retardo !== 1 ? 's' : ''), '#f59e0b');
+    if (s.ausente > 0) html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
+    html += '</div>';
+
+    if (!monthData.days || monthData.days.length === 0) {
+      html += '<div class="empty-state"><span class="material-icons-round">fingerprint</span><p>Sin registros este mes</p></div>';
       return html;
     }
 
@@ -4044,7 +4102,7 @@ var AttendanceView = {
     html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Salida</th>';
     html += '<th style="padding:10px 14px;font-weight:600;color:var(--muted);text-align:left">Estado</th>';
     html += '</tr></thead><tbody>';
-    history.forEach(function(r) {
+    monthData.days.forEach(function(r) {
       var ciStr = r.checkIn  ? AttendanceView._fmtTime(r.checkIn)  + (r.source === 'remoto' ? ' 🏠' : '') : '—';
       var coStr = r.checkOut ? AttendanceView._fmtTime(r.checkOut) : '—';
       html += '<tr style="border-bottom:1px solid var(--border)">';
@@ -4056,6 +4114,100 @@ var AttendanceView = {
     });
     html += '</tbody></table></div>';
     return html;
+  },
+
+  _loadDashboard: function(year, month) {
+    var el = document.getElementById('att-content'); if (!el) return;
+    var cm = AttendanceView._currentMonthCdmx();
+    year  = year  || cm.year;
+    month = month || cm.month;
+    el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    APP.api('attendance.getMonth', { year: year, month: month }, function(err, data) {
+      if (err) { el.innerHTML = '<div class="empty-state"><p>' + err + '</p></div>'; return; }
+      el.innerHTML = AttendanceView._renderDashboard(data, year, month);
+    });
+  },
+
+  _renderDashboard: function(data, year, month) {
+    var MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var cm = AttendanceView._currentMonthCdmx();
+    var isCurrentMonth = (year === cm.year && month === cm.month);
+
+    var prevYear  = month === 1 ? year - 1 : year;
+    var prevMonth = month === 1 ? 12 : month - 1;
+    var nextYear  = month === 12 ? year + 1 : year;
+    var nextMonth = month === 12 ? 1 : month + 1;
+
+    var s = data.summary;
+    var n = (data.workdays || 0) * (s.total || 1);
+    var pct = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
+
+    var html = '';
+
+    // Header: back + month nav
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
+    html += '<button onclick="AttendanceView._loadAdmin(AttendanceView._todayCdmx())" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">← Hoy</button>';
+    html += '<div style="flex:1"></div>';
+    html += '<button onclick="AttendanceView._loadDashboard(' + prevYear + ',' + prevMonth + ')" ';
+    html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
+    html += '<div style="font-weight:600;font-size:15px;min-width:160px;text-align:center">' + MONTHS_ES[month - 1] + ' ' + year + '</div>';
+    if (!isCurrentMonth) {
+      html += '<button onclick="AttendanceView._loadDashboard(' + nextYear + ',' + nextMonth + ')" ';
+      html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">›</button>';
+    } else {
+      html += '<button disabled style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:14px;opacity:0.35">›</button>';
+    }
+    html += '</div>';
+
+    // Summary tiles
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px">';
+    html += AttendanceView._tile(pct + '%', 'Puntualidad', '#3b82f6');
+    html += AttendanceView._tile(s.retardo, 'Retardos', '#f59e0b');
+    html += AttendanceView._tile(s.ausente, 'Ausencias', '#ef4444');
+    html += AttendanceView._tile(data.workdays, 'Días laborables', '#64748b');
+    html += AttendanceView._tile(s.total, 'Empleados', '#7c3aed');
+    html += '</div>';
+
+    if (!data.employees || data.employees.length === 0) {
+      html += '<div class="empty-state"><span class="material-icons-round">people</span><p>Sin empleados con huella registrada</p></div>';
+      return html;
+    }
+
+    html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left">';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Empleado</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Depto.</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">A tiempo</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Retardos</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Ausentes</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:right">% Puntual</th>';
+    html += '</tr></thead><tbody>';
+
+    data.employees.forEach(function(e) {
+      var name = (e.firstName || '') + ' ' + (e.lastName || '');
+      var pctE = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
+      var pctColor = pctE >= 90 ? '#16a34a' : pctE >= 75 ? '#d97706' : '#dc2626';
+      html += '<tr style="border-bottom:1px solid var(--border)">';
+      html += '<td style="padding:8px 10px">' + name + '</td>';
+      html += '<td style="padding:8px 10px;color:var(--muted)">' + (e.department || '—') + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums">' + e.aTime + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + (e.retardo > 0 ? ';color:#d97706;font-weight:600' : '') + '">' + e.retardo + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + (e.ausente > 0 ? ';color:#dc2626;font-weight:600' : '') + '">' + e.ausente + '</td>';
+      html += '<td style="padding:8px 10px;text-align:right;font-weight:600;color:' + pctColor + '">' + pctE + '%</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div></div>';
+    return html;
+  },
+
+  _tile: function(value, label, color) {
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+      '<div style="font-size:28px;font-weight:700;color:' + color + ';font-variant-numeric:tabular-nums">' + value + '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-top:4px">' + label + '</div>' +
+      '</div>';
   },
 
   _scheduleRefresh: function(date) {

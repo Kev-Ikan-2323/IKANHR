@@ -210,7 +210,8 @@ async function dispatch(action, data, user) {
 
     // ── ATTENDANCE ─────────────────────────────────────────────
     'attendance.getDay':     function() { return AttendanceModule.getDay(data, user) },
-    'attendance.getHistory': function() { return AttendanceModule.getHistory(data, user) }
+    'attendance.getHistory': function() { return AttendanceModule.getHistory(data, user) },
+    'attendance.getMonth':   function() { return AttendanceModule.getMonth(data, user) }
   }
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)

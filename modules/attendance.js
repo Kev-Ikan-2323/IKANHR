@@ -68,6 +68,15 @@ export var AttendanceModule = {
     }
     var days = Math.min(parseInt(data.days) || 30, 90)
     return _getHistory(employeeId, days)
+  },
+
+  // Monthly summary — employee sees own record, admin/HR sees all employees
+  async getMonth(data, user) {
+    var todayParts = todayCdmx().split('-')
+    var year  = parseInt(data.year)  || parseInt(todayParts[0])
+    var month = parseInt(data.month) || parseInt(todayParts[1])
+    if (user.isAdmin || user.isHR) return _getAllMonth(year, month)
+    return _getEmployeeMonth(user.id, year, month)
   }
 }
 
@@ -171,6 +180,148 @@ async function _getHistory(employeeId, days) {
       punchCount: byDate[dateStr].length
     }
   })
+}
+
+// Weekdays (Mon–Fri) in a month up to today in CDMX
+function workdaysInMonth(year, month) {
+  var today   = todayCdmx()
+  var lastDay = new Date(year, month, 0).getDate()
+  var mon     = String(month).padStart(2, '0')
+  var days    = []
+  for (var d = 1; d <= lastDay; d++) {
+    var dateStr = year + '-' + mon + '-' + String(d).padStart(2, '0')
+    var dow     = new Date(dateStr + 'T12:00:00').getDay()
+    if (dow === 0 || dow === 6) continue
+    if (dateStr > today) continue
+    days.push(dateStr)
+  }
+  return days
+}
+
+async function _getEmployeeMonth(employeeId, year, month) {
+  var sb      = sbClient()
+  var mon     = String(month).padStart(2, '0')
+  var lastDay = new Date(year, month, 0).getDate()
+  var dayStart = year + '-' + mon + '-01T00:00:00-06:00'
+  var dayEnd   = year + '-' + mon + '-' + String(lastDay).padStart(2, '0') + 'T23:59:59-06:00'
+
+  var { data: punches, error } = await sb
+    .from('attendance_punches')
+    .select('punched_at, source')
+    .eq('employee_id', employeeId)
+    .gte('punched_at', dayStart)
+    .lte('punched_at', dayEnd)
+
+  if (error) throw new Error('Error: ' + error.message)
+
+  var byDate = {}
+  ;(punches || []).forEach(function(p) {
+    var d = toCdmxDate(p.punched_at)
+    if (!byDate[d]) byDate[d] = []
+    byDate[d].push(p)
+  })
+
+  var wdays   = workdaysInMonth(year, month)
+  var summary = { aTime: 0, retardo: 0, ausente: 0, workdays: wdays.length }
+  var records = wdays.slice().reverse().map(function(dateStr) {
+    var fl     = firstLast(byDate[dateStr] || [])
+    var status = toStatus(fl.checkIn, dateStr)
+    if (status === 'a_tiempo') summary.aTime++
+    else if (status === 'retardo') summary.retardo++
+    else if (status === 'ausente') summary.ausente++
+    return {
+      date:     dateStr,
+      checkIn:  fl.checkIn,
+      checkOut: fl.checkOut,
+      status:   status,
+      source:   byDate[dateStr] && byDate[dateStr][0] ? byDate[dateStr][0].source : null
+    }
+  })
+
+  return { year: year, month: month, summary: summary, days: records }
+}
+
+async function _getAllMonth(year, month) {
+  var sb      = sbClient()
+  var mon     = String(month).padStart(2, '0')
+  var lastDay = new Date(year, month, 0).getDate()
+  var dayStart = year + '-' + mon + '-01T00:00:00-06:00'
+  var dayEnd   = year + '-' + mon + '-' + String(lastDay).padStart(2, '0') + 'T23:59:59-06:00'
+
+  var wdays = workdaysInMonth(year, month)
+
+  var [employees, punchRes] = await Promise.all([
+    DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
+    sb.from('attendance_punches')
+      .select('employee_id, punched_at')
+      .gte('punched_at', dayStart)
+      .lte('punched_at', dayEnd)
+  ])
+
+  if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
+
+  var byEmpDate = {}
+  ;(punchRes.data || []).forEach(function(p) {
+    if (!p.employee_id) return
+    var d = toCdmxDate(p.punched_at)
+    if (!byEmpDate[p.employee_id]) byEmpDate[p.employee_id] = {}
+    if (!byEmpDate[p.employee_id][d]) byEmpDate[p.employee_id][d] = []
+    byEmpDate[p.employee_id][d].push(p)
+  })
+
+  var withPin = employees.filter(function(e) {
+    return e.checadorPin && !(e.isRemote === true || e.isRemote === 'true')
+  })
+
+  var empStats = withPin.map(function(emp) {
+    var empDays = byEmpDate[emp.id] || {}
+    var stats   = { aTime: 0, retardo: 0, ausente: 0 }
+    wdays.forEach(function(dateStr) {
+      var fl = firstLast(empDays[dateStr] || [])
+      var s  = toStatus(fl.checkIn, dateStr)
+      if (s === 'a_tiempo') stats.aTime++
+      else if (s === 'retardo') stats.retardo++
+      else if (s === 'ausente') stats.ausente++
+    })
+    return {
+      employeeId: emp.id,
+      firstName:  emp.firstName  || '',
+      lastName:   emp.lastName   || '',
+      department: emp.department || '',
+      aTime:      stats.aTime,
+      retardo:    stats.retardo,
+      ausente:    stats.ausente,
+      workdays:   wdays.length
+    }
+  })
+
+  empStats.sort(function(a, b) {
+    if (b.retardo !== a.retardo) return b.retardo - a.retardo
+    return b.ausente - a.ausente
+  })
+
+  var totals = empStats.reduce(function(acc, e) {
+    acc.aTime   += e.aTime
+    acc.retardo += e.retardo
+    acc.ausente += e.ausente
+    return acc
+  }, { aTime: 0, retardo: 0, ausente: 0 })
+
+  var n = wdays.length * (empStats.length || 1)
+
+  return {
+    year:     year,
+    month:    month,
+    workdays: wdays.length,
+    employees: empStats,
+    summary: {
+      total:   empStats.length,
+      aTime:   totals.aTime,
+      retardo: totals.retardo,
+      ausente: totals.ausente,
+      pct:     n > 0 ? Math.round((totals.aTime / n) * 100) : 0
+    }
+  }
 }
 
 function client() { return sbClient() }
