@@ -24,6 +24,7 @@ import { AttendanceModule }    from '../../modules/attendance.js'
 import { RemoteCheckinModule }   from '../../modules/remote-checkin.js'
 import { TardinessAppealModule }  from '../../modules/tardiness-appeal.js'
 import { TardinessPolicyModule } from '../../modules/tardiness-policy.js'
+import { PayrollReportModule }   from '../../modules/payroll-report.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -342,6 +343,35 @@ async function _sendTestScenario(scenario, user) {
                   '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hoy es el cumpleaños de <strong style="color:#1E293B">' + name + '</strong>. ¡Únete a felicitarle!</p>'
       })
     },
+    'payroll_report': function() {
+      var sampleCsv =
+        '﻿Empleado,Departamento,Días Laborables,A Tiempo,Retardos,Ausencias,Retardos acum. (6m),Días a descontar esta quincena,% Puntualidad\r\n' +
+        'Ana López,Ventas,10,7,3,0,3,1,70%\r\n' +
+        'Carlos Pérez,Operaciones,10,5,2,3,6,2,50%\r\n' +
+        'TOTAL,2 empleados,,,5,3,,3 días,60%\r\n'
+      var month  = new Date().toLocaleString('es-MX', { month:'long',    timeZone:'America/Mexico_City' })
+      var year   = new Date().toLocaleString('es-MX', { year:'numeric',  timeZone:'America/Mexico_City' })
+      var cap    = month.charAt(0).toUpperCase() + month.slice(1)
+      var period = '1ª quincena (días 1–15) · ' + cap + ' ' + year
+      return {
+        subject:     '[IKAN HR] Reporte de asistencia — ' + period + ' (PRUEBA)',
+        htmlBody:    buildEmail({
+          icon: '📊', title: 'Reporte de asistencia — ' + period,
+          bodyHTML:
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Hola,</p>' +
+            '<p style="margin:0 0 12px;color:#475569;font-size:15px;line-height:1.6">Se adjunta el reporte de asistencia de la <strong>' + period + '</strong>. Solo se incluyen empleados con retardos o ausencias en el período.</p>' +
+            '<p style="margin:0 0 8px;color:#94a3b8;font-size:12px;font-style:italic">(Este es un correo de prueba enviado a ' + user.email + ' — los datos son de muestra)</p>' +
+            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.6">Días a descontar por retardos acumulados (6 meses): <strong>3 días</strong>.</p>',
+          details: [
+            { label: 'Período',               value: period },
+            { label: 'Empleados en reporte',   value: '2 de 15' },
+            { label: 'Total días a descontar', value: '3 días', highlight: '#dc2626' }
+          ]
+        }),
+        attachments: [{ filename: 'asistencia-1q-' + month + '-' + year + '.csv',
+                        content: Buffer.from(sampleCsv).toString('base64') }]
+      }
+    }(),
     'announcement': {
       subject:  '📢 Comunicado: Recordatorio de políticas de la empresa (prueba)',
       htmlBody: buildEmail({
@@ -362,7 +392,7 @@ async function _sendTestScenario(scenario, user) {
 
   if (!scenarios[scenario]) throw new Error('Escenario no reconocido: ' + scenario)
   var s    = scenarios[scenario]
-  var sent = await MailService.send({ to: user.email, subject: s.subject, htmlBody: s.htmlBody })
+  var sent = await MailService.send({ to: user.email, subject: s.subject, htmlBody: s.htmlBody, attachments: s.attachments || [] })
   return { ok: true, sentTo: user.email, scenario: scenario, messageId: sent && sent.id }
 }
 

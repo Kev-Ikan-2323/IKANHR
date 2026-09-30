@@ -3580,8 +3580,12 @@ var AdminHR = {
             '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'birthday_notification\',this)">Aviso de cumpleaños (a todos)</button>' +
           '</div>' +
           '<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Comunicados</div>' +
-          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
             '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'announcement\',this)">Nuevo comunicado</button>' +
+          '</div>' +
+          '<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Asistencia</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+            '<button class="btn btn-outline btn-sm" onclick="AdminHR.sendTestScenario(\'payroll_report\',this)">Reporte quincenal a contabilidad</button>' +
           '</div>' +
           '<div id="cfg-scenario-result" style="font-size:13px;margin-top:4px"></div>' +
         '</div>' +
