@@ -3502,7 +3502,19 @@ var AdminHR = {
   },
 
   openSystemConfig: function() {
-    APP.api('email.getEnabled', {}, function(err, val) {
+    var results = {};
+    var pending = 2;
+    function done() {
+      if (--pending > 0) return;
+      AdminHR._renderSystemConfig(results.emailEnabled, results.contabilidadEmail);
+    }
+    APP.api('email.getEnabled', {}, function(err, val) { results.emailEnabled = val; done(); });
+    APP.api('config.get', { key: 'contabilidadEmail' }, function(err, val) { results.contabilidadEmail = val || ''; done(); });
+  },
+
+  _renderSystemConfig: function(emailEnabledVal, contabilidadEmail) {
+    var val = emailEnabledVal;
+    {
       var enabled = (val !== 'false');
       var bgColor = enabled ? 'var(--primary)' : '#94a3b8';
       var knobTransform = enabled ? 'translateX(20px)' : 'translateX(0)';
@@ -3535,6 +3547,16 @@ var AdminHR = {
             '<span class="material-icons-round">send</span>Enviar correo de prueba' +
           '</button>' +
           '<div id="cfg-test-result" style="margin-top:8px;font-size:13px"></div>' +
+        '</div>' +
+        '<div class="card mb-12" style="padding:16px">' +
+          '<div style="font-weight:600;margin-bottom:4px">Correo de contabilidad</div>' +
+          '<div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Destinatario del reporte quincenal de asistencia (CSV adjunto, se envía el día 14 y el penúltimo día de cada mes a las 12:00 PM)</div>' +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+            '<input id="cfg-contabilidad-email" type="email" placeholder="contabilidad@empresa.com" value="' + (contabilidadEmail || '') + '" ' +
+              'style="flex:1;min-width:200px;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">' +
+            '<button class="btn btn-primary btn-sm" onclick="AdminHR.saveContabilidadEmail()">Guardar</button>' +
+          '</div>' +
+          '<div id="cfg-contabilidad-result" style="margin-top:8px;font-size:13px"></div>' +
         '</div>' +
         '<div class="card" style="padding:16px">' +
           '<div style="font-weight:600;margin-bottom:4px">Probar escenarios de correo</div>' +
@@ -3579,6 +3601,23 @@ var AdminHR = {
       if (bg)    bg.style.background = enabled ? 'var(--primary)' : '#94a3b8';
       if (knob)  knob.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)';
       APP.toast(enabled ? 'Correos activados' : 'Correos desactivados', 'success');
+    });
+  },
+
+  saveContabilidadEmail: function() {
+    var input  = document.getElementById('cfg-contabilidad-email');
+    var result = document.getElementById('cfg-contabilidad-result');
+    if (!input) return;
+    var email = input.value.trim();
+    if (result) result.textContent = 'Guardando...';
+    APP.api('config.set', { key: 'contabilidadEmail', value: email }, function(err) {
+      var el = document.getElementById('cfg-contabilidad-result');
+      if (err) {
+        if (el) el.innerHTML = '<span style="color:var(--danger)">Error: ' + err + '</span>';
+        return;
+      }
+      if (el) el.innerHTML = '<span style="color:var(--success)">✅ Guardado</span>';
+      APP.toast('Correo de contabilidad actualizado', 'success');
     });
   },
 
