@@ -58,7 +58,11 @@ export var RemoteCheckinModule = {
     if (!emp) throw new Error('Empleado no encontrado.')
 
     var isRemoteEmp = emp.isRemote === true || emp.isRemote === 'true'
-    var autoApprove = isRemoteEmp && type === 'remoto'
+    var remoteDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : []
+    var cdmxNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+    var todayDow = cdmxNow.getDay()
+    var isAuthorizedDay = remoteDays.length === 0 || remoteDays.indexOf(todayDow) > -1
+    var autoApprove = isRemoteEmp && type === 'remoto' && isAuthorizedDay
     var now = new Date().toISOString()
 
     var { data: inserted, error } = await sb.from('remote_checkins').insert({

@@ -2479,7 +2479,7 @@ var AdminHR = {
         var rem = v.isRemote===true||v.isRemote==='true';
         var trackBg = rem ? '#3b82f6' : 'var(--border)';
         var knobLeft = rem ? '21px' : '3px';
-        var onChange = "var c=this.checked,t=document.getElementById('ef-rt'),k=document.getElementById('ef-rk'),p=document.getElementById('ef-pin-wrap');t.style.background=c?'#3b82f6':'var(--border)';k.style.left=c?'21px':'3px';p.style.opacity=c?'0.4':'1';p.querySelector('input').disabled=c;";
+        var onChange = "var c=this.checked,t=document.getElementById('ef-rt'),k=document.getElementById('ef-rk'),p=document.getElementById('ef-pin-wrap'),rd=document.getElementById('ef-remote-days-wrap');t.style.background=c?'#3b82f6':'var(--border)';k.style.left=c?'21px':'3px';p.style.opacity=c?'0.4':'1';p.querySelector('input').disabled=c;if(rd)rd.style.display=c?'block':'none';";
         return '<div class="form-group" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px;cursor:pointer" onclick="document.getElementById(\'ef-remote\').click()">' +
           '<div style="position:relative;width:40px;height:22px;flex-shrink:0;pointer-events:none">' +
           '<input type="checkbox" id="ef-remote" style="position:absolute;opacity:0;width:0;height:0"' + (rem?' checked':'') + ' onchange="' + onChange + '">' +
@@ -2487,6 +2487,25 @@ var AdminHR = {
           '<div id="ef-rk" style="position:absolute;height:16px;width:16px;left:' + knobLeft + ';bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>' +
           '</div>' +
           '<div><strong style="font-size:13px">Empleado remoto</strong><br><span style="font-size:11px;color:var(--muted)">No usa el checador físico</span></div>' +
+          '</div>';
+      })() +
+      (function() {
+        var rem = v.isRemote===true||v.isRemote==='true';
+        var remDays = Array.isArray(v.remoteDays) ? v.remoteDays : [];
+        var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'},{d:6,l:'Sáb'}];
+        var pillsHtml = '';
+        dayList.forEach(function(item) {
+          var sel = remDays.indexOf(item.d) > -1;
+          pillsHtml += '<button type="button" data-day="' + item.d + '" onclick="AdminHR._toggleRemoteDay(this,' + item.d + ')" ' +
+            'style="padding:5px 11px;border-radius:20px;font-size:12px;cursor:pointer;transition:.15s;border:1px solid ' +
+            (sel ? '#93c5fd;background:#dbeafe;color:#1d4ed8;font-weight:600' : 'var(--border);background:var(--surface);color:var(--fg);font-weight:400') + '">' +
+            item.l + '</button>';
+        });
+        return '<input type="hidden" id="ef-remote-days-val" value="' + JSON.stringify(remDays) + '">' +
+          '<div id="ef-remote-days-wrap" style="display:' + (rem ? 'block' : 'none') + ';margin-bottom:12px">' +
+          '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">Días autorizados de home office</label>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' + pillsHtml + '</div>' +
+          '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = cualquier día. Si elige un día no autorizado, requerirá aprobación del manager.</p>' +
           '</div>';
       })() +
       '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
@@ -2517,7 +2536,12 @@ var AdminHR = {
       notes:     (document.getElementById('ef-notes')||{value:''}).value,
       isRemote:    !!(document.getElementById('ef-remote')&&document.getElementById('ef-remote').checked),
       checadorPin: (document.getElementById('ef-pin')||{value:''}).value.trim() || null,
-      canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked)
+      canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked),
+      remoteDays: (function() {
+        var inp = document.getElementById('ef-remote-days-val');
+        if (!inp) return null;
+        try { var arr = JSON.parse(inp.value || '[]'); return arr.length > 0 ? arr : null; } catch(e) { return null; }
+      })()
     };
     if (!data.firstName||!data.lastName||!data.email||!data.roleId||!data.hireDate) {
       APP.toast('Nombre, apellido, email, rol y fecha de ingreso son obligatorios', 'error'); return;
@@ -2538,6 +2562,28 @@ var AdminHR = {
       APP.closeModal(); APP.toast('✅ ' + name + ' dado de baja', 'success');
       EmployeesView.all = []; EmployeesView.load();
     });
+  },
+
+  _toggleRemoteDay: function(btn, day) {
+    var inp = document.getElementById('ef-remote-days-val');
+    if (!inp) return;
+    var days = [];
+    try { days = JSON.parse(inp.value || '[]'); } catch(e) {}
+    var idx = days.indexOf(day);
+    if (idx > -1) {
+      days.splice(idx, 1);
+      btn.style.background = 'var(--surface)';
+      btn.style.color = 'var(--fg)';
+      btn.style.borderColor = 'var(--border)';
+      btn.style.fontWeight = '400';
+    } else {
+      days.push(day);
+      btn.style.background = '#dbeafe';
+      btn.style.color = '#1d4ed8';
+      btn.style.borderColor = '#93c5fd';
+      btn.style.fontWeight = '600';
+    }
+    inp.value = JSON.stringify(days);
   },
 
   // ── KPI ADMIN ──────────────────────────────────────────────
@@ -4696,7 +4742,10 @@ var AttendanceView = {
   // ── Remote check-in multi-step modal ──────────────────────────
 
   _openRemoteModal: function() {
-    AttendanceView._rState = { step: 1, reason: '', photoSelf: null, photoEnv: null, stream: null, reasons: [] };
+    var remoteDays = (APP.user && Array.isArray(APP.user.remoteDays)) ? APP.user.remoteDays : [];
+    var todayDow = new Date().getDay();
+    var authorizedDay = remoteDays.length === 0 || remoteDays.indexOf(todayDow) > -1;
+    AttendanceView._rState = { step: 1, reason: '', photoSelf: null, photoEnv: null, stream: null, reasons: [], authorizedDay: authorizedDay };
     APP.api('remote.getConfig', {}, function(err, cfg) {
       AttendanceView._rState.reasons = (cfg && cfg.reasons) || ['Visita a cliente','Trámite personal / médico','Trabajo desde casa','Evento o capacitación externa','Otro'];
       AttendanceView._drawRemoteModal();
@@ -4723,6 +4772,10 @@ var AttendanceView = {
     html += '</div>';
     html += '<div style="height:3px;background:var(--border)"><div style="height:100%;width:' + pct + '%;background:#2563eb"></div></div>';
     html += '<div style="padding:20px">';
+
+    if (!st.authorizedDay) {
+      html += '<div style="background:#fef9c3;border:1px solid #fef08a;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e">⚠️ Hoy no es uno de tus días de home office autorizados. Tu solicitud requerirá aprobación del manager.</div>';
+    }
 
     if (st.step === 1) {
       html += '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Selecciona el motivo de tu check-in:</p>';
