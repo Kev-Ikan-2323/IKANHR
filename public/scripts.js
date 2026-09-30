@@ -3986,7 +3986,6 @@ var AttendanceView = {
     html += '</tr></thead><tbody>';
 
     var canOverride = APP.user && (APP.user.isAdmin || APP.user.isHR);
-    var isPastDate  = date !== AttendanceView._todayCdmx();
     rows.forEach(function(r) {
       var name = (r.firstName || '') + ' ' + (r.lastName || '');
       var ci = r.checkIn  ? AttendanceView._fmtTime(r.checkIn)  + (r.status === 'remoto' || r.source === 'remoto' ? ' 🏠' : '') : '—';
@@ -3999,7 +3998,7 @@ var AttendanceView = {
       var badge = (r.checadorPin || r.isRemote)
         ? AttendanceView._badge(r.status)
         : '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0">Sin huella</span>';
-      var overrideBtn = (canOverride && isPastDate && r.status === 'ausente')
+      var overrideBtn = (canOverride && r.status === 'ausente')
         ? '<button onclick="AttendanceView._openOverrideModal(' +
             '\'' + r.employeeId + '\',\'' + date + '\',\'' + (r.rcId || '') + '\',' +
             '\'' + name.replace(/'/g, '') + '\'' +
