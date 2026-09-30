@@ -3973,8 +3973,9 @@ var AttendanceView = {
     } else {
       AttendanceView._loadEmployee();
     }
-    // Check for pending remote/justified approvals (for managers and HR)
+    // Check for pending remote/justified approvals and tardiness appeals
     AttendanceView._checkManagerPending();
+    AttendanceView._checkManagerAppeals();
   },
 
   _loadAdmin: function(date) {
@@ -4167,6 +4168,7 @@ var AttendanceView = {
     var ST = {
       a_tiempo:              { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
       retardo:               { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
+      retardo_apelado:       { bg: '#fefce8', color: '#16a34a', text: 'Retardo apelado ✓' },
       ausente:               { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
       vacaciones:            { bg: '#e0f2fe', color: '#0284c7', text: 'Vacaciones' },
       remoto:                { bg: '#eff6ff', color: '#2563eb', text: 'Remoto ✓' },
@@ -4185,6 +4187,9 @@ var AttendanceView = {
 
     var curStatus  = rec ? rec.status : 'pendiente';
     var showBtns   = dateLabel === 'Hoy' && (curStatus === 'ausente' || curStatus === 'pendiente');
+    var appealStatus = rec && rec.appeal ? rec.appeal.status : null;
+    var canAppeal  = curStatus === 'retardo' && appealStatus !== 'pendiente' && appealStatus !== 'aprobado';
+    var appealDate = (dateLabel === 'Hoy') ? AttendanceView._todayCdmx() : (rec && rec.date ? rec.date : '');
 
     var html = '<div id="att-day-card" class="card" style="margin-bottom:16px;background:' + s.bg + ';border-color:' + s.color + '33">';
     html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + s.color + ';margin-bottom:4px">' + dateLabel + '</div>';
@@ -4198,6 +4203,14 @@ var AttendanceView = {
       html += '<button onclick="AttendanceView._openRemoteModal()" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:600">🏠 Check-in remoto</button>';
       html += '<button onclick="AttendanceView._openJustifiedModal()" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:#7c3aed;color:#fff;cursor:pointer;font-size:12px;font-weight:600">📋 Falta justificada</button>';
       html += '</div>';
+    }
+    if (canAppeal && appealDate) {
+      html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid ' + s.color + '33">';
+      html += '<button onclick="AttendanceView._openAppealModal(\'' + appealDate + '\')" style="width:100%;padding:8px 6px;border-radius:8px;border:none;background:#d97706;color:#fff;cursor:pointer;font-size:12px;font-weight:600">⚠ Apelar tardanza</button>';
+      html += '</div>';
+    }
+    if (appealStatus === 'pendiente') {
+      html += '<div style="margin-top:8px;font-size:11px;color:#d97706;text-align:center">⏳ Apelación pendiente de revisión</div>';
     }
     html += '</div>';
     return html;
@@ -4285,6 +4298,7 @@ var AttendanceView = {
     var ST = {
       a_tiempo:              { bg: '#ecfdf5', fg: '#16a34a', brd: '#bbf7d0' },
       retardo:               { bg: '#fffbeb', fg: '#d97706', brd: '#fde68a' },
+      retardo_apelado:       { bg: '#fefce8', fg: '#16a34a', brd: '#bbf7d0' },
       ausente:               { bg: '#fef2f2', fg: '#dc2626', brd: '#fecaca' },
       vacaciones:            { bg: '#e0f2fe', fg: '#0284c7', brd: '#bae6fd' },
       remoto:                { bg: '#eff6ff', fg: '#2563eb', brd: '#bfdbfe' },
@@ -4363,6 +4377,7 @@ var AttendanceView = {
     html += '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfdf5;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">A tiempo</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fffbeb;border:1px solid #fde68a"></div><span style="font-size:12px;color:var(--muted)">Retardo</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fefce8;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">Retardo apelado</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca"></div><span style="font-size:12px;color:var(--muted)">Ausente</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#eff6ff;border:1px solid #bfdbfe"></div><span style="font-size:12px;color:var(--muted)">Remoto</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#f5f3ff;border:1px solid #ddd6fe"></div><span style="font-size:12px;color:var(--muted)">Justificada</span></div>';
@@ -5045,10 +5060,138 @@ var AttendanceView = {
 
   // ─────────────────────────────────────────────────────────────
 
+  // ── APPEAL MODAL ─────────────────────────────────────────────
+  _openAppealModal: function(dateStr) {
+    var existing = document.getElementById('att-appeal-modal');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'att-appeal-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+    var html = '<div style="background:var(--card);border-radius:16px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:24px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+    html += '<div><div style="font-weight:700;font-size:15px">Apelar tardanza</div>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + dateStr + '</div></div>';
+    html += '<button onclick="document.getElementById(\'att-appeal-modal\').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1">×</button>';
+    html += '</div>';
+    html += '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Explica por qué llegaste tarde. Tu manager revisará la solicitud.</p>';
+    html += '<textarea id="appeal-reason" placeholder="Escribe tu justificación..." style="width:100%;min-height:90px;border-radius:8px;border:1px solid var(--border);padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;background:var(--surface);color:var(--fg)" oninput="var b=document.getElementById(\'appeal-submit\');if(b)b.disabled=!this.value.trim()"></textarea>';
+    html += '<div class="form-group" style="margin-top:10px"><label style="font-size:12px;color:var(--muted)">Documento de soporte (opcional)</label>';
+    html += '<input type="file" id="appeal-file" accept=".pdf,.jpg,.jpeg,.png" style="font-size:12px"></div>';
+    html += '<button id="appeal-submit" disabled onclick="AttendanceView._submitAppeal(\'' + dateStr + '\')" ';
+    html += 'style="width:100%;margin-top:14px;padding:11px;border-radius:8px;border:none;background:#d97706;color:#fff;cursor:pointer;font-weight:700;font-size:14px;opacity:1" ';
+    html += 'onmouseover="if(!this.disabled)this.style.background=\'#b45309\'" onmouseout="this.style.background=\'#d97706\'">Enviar apelación</button>';
+    html += '</div>';
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+  },
+
+  _submitAppeal: function(dateStr) {
+    var reasonEl = document.getElementById('appeal-reason');
+    var fileEl   = document.getElementById('appeal-file');
+    var btn      = document.getElementById('appeal-submit');
+    var reason   = reasonEl ? reasonEl.value.trim() : '';
+    if (!reason) { APP.toast('Escribe una justificación', 'error'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+
+    var doSubmit = function(docUrl) {
+      APP.api('appeal.request', { date: dateStr, reason: reason, documentUrl: docUrl || null }, function(err) {
+        if (err) {
+          APP.toast(err, 'error');
+          if (btn) { btn.disabled = false; btn.textContent = 'Enviar apelación'; }
+          return;
+        }
+        var modal = document.getElementById('att-appeal-modal');
+        if (modal) modal.remove();
+        APP.toast('✅ Apelación enviada — tu manager la revisará', 'success');
+        if (AttendanceView._empMonthData) {
+          AttendanceView._loadEmployeeMonth(AttendanceView._empMonthData.year, AttendanceView._empMonthData.month);
+        }
+      });
+    };
+
+    var file = fileEl && fileEl.files && fileEl.files[0];
+    if (file) {
+      var fd = new FormData();
+      fd.append('file', file, 'appeal-' + dateStr + '-' + Date.now() + '.' + (file.name.split('.').pop() || 'pdf'));
+      var doUpload = function(token) {
+        var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        fetch('/api/upload-evidence', { method: 'POST', body: fd, headers: headers })
+          .then(function(r) { return r.json(); })
+          .then(function(j) {
+            if (j.error) { APP.toast('Error subiendo documento: ' + j.error, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar apelación'; } return; }
+            doSubmit(j.url);
+          })
+          .catch(function(e) { APP.toast('Error subiendo documento', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar apelación'; } });
+      };
+      if (typeof _sb !== 'undefined' && _sb) {
+        _sb.auth.getSession().then(function(res) { doUpload(res && res.data && res.data.session ? res.data.session.access_token : null); });
+      } else { doUpload(null); }
+    } else {
+      doSubmit(null);
+    }
+  },
+
+  // ── APPEAL MANAGER REVIEW ────────────────────────────────────
+  _checkManagerAppeals: function() {
+    if (!APP.user || (!APP.user.isAdmin && !APP.user.isHR && !APP.user.isManager)) return;
+    APP.api('appeal.getPending', {}, function(err, data) {
+      if (err || !data || !data.items || data.items.length === 0) return;
+      AttendanceView._renderAppealsPopup(data.items);
+    });
+  },
+
+  _renderAppealsPopup: function(items) {
+    var existing = document.getElementById('att-appeals-popup');
+    if (existing) existing.remove();
+
+    var popup = document.createElement('div');
+    popup.id = 'att-appeals-popup';
+    popup.style.cssText = 'position:fixed;bottom:24px;right:24px;width:320px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:8900;overflow:hidden';
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)">';
+    html += '<div style="font-weight:700;font-size:14px">⚠ Apelaciones de tardanza <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">' + items.length + '</span></div>';
+    html += '<button onclick="document.getElementById(\'att-appeals-popup\').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1">×</button>';
+    html += '</div>';
+    html += '<div style="max-height:340px;overflow-y:auto">';
+
+    items.forEach(function(item) {
+      html += '<div id="appeal-item-' + item.id + '" style="padding:14px 16px;border-bottom:1px solid var(--border)">';
+      html += '<div style="font-weight:600;font-size:13px">' + item.employeeName + '</div>';
+      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + item.date + (item.department ? ' · ' + item.department : '') + '</div>';
+      html += '<div style="font-size:12px;color:var(--fg);margin-bottom:10px;line-height:1.4">' + (item.reason || '') + '</div>';
+      if (item.documentUrl) {
+        html += '<a href="' + item.documentUrl + '" target="_blank" style="font-size:11px;color:#2563eb;display:block;margin-bottom:8px">📎 Ver documento</a>';
+      }
+      html += '<div style="display:flex;gap:8px">';
+      html += '<button onclick="AttendanceView._reviewAppeal(\'' + item.id + '\',\'approve\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:#16a34a;color:#fff;cursor:pointer;font-size:12px;font-weight:600">✓ Aprobar</button>';
+      html += '<button onclick="AttendanceView._reviewAppeal(\'' + item.id + '\',\'deny\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:#dc2626;color:#fff;cursor:pointer;font-size:12px;font-weight:600">✗ Denegar</button>';
+      html += '</div></div>';
+    });
+
+    html += '</div>';
+    popup.innerHTML = html;
+    document.body.appendChild(popup);
+  },
+
+  _reviewAppeal: function(id, action) {
+    var itemEl = document.getElementById('appeal-item-' + id);
+    if (itemEl) itemEl.style.opacity = '0.5';
+    APP.api('appeal.review', { id: id, action: action }, function(err) {
+      if (err) { APP.toast(err, 'error'); if (itemEl) itemEl.style.opacity = '1'; return; }
+      if (itemEl) itemEl.remove();
+      APP.toast(action === 'approve' ? '✅ Apelación aprobada' : '✅ Apelación denegada', 'success');
+      var popup = document.getElementById('att-appeals-popup');
+      if (popup && !popup.querySelector('[id^="appeal-item-"]')) popup.remove();
+    });
+  },
+
   _badge: function(status) {
     var map = {
       a_tiempo:              ['#ecfdf5', '#16a34a', 'A tiempo'],
       retardo:               ['#fffbeb', '#d97706', 'Retardo'],
+      retardo_apelado:       ['#fefce8', '#16a34a', 'Retardo apelado ✓'],
       ausente:               ['#fef2f2', '#dc2626', 'Ausente'],
       vacaciones:            ['#e0f2fe', '#0284c7', 'Vacaciones'],
       remoto:                ['#eff6ff', '#2563eb', 'Remoto'],

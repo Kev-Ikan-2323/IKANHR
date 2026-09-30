@@ -278,7 +278,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var dateMin  = year + '-' + mon + '-01'
   var dateMax  = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [punchRes, vacRequests, remotoRes, empRow] = await Promise.all([
+  var [punchRes, vacRequests, remotoRes, empRow, appealRes] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
@@ -290,7 +290,12 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
       .eq('employee_id', employeeId)
       .gte('date', dateMin)
       .lte('date', dateMax),
-    DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId)
+    DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId),
+    sb.from('tardiness_appeals')
+      .select('id, date, status, reason')
+      .eq('employee_id', employeeId)
+      .gte('date', dateMin)
+      .lte('date', dateMax)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -315,15 +320,28 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var vacDates = _buildVacationSet(vacRequests, year, month)
   var today    = todayCdmx()
 
+  // Build appeal map: date → appeal (prefer aprobado > pendiente > denegado)
+  var appealByDate = {}
+  ;(appealRes.data || []).forEach(function(a) {
+    var prev = appealByDate[a.date]
+    var priority = { aprobado: 2, pendiente: 1, denegado: 0 }
+    if (!prev || (priority[a.status] || 0) > (priority[prev.status] || 0)) {
+      appealByDate[a.date] = a
+    }
+  })
+
   var wdays   = workdaysInMonth(year, month, quincena)
   var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
     var fl     = firstLast(byDate[dateStr] || [])
     var rc     = remotoByDate[dateStr]
+    var ap     = appealByDate[dateStr]
     var status
 
     if (fl.checkIn) {
       status = toStatus(fl.checkIn, dateStr)
+      // If retardo but appeal approved → retardo_apelado
+      if (status === 'retardo' && ap && ap.status === 'aprobado') status = 'retardo_apelado'
     } else if (rc && rc.status === 'aprobado') {
       status = rc.type === 'remoto' ? 'remoto' : 'justificada'
     } else if (rc && rc.status === 'pendiente' && dateStr === today) {
@@ -349,7 +367,8 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
       source:         byDate[dateStr] && byDate[dateStr][0] ? byDate[dateStr][0].source : (rc ? 'remoto' : null),
       remoteCheckin:  rc ? { id: rc.id, type: rc.type, reason: rc.reason, status: rc.status,
                              photoSelfUrl: rc.photo_self_url, photoEnvUrl: rc.photo_env_url,
-                             documentUrl: rc.document_url } : null
+                             documentUrl: rc.document_url } : null,
+      appeal:         ap ? { id: ap.id, status: ap.status, reason: ap.reason } : null
     }
   })
 

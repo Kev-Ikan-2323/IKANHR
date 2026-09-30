@@ -21,7 +21,8 @@ import { MailService }        from '../../lib/email.js'
 import { buildEmail }        from '../../lib/email-template.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
 import { AttendanceModule }    from '../../modules/attendance.js'
-import { RemoteCheckinModule } from '../../modules/remote-checkin.js'
+import { RemoteCheckinModule }   from '../../modules/remote-checkin.js'
+import { TardinessAppealModule } from '../../modules/tardiness-appeal.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -217,7 +218,10 @@ async function dispatch(action, data, user) {
     'remote.review':         function() { return RemoteCheckinModule.review(data, user) },
     'remote.getPending':     function() { return RemoteCheckinModule.getPending(data, user) },
     'remote.override':       function() { return RemoteCheckinModule.override(data, user) },
-    'remote.getConfig':      function() { return RemoteCheckinModule.getConfig() }
+    'remote.getConfig':      function() { return RemoteCheckinModule.getConfig() },
+    'appeal.request':        function() { return TardinessAppealModule.request(data, user) },
+    'appeal.review':         function() { return TardinessAppealModule.review(data, user) },
+    'appeal.getPending':     function() { return TardinessAppealModule.getPending(data, user) }
   }
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)
