@@ -14,7 +14,9 @@ function sbClient() {
 }
 
 // 9:10 AM CDMX in minutes from local midnight
-var LATE_LIMIT = 9 * 60 + 10
+var LATE_LIMIT   = 9 * 60 + 10
+// 10:00 AM — at or after this = ausente, not retardo
+var ABSENT_LIMIT = 10 * 60
 
 // Convert UTC timestamp to CDMX minutes-since-midnight (UTC-6)
 function toCdmxMins(utcTs) {
@@ -36,7 +38,10 @@ function toStatus(checkInUtc, dateStr) {
     if (dateStr !== todayCdmx()) return 'ausente'
     return toCdmxMins(new Date().toISOString()) < LATE_LIMIT ? 'pendiente' : 'ausente'
   }
-  return toCdmxMins(checkInUtc) <= LATE_LIMIT ? 'a_tiempo' : 'retardo'
+  var mins = toCdmxMins(checkInUtc)
+  if (mins <= LATE_LIMIT)  return 'a_tiempo'
+  if (mins < ABSENT_LIMIT) return 'retardo'
+  return 'ausente'
 }
 
 // Given an array of punches for one employee, return first and last UTC timestamps

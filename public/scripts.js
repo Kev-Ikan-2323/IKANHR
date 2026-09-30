@@ -4399,8 +4399,17 @@ var AttendanceView = {
     year  = year  || cm.year;
     month = month || cm.month;
     el.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
-    APP.api('attendance.getMonth', { year: year, month: month }, function(err, data) {
-      if (err) { el.innerHTML = '<div class="empty-state"><p>' + err + '</p></div>'; return; }
+    var isAdminHR = APP.user && (APP.user.isAdmin || APP.user.isHR);
+    var reqs = [
+      new Promise(function(res) { APP.api('attendance.getMonth', { year: year, month: month }, function(e, d) { res(e ? null : d); }); })
+    ];
+    if (isAdminHR) {
+      reqs.push(new Promise(function(res) { APP.api('tardiness.getAllStatus', {}, function(e, d) { res(e ? null : d); }); }));
+    }
+    Promise.all(reqs).then(function(results) {
+      var data = results[0];
+      if (!data) { el.innerHTML = '<div class="empty-state"><p>Error cargando datos</p></div>'; return; }
+      AttendanceView._tardinessData = results[1] || null;
       el.innerHTML = AttendanceView._renderDashboard(data, year, month);
     });
   },
@@ -4522,11 +4531,23 @@ var AttendanceView = {
     if (!d || !d.data) return;
 
     function doExport(data, periodLabel) {
+      // Build tardiness lookup by employeeId
+      var tardMap = {};
+      var tardItems = (AttendanceView._tardinessData && AttendanceView._tardinessData.items) || [];
+      tardItems.forEach(function(t) { tardMap[t.employeeId] = t; });
+
       var rows = [
-        ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Vacaciones', 'Remotos', 'Justificadas', '% Puntualidad']
+        ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Retardos acum. (6m)', 'Días a desc. esta quincena', '% Puntualidad']
       ];
-      data.employees.forEach(function(e) {
+
+      // Only include employees with at least one retardo or ausencia
+      var filtered = (data.employees || []).filter(function(e) {
+        return e.retardo > 0 || e.ausente > 0;
+      });
+
+      filtered.forEach(function(e) {
         var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
+        var tard = tardMap[e.employeeId] || tardMap[e.id] || null;
         rows.push([
           (e.firstName + ' ' + e.lastName).trim(),
           e.department || '',
@@ -4534,16 +4555,19 @@ var AttendanceView = {
           e.aTime,
           e.retardo,
           e.ausente,
-          e.vacaciones || 0,
-          e.remoto || 0,
-          e.justificada || 0,
+          tard ? tard.count       : '',
+          tard ? tard.daysToDeduct : '',
           pct + '%'
         ]);
       });
+
       var s = data.summary;
-      var n = (data.workdays || 0) * (s.total || 1);
-      var pctTotal = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
-      rows.push(['TOTAL', s.total + ' empleados', data.workdays, s.aTime, s.retardo, s.ausente, s.vacaciones || 0, s.remoto || 0, s.justificada || 0, pctTotal + '%']);
+      var n = (data.workdays || 0) * (filtered.length || 1);
+      var pctTotal = n > 0 ? Math.round(
+        filtered.reduce(function(acc, e) { return acc + e.aTime; }, 0) / n * 100
+      ) : 0;
+      var totalDesc = tardItems.reduce(function(acc, t) { return acc + (t.daysToDeduct || 0); }, 0);
+      rows.push(['TOTAL', filtered.length + ' empleados', data.workdays, s.aTime, s.retardo, s.ausente, '', totalDesc + ' días', pctTotal + '%']);
 
       var csv = '﻿' + rows.map(function(r) {
         return r.map(function(v) {

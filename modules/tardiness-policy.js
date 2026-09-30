@@ -8,8 +8,9 @@ import { createClient } from '@supabase/supabase-js'
 import { DB } from '../lib/db.js'
 import { CONFIG } from '../lib/auth.js'
 
-const POLICY_START = '2026-10-01'
-const LATE_LIMIT   = 9 * 60 + 10  // 9:10 AM in minutes
+const POLICY_START  = '2026-10-01'
+const LATE_LIMIT    = 9 * 60 + 10  // 9:10 AM in minutes
+const ABSENT_LIMIT  = 10 * 60      // 10:00 AM — at or after = ausente, not retardo
 
 const TIERS = [
   { min: 17, label: 'Rescisión de la relación laboral',              severity: 'rescision', bg: '#450a0a', fg: '#fca5a5' },
@@ -46,7 +47,19 @@ function windowStart() {
 function isLate(punchedAt) {
   var d = new Date(punchedAt)
   var cdmxMin = ((d.getUTCHours() - 6 + 24) % 24) * 60 + d.getUTCMinutes()
-  return cdmxMin > LATE_LIMIT
+  // Only 9:10–9:59 counts as retardo; 10:00+ is ausente per company policy
+  return cdmxMin > LATE_LIMIT && cdmxMin < ABSENT_LIMIT
+}
+
+function getDaysToDeduct(count) {
+  if (count >= 17) return 0   // rescisión — not a payroll deduction
+  if (count >= 16) return 3
+  if (count >= 15) return 3
+  if (count >= 12) return 1
+  if (count >=  9) return 3
+  if (count >=  6) return 2
+  if (count >=  3) return 1
+  return 0
 }
 
 async function countRetardos(employeeId, sb) {
@@ -106,7 +119,7 @@ export var TardinessPolicyModule = {
 
     var sb = sbClient()
     var count = await countRetardos(employeeId, sb)
-    return getTier(count)
+    return { ...getTier(count), daysToDeduct: getDaysToDeduct(count) }
   },
 
   // Get tardiness status for all tracked employees (HR/admin only)
@@ -175,14 +188,15 @@ export var TardinessPolicyModule = {
       var count = countByEmp[e.id] || 0
       var tier  = getTier(count)
       return {
-        employeeId:  e.id,
-        name:        (e.firstName || '') + ' ' + (e.lastName || ''),
-        department:  e.department || '',
-        count:       count,
-        severity:    tier.severity,
-        label:       tier.label,
-        bg:          tier.bg,
-        fg:          tier.fg
+        employeeId:    e.id,
+        name:          (e.firstName || '') + ' ' + (e.lastName || ''),
+        department:    e.department || '',
+        count:         count,
+        daysToDeduct:  getDaysToDeduct(count),
+        severity:      tier.severity,
+        label:         tier.label,
+        bg:            tier.bg,
+        fg:            tier.fg
       }
     })
 
