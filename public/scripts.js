@@ -3904,6 +3904,7 @@ var AnnouncementsView = {
 var AttendanceView = {
   _timer: null,
   _empView: 'calendar',
+  _rState: null,
 
   load: function() {
     var el = document.getElementById('att-content'); if (!el) return;
@@ -3915,6 +3916,8 @@ var AttendanceView = {
     } else {
       AttendanceView._loadEmployee();
     }
+    // Check for pending remote/justified approvals (for managers and HR)
+    AttendanceView._checkManagerPending();
   },
 
   _loadAdmin: function(date) {
@@ -4104,11 +4107,15 @@ var AttendanceView = {
 
   _dayCard: function(dateLabel, rec) {
     var ST = {
-      a_tiempo:   { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
-      retardo:    { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
-      ausente:    { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
-      vacaciones: { bg: '#e0f2fe', color: '#0284c7', text: 'Vacaciones' },
-      pendiente:  { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' }
+      a_tiempo:              { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
+      retardo:               { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
+      ausente:               { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
+      vacaciones:            { bg: '#e0f2fe', color: '#0284c7', text: 'Vacaciones' },
+      remoto:                { bg: '#eff6ff', color: '#2563eb', text: 'Remoto ✓' },
+      justificada:           { bg: '#f5f3ff', color: '#7c3aed', text: 'Justificada ✓' },
+      pendiente_remoto:      { bg: '#fff7ed', color: '#ea580c', text: 'Pendiente (remoto)' },
+      pendiente_justificada: { bg: '#fdf4ff', color: '#c026d3', text: 'Pendiente (just.)' },
+      pendiente:             { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' }
     };
     if (!dateLabel) {
       return '<div id="att-day-card" class="card" style="margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center">' +
@@ -4117,13 +4124,25 @@ var AttendanceView = {
     var s  = rec ? (ST[rec.status] || ST.ausente) : ST.pendiente;
     var ci = rec && rec.checkIn  ? AttendanceView._fmtTime(rec.checkIn)  : '—';
     var co = rec && rec.checkOut ? AttendanceView._fmtTime(rec.checkOut) : '—';
-    return '<div id="att-day-card" class="card" style="margin-bottom:16px;background:' + s.bg + ';border-color:' + s.color + '33">' +
-      '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + s.color + ';margin-bottom:4px">' + dateLabel + '</div>' +
-      '<div style="font-size:26px;font-weight:700;color:' + s.color + ';margin-bottom:12px">' + s.text + '</div>' +
-      '<div style="display:flex;gap:28px">' +
-      '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>' +
-      '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>' +
-      '</div></div>';
+
+    var curStatus  = rec ? rec.status : 'pendiente';
+    var showBtns   = dateLabel === 'Hoy' && (curStatus === 'ausente' || curStatus === 'pendiente');
+
+    var html = '<div id="att-day-card" class="card" style="margin-bottom:16px;background:' + s.bg + ';border-color:' + s.color + '33">';
+    html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + s.color + ';margin-bottom:4px">' + dateLabel + '</div>';
+    html += '<div style="font-size:26px;font-weight:700;color:' + s.color + ';margin-bottom:12px">' + s.text + '</div>';
+    html += '<div style="display:flex;gap:28px">';
+    html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>';
+    html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>';
+    html += '</div>';
+    if (showBtns) {
+      html += '<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid ' + s.color + '33">';
+      html += '<button onclick="AttendanceView._openRemoteModal()" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:600">🏠 Check-in remoto</button>';
+      html += '<button onclick="AttendanceView._openJustifiedModal()" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:#7c3aed;color:#fff;cursor:pointer;font-size:12px;font-weight:600">📋 Falta justificada</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
   },
 
   _selectDay: function(dateStr) {
@@ -4204,10 +4223,14 @@ var AttendanceView = {
     var lastDay  = new Date(year, month, 0).getDate();
 
     var ST = {
-      a_tiempo:   { bg: '#ecfdf5', fg: '#16a34a', brd: '#bbf7d0' },
-      retardo:    { bg: '#fffbeb', fg: '#d97706', brd: '#fde68a' },
-      ausente:    { bg: '#fef2f2', fg: '#dc2626', brd: '#fecaca' },
-      vacaciones: { bg: '#e0f2fe', fg: '#0284c7', brd: '#bae6fd' }
+      a_tiempo:              { bg: '#ecfdf5', fg: '#16a34a', brd: '#bbf7d0' },
+      retardo:               { bg: '#fffbeb', fg: '#d97706', brd: '#fde68a' },
+      ausente:               { bg: '#fef2f2', fg: '#dc2626', brd: '#fecaca' },
+      vacaciones:            { bg: '#e0f2fe', fg: '#0284c7', brd: '#bae6fd' },
+      remoto:                { bg: '#eff6ff', fg: '#2563eb', brd: '#bfdbfe' },
+      justificada:           { bg: '#f5f3ff', fg: '#7c3aed', brd: '#ddd6fe' },
+      pendiente_remoto:      { bg: '#fff7ed', fg: '#ea580c', brd: '#fed7aa' },
+      pendiente_justificada: { bg: '#fdf4ff', fg: '#c026d3', brd: '#f0abfc' }
     };
 
     var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
@@ -4244,7 +4267,10 @@ var AttendanceView = {
         html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:' + c.bg + ';border:1px solid ' + c.brd + sel + ';text-align:center;cursor:pointer">';
         html += '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + ';color:' + c.fg + '">' + d + '</div>';
         if (ci) html += '<div style="font-size:10px;color:' + c.fg + ';margin-top:3px;font-variant-numeric:tabular-nums">' + ci + '</div>';
-        if (rec.source === 'remoto') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
+        if (rec.status === 'remoto' || rec.source === 'remoto') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
+        if (rec.status === 'justificada') html += '<div style="font-size:10px;margin-top:2px">📋</div>';
+        if (rec.status === 'pendiente_remoto') html += '<div style="font-size:10px;margin-top:2px">⏳</div>';
+        if (rec.status === 'pendiente_justificada') html += '<div style="font-size:10px;margin-top:2px">⏳</div>';
         html += '</div>';
       } else {
         var sel2 = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
@@ -4257,10 +4283,12 @@ var AttendanceView = {
     html += '</div>';
 
     // Legend
-    html += '<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">';
+    html += '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfdf5;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">A tiempo</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fffbeb;border:1px solid #fde68a"></div><span style="font-size:12px;color:var(--muted)">Retardo</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca"></div><span style="font-size:12px;color:var(--muted)">Ausente</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#eff6ff;border:1px solid #bfdbfe"></div><span style="font-size:12px;color:var(--muted)">Remoto</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#f5f3ff;border:1px solid #ddd6fe"></div><span style="font-size:12px;color:var(--muted)">Justificada</span></div>';
     html += '</div>';
     return html;
   },
@@ -4320,13 +4348,15 @@ var AttendanceView = {
     html += '</div></div>';
 
     // Summary tiles
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px">';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-bottom:20px">';
     html += AttendanceView._tile(pct + '%', 'Puntualidad', '#3b82f6');
     html += AttendanceView._tile(s.retardo, 'Retardos', '#f59e0b');
     html += AttendanceView._tile(s.ausente, 'Ausencias', '#ef4444');
     html += AttendanceView._tile(s.vacaciones || 0, 'Vacaciones', '#0ea5e9');
-    html += AttendanceView._tile(data.workdays, 'Días laborables', '#64748b');
-    html += AttendanceView._tile(s.total, 'Empleados', '#7c3aed');
+    html += AttendanceView._tile(s.remoto || 0, 'Remotos', '#2563eb');
+    html += AttendanceView._tile(s.justificada || 0, 'Justificadas', '#7c3aed');
+    html += AttendanceView._tile(data.workdays, 'Días lab.', '#64748b');
+    html += AttendanceView._tile(s.total, 'Empleados', '#475569');
     html += '</div>';
 
     if (!data.employees || data.employees.length === 0) {
@@ -4343,6 +4373,8 @@ var AttendanceView = {
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Retardos</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Ausentes</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Vacaciones</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Remotos</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Justificadas</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:right">% Puntual</th>';
     html += '</tr></thead><tbody>';
 
@@ -4357,6 +4389,8 @@ var AttendanceView = {
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + (e.retardo > 0 ? ';color:#d97706;font-weight:600' : '') + '">' + e.retardo + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + (e.ausente > 0 ? ';color:#dc2626;font-weight:600' : '') + '">' + e.ausente + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.vacaciones || 0) > 0 ? ';color:#0284c7;font-weight:600' : '') + '">' + (e.vacaciones || 0) + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.remoto || 0) > 0 ? ';color:#2563eb;font-weight:600' : '') + '">' + (e.remoto || 0) + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.justificada || 0) > 0 ? ';color:#7c3aed;font-weight:600' : '') + '">' + (e.justificada || 0) + '</td>';
       html += '<td style="padding:8px 10px;text-align:right;font-weight:600;color:' + pctColor + '">' + pctE + '%</td>';
       html += '</tr>';
     });
@@ -4389,7 +4423,7 @@ var AttendanceView = {
 
     function doExport(data, periodLabel) {
       var rows = [
-        ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Vacaciones', '% Puntualidad']
+        ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Vacaciones', 'Remotos', 'Justificadas', '% Puntualidad']
       ];
       data.employees.forEach(function(e) {
         var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
@@ -4401,13 +4435,15 @@ var AttendanceView = {
           e.retardo,
           e.ausente,
           e.vacaciones || 0,
+          e.remoto || 0,
+          e.justificada || 0,
           pct + '%'
         ]);
       });
       var s = data.summary;
       var n = (data.workdays || 0) * (s.total || 1);
       var pctTotal = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
-      rows.push(['TOTAL', s.total + ' empleados', data.workdays, s.aTime, s.retardo, s.ausente, s.vacaciones || 0, pctTotal + '%']);
+      rows.push(['TOTAL', s.total + ' empleados', data.workdays, s.aTime, s.retardo, s.ausente, s.vacaciones || 0, s.remoto || 0, s.justificada || 0, pctTotal + '%']);
 
       var csv = '﻿' + rows.map(function(r) {
         return r.map(function(v) {
@@ -4487,13 +4523,369 @@ var AttendanceView = {
     return '<div style="padding:4px 12px;border-radius:20px;background:' + color + '20;color:' + color + ';font-size:12px;font-weight:600">' + text + '</div>';
   },
 
+  // ── Manager pending-approval popup ────────────────────────────
+
+  _checkManagerPending: function() {
+    APP.api('remote.getPending', {}, function(err, items) {
+      if (err || !items || items.length === 0) return;
+      AttendanceView._renderManagerPopup(items);
+    });
+  },
+
+  _renderManagerPopup: function(items) {
+    var existing = document.getElementById('att-mgr-popup');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'att-mgr-popup';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+    var html = '<div style="background:var(--card);border-radius:16px;max-width:560px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">';
+    html += '<div><div style="font-weight:700;font-size:15px">Solicitudes pendientes</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-top:1px">' + items.length + ' solicitud' + (items.length !== 1 ? 'es' : '') + ' esperan tu respuesta hoy</div></div>';
+    html += '<button onclick="document.getElementById(\'att-mgr-popup\').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px 6px">×</button>';
+    html += '</div><div style="overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">';
+
+    items.forEach(function(item) {
+      var name = (item.firstName + ' ' + item.lastName).trim();
+      var isRemoto = item.type === 'remoto';
+      var typeLabel = isRemoto ? 'Check-in remoto' : 'Falta justificada';
+      var typeColor = isRemoto ? '#2563eb' : '#7c3aed';
+
+      html += '<div id="att-mgr-' + item.id + '" style="border:1px solid var(--border);border-radius:10px;padding:14px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+      html += '<div style="font-weight:600;font-size:14px">' + name + '</div>';
+      html += '<span style="padding:2px 8px;border-radius:4px;background:' + typeColor + '20;color:' + typeColor + ';font-size:12px;font-weight:600">' + typeLabel + '</span>';
+      html += '</div>';
+      if (item.reason) {
+        html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">📝 ' + item.reason + '</div>';
+      }
+      if (isRemoto && (item.photoSelfUrl || item.photoEnvUrl)) {
+        html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
+        if (item.photoSelfUrl) {
+          html += '<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Selfie</div>';
+          html += '<img src="' + item.photoSelfUrl + '" style="width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></div>';
+        }
+        if (item.photoEnvUrl) {
+          html += '<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Entorno</div>';
+          html += '<img src="' + item.photoEnvUrl + '" style="width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></div>';
+        }
+        html += '</div>';
+      }
+      if (!isRemoto && item.documentUrl) {
+        html += '<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Justificante</div>';
+        html += '<img src="' + item.documentUrl + '" style="width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></div>';
+      }
+      html += '<div style="display:flex;gap:8px">';
+      html += '<button onclick="AttendanceView._reviewRequest(\'' + item.id + '\',\'aprobar\')" ';
+      html += 'style="flex:1;padding:8px;border-radius:7px;border:none;background:#16a34a;color:#fff;cursor:pointer;font-weight:600;font-size:13px">✓ Aprobar</button>';
+      html += '<button onclick="AttendanceView._reviewRequest(\'' + item.id + '\',\'denegar\')" ';
+      html += 'style="flex:1;padding:8px;border-radius:7px;border:1px solid #dc2626;background:transparent;color:#dc2626;cursor:pointer;font-weight:600;font-size:13px">✗ Denegar</button>';
+      html += '</div></div>';
+    });
+
+    html += '</div></div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+  },
+
+  _reviewRequest: function(id, action) {
+    var notes = '';
+    if (action === 'denegar') {
+      notes = window.prompt('Motivo del rechazo (opcional):') || '';
+    }
+    var itemEl = document.getElementById('att-mgr-' + id);
+    if (itemEl) itemEl.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);font-size:13px">Procesando…</div>';
+
+    APP.api('remote.review', { id: id, action: action, notes: notes }, function(err) {
+      if (err) { APP.toast(err, 'error'); AttendanceView._checkManagerPending(); return; }
+      if (itemEl) {
+        var color = action === 'aprobar' ? '#16a34a' : '#dc2626';
+        itemEl.style.opacity = '.5';
+        itemEl.innerHTML = '<div style="text-align:center;padding:12px;font-size:13px;font-weight:600;color:' + color + '">' + (action === 'aprobar' ? '✓ Aprobado' : '✗ Denegado') + '</div>';
+      }
+      APP.toast(action === 'aprobar' ? 'Aprobado ✓' : 'Denegado', 'success');
+      setTimeout(function() {
+        var popup = document.getElementById('att-mgr-popup');
+        if (!popup) return;
+        var all = popup.querySelectorAll('[id^="att-mgr-"]');
+        var done = true;
+        all.forEach(function(el) { if (parseFloat(el.style.opacity || '1') > 0.6) done = false; });
+        if (done) popup.remove();
+      }, 1200);
+    });
+  },
+
+  // ── Remote check-in multi-step modal ──────────────────────────
+
+  _openRemoteModal: function() {
+    AttendanceView._rState = { step: 1, reason: '', photoSelf: null, photoEnv: null, stream: null, reasons: [] };
+    APP.api('remote.getConfig', {}, function(err, cfg) {
+      AttendanceView._rState.reasons = (cfg && cfg.reasons) || ['Visita a cliente','Trámite personal / médico','Trabajo desde casa','Evento o capacitación externa','Otro'];
+      AttendanceView._drawRemoteModal();
+    });
+  },
+
+  _drawRemoteModal: function() {
+    var st = AttendanceView._rState;
+    if (!st) return;
+
+    var existing = document.getElementById('att-rmodal');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'att-rmodal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+    var pct = Math.round((st.step / 3) * 100);
+    var html = '<div style="background:var(--card);border-radius:16px;max-width:400px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">';
+    html += '<div><div style="font-weight:700;font-size:15px">Check-in remoto</div>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-top:1px">Paso ' + st.step + ' de 3</div></div>';
+    html += '<button onclick="AttendanceView._closeRemoteModal()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px">×</button>';
+    html += '</div>';
+    html += '<div style="height:3px;background:var(--border)"><div style="height:100%;width:' + pct + '%;background:#2563eb"></div></div>';
+    html += '<div style="padding:20px">';
+
+    if (st.step === 1) {
+      html += '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Selecciona el motivo de tu check-in:</p>';
+      st.reasons.forEach(function(r) {
+        var sel = st.reason === r;
+        var safeR = r.replace(/'/g, '&#39;');
+        html += '<div onclick="AttendanceView._setRemoteReason(\'' + safeR + '\')" ';
+        html += 'style="padding:10px 14px;border:2px solid ' + (sel ? '#2563eb' : 'var(--border)') + ';border-radius:8px;cursor:pointer;margin-bottom:8px;font-size:13px;background:' + (sel ? '#eff6ff' : 'var(--surface)') + ';color:' + (sel ? '#2563eb' : 'var(--text)') + ';font-weight:' + (sel ? '600' : '400') + '">' + r + '</div>';
+      });
+      var canNext = !!st.reason;
+      html += '<button onclick="AttendanceView._remoteNext()" ' + (canNext ? '' : 'disabled ');
+      html += 'style="width:100%;padding:10px;border-radius:8px;border:none;background:' + (canNext ? '#2563eb' : '#cbd5e1') + ';color:#fff;cursor:' + (canNext ? 'pointer' : 'default') + ';font-weight:600;font-size:14px;margin-top:4px">Continuar →</button>';
+
+    } else if (st.step === 2 || st.step === 3) {
+      var isStep2 = st.step === 2;
+      var photo   = isStep2 ? st.photoSelf : st.photoEnv;
+      var tip     = isStep2 ? 'Toma una selfie para verificar tu identidad.' : 'Toma una foto de tu entorno de trabajo.';
+      html += '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">' + tip + '</p>';
+
+      if (!photo) {
+        html += '<div style="background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;margin-bottom:12px">';
+        html += '<video id="att-rv" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video></div>';
+        html += '<button onclick="AttendanceView._captureRemote(\'' + (isStep2 ? 'self' : 'env') + '\')" ';
+        html += 'style="width:100%;padding:10px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;font-size:14px;margin-bottom:10px">📷 Tomar foto</button>';
+      } else {
+        html += '<div style="border-radius:10px;overflow:hidden;aspect-ratio:4/3;margin-bottom:8px">';
+        html += '<img src="' + photo + '" style="width:100%;height:100%;object-fit:cover" /></div>';
+        html += '<button onclick="AttendanceView._retakeRemote(\'' + (isStep2 ? 'self' : 'env') + '\')" ';
+        html += 'style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px;margin-bottom:10px">↺ Repetir foto</button>';
+      }
+
+      if (isStep2) {
+        var can2 = !!st.photoSelf;
+        html += '<button onclick="AttendanceView._remoteNext()" ' + (can2 ? '' : 'disabled ');
+        html += 'style="width:100%;padding:10px;border-radius:8px;border:none;background:' + (can2 ? '#2563eb' : '#cbd5e1') + ';color:#fff;cursor:' + (can2 ? 'pointer' : 'default') + ';font-weight:600;font-size:14px">Continuar →</button>';
+      } else {
+        var can3 = !!st.photoEnv;
+        html += '<button id="att-rsubmit" onclick="AttendanceView._submitRemote()" ' + (can3 ? '' : 'disabled ');
+        html += 'style="width:100%;padding:10px;border-radius:8px;border:none;background:' + (can3 ? '#16a34a' : '#cbd5e1') + ';color:#fff;cursor:' + (can3 ? 'pointer' : 'default') + ';font-weight:600;font-size:14px">✓ Enviar solicitud</button>';
+      }
+    }
+
+    html += '</div></div>';
+    overlay.innerHTML = html;
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) AttendanceView._closeRemoteModal(); });
+    document.body.appendChild(overlay);
+
+    if ((st.step === 2 && !st.photoSelf) || (st.step === 3 && !st.photoEnv)) {
+      var facingMode = st.step === 2 ? 'user' : 'environment';
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false })
+        .then(function(s) {
+          st.stream = s;
+          var v = document.getElementById('att-rv');
+          if (v) v.srcObject = s;
+        })
+        .catch(function() { APP.toast('No se pudo acceder a la cámara', 'error'); });
+    }
+  },
+
+  _closeRemoteModal: function() {
+    var st = AttendanceView._rState;
+    if (st && st.stream) { st.stream.getTracks().forEach(function(t) { t.stop(); }); }
+    AttendanceView._rState = null;
+    var m = document.getElementById('att-rmodal');
+    if (m) m.remove();
+  },
+
+  _setRemoteReason: function(reason) {
+    if (!AttendanceView._rState) return;
+    AttendanceView._rState.reason = reason;
+    AttendanceView._drawRemoteModal();
+  },
+
+  _remoteNext: function() {
+    var st = AttendanceView._rState;
+    if (!st) return;
+    if (st.step === 1 && !st.reason) return;
+    if (st.step === 2 && !st.photoSelf) return;
+    if (st.stream) { st.stream.getTracks().forEach(function(t) { t.stop(); }); st.stream = null; }
+    st.step++;
+    AttendanceView._drawRemoteModal();
+  },
+
+  _captureRemote: function(which) {
+    var v = document.getElementById('att-rv');
+    if (!v || !v.srcObject) { APP.toast('Cámara no disponible', 'error'); return; }
+    var canvas = document.createElement('canvas');
+    canvas.width  = v.videoWidth  || 640;
+    canvas.height = v.videoHeight || 480;
+    canvas.getContext('2d').drawImage(v, 0, 0);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    var st = AttendanceView._rState;
+    if (!st) return;
+    if (which === 'self') st.photoSelf = dataUrl;
+    else                  st.photoEnv  = dataUrl;
+    if (st.stream) { st.stream.getTracks().forEach(function(t) { t.stop(); }); st.stream = null; }
+    AttendanceView._drawRemoteModal();
+  },
+
+  _retakeRemote: function(which) {
+    var st = AttendanceView._rState;
+    if (!st) return;
+    if (which === 'self') st.photoSelf = null;
+    else                  st.photoEnv  = null;
+    AttendanceView._drawRemoteModal();
+  },
+
+  _dataUrlToBlob: function(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mimeMatch = parts[0].match(/:(.*?);/);
+    var mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    var binary = atob(parts[1]);
+    var arr = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  },
+
+  _uploadPhoto: function(dataUrl, filename, callback) {
+    var blob = AttendanceView._dataUrlToBlob(dataUrl);
+    var fd = new FormData();
+    fd.append('file', blob, filename);
+    fetch('/api/upload-evidence', { method: 'POST', body: fd, credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(j) { j.url ? callback(null, j.url) : callback(j.error || 'Error al subir'); })
+      .catch(function(e) { callback(e.message); });
+  },
+
+  _submitRemote: function() {
+    var st = AttendanceView._rState;
+    if (!st || !st.photoSelf || !st.photoEnv) return;
+    var btn = document.getElementById('att-rsubmit');
+    if (btn) { btn.disabled = true; btn.textContent = 'Subiendo fotos…'; }
+
+    AttendanceView._uploadPhoto(st.photoSelf, 'selfie.jpg', function(err1, url1) {
+      if (err1) { APP.toast('Error subiendo foto: ' + err1, 'error'); if (btn) { btn.disabled = false; btn.textContent = '✓ Enviar solicitud'; } return; }
+      AttendanceView._uploadPhoto(st.photoEnv, 'entorno.jpg', function(err2, url2) {
+        if (err2) { APP.toast('Error subiendo foto: ' + err2, 'error'); if (btn) { btn.disabled = false; btn.textContent = '✓ Enviar solicitud'; } return; }
+        if (btn) btn.textContent = 'Enviando solicitud…';
+        APP.api('remote.request', { type: 'remoto', reason: st.reason, photoSelfUrl: url1, photoEnvUrl: url2 }, function(err3) {
+          if (err3) { APP.toast(err3, 'error'); if (btn) { btn.disabled = false; btn.textContent = '✓ Enviar solicitud'; } return; }
+          APP.toast('Solicitud enviada. Tu manager recibirá un correo ✓', 'success');
+          AttendanceView._closeRemoteModal();
+          AttendanceView._loadEmployee();
+        });
+      });
+    });
+  },
+
+  // ── Justified absence modal ────────────────────────────────────
+
+  _openJustifiedModal: function() {
+    var existing = document.getElementById('att-jmodal');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'att-jmodal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+    var html = '<div style="background:var(--card);border-radius:16px;max-width:400px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">';
+    html += '<div style="font-weight:700;font-size:15px">Falta justificada</div>';
+    html += '<button onclick="document.getElementById(\'att-jmodal\').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px">×</button>';
+    html += '</div><div style="padding:20px">';
+    html += '<p style="font-size:13px;color:var(--muted);margin:0 0 16px">Sube tu justificante (receta, comprobante, etc.). El área de RH lo revisará y aprobará tu ausencia.</p>';
+    html += '<div style="margin-bottom:14px">';
+    html += '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Motivo (opcional)</label>';
+    html += '<input type="text" id="att-jreason" placeholder="Ej: Cita médica" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)" />';
+    html += '</div>';
+    html += '<div style="margin-bottom:16px">';
+    html += '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Justificante <span style="color:#dc2626">*</span></label>';
+    html += '<input type="file" id="att-jfile" accept="image/*,application/pdf" onchange="AttendanceView._onJustifiedFileChange()" ';
+    html += 'style="width:100%;box-sizing:border-box;padding:8px;border:1px dashed var(--border);border-radius:8px;font-size:13px;cursor:pointer;background:var(--surface);color:var(--text)" />';
+    html += '<div id="att-jpreview" style="margin-top:8px"></div>';
+    html += '</div>';
+    html += '<button id="att-jsubmit" onclick="AttendanceView._submitJustified()" disabled ';
+    html += 'style="width:100%;padding:10px;border-radius:8px;border:none;background:#cbd5e1;color:#fff;cursor:default;font-weight:600;font-size:14px">Enviar solicitud</button>';
+    html += '</div></div>';
+
+    overlay.innerHTML = html;
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  },
+
+  _onJustifiedFileChange: function() {
+    var input = document.getElementById('att-jfile');
+    var btn   = document.getElementById('att-jsubmit');
+    var prev  = document.getElementById('att-jpreview');
+    if (!input || !input.files || !input.files[0]) return;
+    var file = input.files[0];
+    if (btn) { btn.disabled = false; btn.style.background = '#7c3aed'; btn.style.cursor = 'pointer'; }
+    if (prev && file.type.startsWith('image/')) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        prev.innerHTML = '<img src="' + ev.target.result + '" style="max-width:100%;border-radius:6px;border:1px solid var(--border)" />';
+      };
+      reader.readAsDataURL(file);
+    } else if (prev) {
+      prev.innerHTML = '<div style="padding:8px;background:var(--surface);border-radius:6px;font-size:12px;color:var(--muted)">' + file.name + '</div>';
+    }
+  },
+
+  _submitJustified: function() {
+    var reasonEl = document.getElementById('att-jreason');
+    var fileEl   = document.getElementById('att-jfile');
+    var btn      = document.getElementById('att-jsubmit');
+    if (!fileEl || !fileEl.files || !fileEl.files[0]) { APP.toast('Debes subir un justificante', 'error'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Subiendo…'; }
+    var reason = reasonEl ? reasonEl.value.trim() : '';
+    var file   = fileEl.files[0];
+    var fd = new FormData();
+    fd.append('file', file, file.name);
+    fetch('/api/upload-evidence', { method: 'POST', body: fd, credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        if (!j.url) { APP.toast('Error al subir: ' + (j.error || 'desconocido'), 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } return; }
+        APP.api('remote.request', { type: 'falta_justificada', reason: reason, documentUrl: j.url }, function(err) {
+          if (err) { APP.toast(err, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } return; }
+          APP.toast('Solicitud enviada a RH ✓', 'success');
+          var m = document.getElementById('att-jmodal');
+          if (m) m.remove();
+          AttendanceView._loadEmployee();
+        });
+      })
+      .catch(function(e) { APP.toast('Error: ' + e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } });
+  },
+
+  // ─────────────────────────────────────────────────────────────
+
   _badge: function(status) {
     var map = {
-      a_tiempo:   ['#ecfdf5', '#16a34a', 'A tiempo'],
-      retardo:    ['#fffbeb', '#d97706', 'Retardo'],
-      ausente:    ['#fef2f2', '#dc2626', 'Ausente'],
-      vacaciones: ['#e0f2fe', '#0284c7', 'Vacaciones'],
-      pendiente:  ['#f8fafc', '#64748b', 'Pendiente']
+      a_tiempo:              ['#ecfdf5', '#16a34a', 'A tiempo'],
+      retardo:               ['#fffbeb', '#d97706', 'Retardo'],
+      ausente:               ['#fef2f2', '#dc2626', 'Ausente'],
+      vacaciones:            ['#e0f2fe', '#0284c7', 'Vacaciones'],
+      remoto:                ['#eff6ff', '#2563eb', 'Remoto'],
+      justificada:           ['#f5f3ff', '#7c3aed', 'Justificada'],
+      pendiente_remoto:      ['#fff7ed', '#ea580c', 'Pendiente (remoto)'],
+      pendiente_justificada: ['#fdf4ff', '#c026d3', 'Pendiente (just.)'],
+      pendiente:             ['#f8fafc', '#64748b', 'Pendiente']
     };
     var s = map[status] || ['#f8fafc', '#64748b', status];
     return '<span style="padding:2px 8px;border-radius:4px;background:' + s[0] + ';color:' + s[1] + ';font-size:12px;font-weight:600">' + s[2] + '</span>';

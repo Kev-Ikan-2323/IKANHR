@@ -3,6 +3,18 @@
     {
       "path": "/api/cron/birthdays",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/attendance-reminder?action=reminder",
+      "schedule": "0 22 * * 1-5"
+    },
+    {
+      "path": "/api/cron/attendance-reminder?action=reminder",
+      "schedule": "0 1 * * 2-6"
+    },
+    {
+      "path": "/api/cron/attendance-reminder?action=autoclose",
+      "schedule": "0 6 * * 2-6"
     }
   ]
 }

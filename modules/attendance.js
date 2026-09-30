@@ -228,14 +228,21 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var lastDay = new Date(year, month, 0).getDate()
   var dayStart = year + '-' + mon + '-01T00:00:00-06:00'
   var dayEnd   = year + '-' + mon + '-' + String(lastDay).padStart(2, '0') + 'T23:59:59-06:00'
+  var dateMin  = year + '-' + mon + '-01'
+  var dateMax  = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [punchRes, vacRequests] = await Promise.all([
+  var [punchRes, vacRequests, remotoRes] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
       .gte('punched_at', dayStart)
       .lte('punched_at', dayEnd),
-    DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { employeeId: employeeId, status: 'Aprobado' })
+    DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { employeeId: employeeId, status: 'Aprobado' }),
+    sb.from('remote_checkins')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .gte('date', dateMin)
+      .lte('date', dateMax)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -247,28 +254,54 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     byDate[d].push(p)
   })
 
+  // Build remote check-in map: date → record (prefer aprobado > pendiente > denegado)
+  var remotoByDate = {}
+  ;(remotoRes.data || []).forEach(function(r) {
+    var prev = remotoByDate[r.date]
+    var priority = { aprobado: 2, pendiente: 1, denegado: 0 }
+    if (!prev || (priority[r.status] || 0) > (priority[prev.status] || 0)) {
+      remotoByDate[r.date] = r
+    }
+  })
+
   var vacDates = _buildVacationSet(vacRequests, year, month)
+  var today    = todayCdmx()
 
   var wdays   = workdaysInMonth(year, month, quincena)
-  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, workdays: wdays.length }
+  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
-    var fl  = firstLast(byDate[dateStr] || [])
+    var fl     = firstLast(byDate[dateStr] || [])
+    var rc     = remotoByDate[dateStr]
     var status
-    if (!fl.checkIn && vacDates.has(dateStr)) {
+
+    if (fl.checkIn) {
+      status = toStatus(fl.checkIn, dateStr)
+    } else if (rc && rc.status === 'aprobado') {
+      status = rc.type === 'remoto' ? 'remoto' : 'justificada'
+    } else if (rc && rc.status === 'pendiente' && dateStr === today) {
+      status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
+    } else if (vacDates.has(dateStr)) {
       status = 'vacaciones'
     } else {
-      status = toStatus(fl.checkIn, dateStr)
+      status = toStatus(null, dateStr)
     }
-    if (status === 'a_tiempo')  summary.aTime++
-    else if (status === 'retardo')    summary.retardo++
-    else if (status === 'ausente')    summary.ausente++
-    else if (status === 'vacaciones') summary.vacaciones++
+
+    if (status === 'a_tiempo')            summary.aTime++
+    else if (status === 'retardo')        summary.retardo++
+    else if (status === 'ausente')        summary.ausente++
+    else if (status === 'vacaciones')     summary.vacaciones++
+    else if (status === 'remoto')         summary.remoto++
+    else if (status === 'justificada')    summary.justificada++
+
     return {
-      date:     dateStr,
-      checkIn:  fl.checkIn,
-      checkOut: fl.checkOut,
-      status:   status,
-      source:   byDate[dateStr] && byDate[dateStr][0] ? byDate[dateStr][0].source : null
+      date:           dateStr,
+      checkIn:        fl.checkIn || (rc && rc.status === 'aprobado' ? rc.requested_at : null),
+      checkOut:       fl.checkOut,
+      status:         status,
+      source:         byDate[dateStr] && byDate[dateStr][0] ? byDate[dateStr][0].source : (rc ? 'remoto' : null),
+      remoteCheckin:  rc ? { id: rc.id, type: rc.type, reason: rc.reason, status: rc.status,
+                             photoSelfUrl: rc.photo_self_url, photoEnvUrl: rc.photo_env_url,
+                             documentUrl: rc.document_url } : null
     }
   })
 
@@ -282,15 +315,21 @@ async function _getAllMonth(year, month, quincena) {
   var dayStart = year + '-' + mon + '-01T00:00:00-06:00'
   var dayEnd   = year + '-' + mon + '-' + String(lastDay).padStart(2, '0') + 'T23:59:59-06:00'
 
-  var wdays = workdaysInMonth(year, month, quincena)
+  var wdays   = workdaysInMonth(year, month, quincena)
+  var dateMin = year + '-' + mon + '-01'
+  var dateMax = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [employees, punchRes, vacAll] = await Promise.all([
+  var [employees, punchRes, vacAll, remotoRes] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
     sb.from('attendance_punches')
       .select('employee_id, punched_at')
       .gte('punched_at', dayStart)
       .lte('punched_at', dayEnd),
-    DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { status: 'Aprobado' })
+    DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { status: 'Aprobado' }),
+    sb.from('remote_checkins')
+      .select('employee_id, date, type, status, requested_at')
+      .gte('date', dateMin)
+      .lte('date', dateMax)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -307,6 +346,17 @@ async function _getAllMonth(year, month, quincena) {
     vacByEmp[empId] = _buildVacationSet(vacRawByEmp[empId], year, month)
   })
 
+  // Build remote check-in map per employee+date
+  var remotoByEmpDate = {}
+  var priority = { aprobado: 2, pendiente: 1, denegado: 0 }
+  ;(remotoRes.data || []).forEach(function(r) {
+    if (!remotoByEmpDate[r.employee_id]) remotoByEmpDate[r.employee_id] = {}
+    var prev = remotoByEmpDate[r.employee_id][r.date]
+    if (!prev || (priority[r.status] || 0) > (priority[prev.status] || 0)) {
+      remotoByEmpDate[r.employee_id][r.date] = r
+    }
+  })
+
   var byEmpDate = {}
   ;(punchRes.data || []).forEach(function(p) {
     if (!p.employee_id) return
@@ -316,36 +366,55 @@ async function _getAllMonth(year, month, quincena) {
     byEmpDate[p.employee_id][d].push(p)
   })
 
-  var withPin = employees.filter(function(e) {
-    return e.checadorPin && !(e.isRemote === true || e.isRemote === 'true')
+  // Include in-office employees (checadorPin + !isRemote) AND remote employees
+  var today = todayCdmx()
+  var withTracking = employees.filter(function(e) {
+    var isRem = e.isRemote === true || e.isRemote === 'true'
+    return (e.checadorPin && !isRem) || isRem
   })
 
-  var empStats = withPin.map(function(emp) {
-    var empDays   = byEmpDate[emp.id] || {}
-    var empVacSet = vacByEmp[emp.id]  || new Set()
-    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0 }
+  var empStats = withTracking.map(function(emp) {
+    var isRem     = emp.isRemote === true || emp.isRemote === 'true'
+    var empDays   = byEmpDate[emp.id]         || {}
+    var empVacSet = vacByEmp[emp.id]          || new Set()
+    var empRem    = remotoByEmpDate[emp.id]   || {}
+    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0 }
+
     wdays.forEach(function(dateStr) {
-      var fl = firstLast(empDays[dateStr] || [])
+      var fl  = firstLast(empDays[dateStr] || [])
+      var rc  = empRem[dateStr]
       var s
-      if (!fl.checkIn && empVacSet.has(dateStr)) {
+
+      if (fl.checkIn) {
+        s = toStatus(fl.checkIn, dateStr)
+      } else if (rc && rc.status === 'aprobado') {
+        s = rc.type === 'remoto' ? 'remoto' : 'justificada'
+      } else if (empVacSet.has(dateStr)) {
         s = 'vacaciones'
       } else {
-        s = toStatus(fl.checkIn, dateStr)
+        s = toStatus(null, dateStr)
       }
-      if (s === 'a_tiempo')       stats.aTime++
-      else if (s === 'retardo')   stats.retardo++
-      else if (s === 'ausente')   stats.ausente++
-      else if (s === 'vacaciones') stats.vacaciones++
+
+      if (s === 'a_tiempo')         stats.aTime++
+      else if (s === 'retardo')     stats.retardo++
+      else if (s === 'ausente')     stats.ausente++
+      else if (s === 'vacaciones')  stats.vacaciones++
+      else if (s === 'remoto')      stats.remoto++
+      else if (s === 'justificada') stats.justificada++
     })
+
     return {
       employeeId:  emp.id,
       firstName:   emp.firstName  || '',
       lastName:    emp.lastName   || '',
       department:  emp.department || '',
+      isRemote:    isRem,
       aTime:       stats.aTime,
       retardo:     stats.retardo,
       ausente:     stats.ausente,
       vacaciones:  stats.vacaciones,
+      remoto:      stats.remoto,
+      justificada: stats.justificada,
       workdays:    wdays.length
     }
   })
@@ -360,8 +429,10 @@ async function _getAllMonth(year, month, quincena) {
     acc.retardo    += e.retardo
     acc.ausente    += e.ausente
     acc.vacaciones += e.vacaciones
+    acc.remoto     += e.remoto
+    acc.justificada+= e.justificada
     return acc
-  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0 })
+  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0 })
 
   var n = wdays.length * (empStats.length || 1)
 
@@ -371,12 +442,14 @@ async function _getAllMonth(year, month, quincena) {
     workdays: wdays.length,
     employees: empStats,
     summary: {
-      total:      empStats.length,
-      aTime:      totals.aTime,
-      retardo:    totals.retardo,
-      ausente:    totals.ausente,
-      vacaciones: totals.vacaciones,
-      pct:        n > 0 ? Math.round((totals.aTime / n) * 100) : 0
+      total:       empStats.length,
+      aTime:       totals.aTime,
+      retardo:     totals.retardo,
+      ausente:     totals.ausente,
+      vacaciones:  totals.vacaciones,
+      remoto:      totals.remoto,
+      justificada: totals.justificada,
+      pct:         n > 0 ? Math.round((totals.aTime / n) * 100) : 0
     }
   }
 }

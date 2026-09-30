@@ -20,7 +20,8 @@ import { PoliciesModule }     from '../../modules/policies.js'
 import { MailService }        from '../../lib/email.js'
 import { buildEmail }        from '../../lib/email-template.js'
 import { KPISchedulesModule } from '../../modules/kpi-schedules.js'
-import { AttendanceModule }   from '../../modules/attendance.js'
+import { AttendanceModule }    from '../../modules/attendance.js'
+import { RemoteCheckinModule } from '../../modules/remote-checkin.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -211,7 +212,12 @@ async function dispatch(action, data, user) {
     // ── ATTENDANCE ─────────────────────────────────────────────
     'attendance.getDay':     function() { return AttendanceModule.getDay(data, user) },
     'attendance.getHistory': function() { return AttendanceModule.getHistory(data, user) },
-    'attendance.getMonth':   function() { return AttendanceModule.getMonth(data, user) }
+    'attendance.getMonth':   function() { return AttendanceModule.getMonth(data, user) },
+    'remote.request':        function() { return RemoteCheckinModule.request(data, user) },
+    'remote.review':         function() { return RemoteCheckinModule.review(data, user) },
+    'remote.getPending':     function() { return RemoteCheckinModule.getPending(data, user) },
+    'remote.override':       function() { return RemoteCheckinModule.override(data, user) },
+    'remote.getConfig':      function() { return RemoteCheckinModule.getConfig() }
   }
 
   if (!routes[action]) throw new Error('Acción no reconocida: ' + action)
