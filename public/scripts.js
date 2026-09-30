@@ -4048,27 +4048,10 @@ var AttendanceView = {
 
     var html = '';
 
-    // Today card
-    if (isCurrentMonth) {
-      var tr = todayRec || {};
-      var status = tr.status || 'pendiente';
-      var ci = tr.checkIn  ? AttendanceView._fmtTime(tr.checkIn)  : '—';
-      var co = tr.checkOut ? AttendanceView._fmtTime(tr.checkOut) : '—';
-      var colors = {
-        a_tiempo:  { bg: '#ecfdf5', color: '#16a34a', label: 'A tiempo' },
-        retardo:   { bg: '#fffbeb', color: '#d97706', label: 'Retardo' },
-        ausente:   { bg: '#fef2f2', color: '#dc2626', label: 'Ausente hoy' },
-        pendiente: { bg: '#f8fafc', color: '#64748b', label: 'Sin registro aún' }
-      };
-      var c = colors[status] || colors.pendiente;
-      html += '<div class="card" style="margin-bottom:16px;background:' + c.bg + ';border-color:' + c.color + '33">';
-      html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + c.color + ';margin-bottom:4px">Hoy</div>';
-      html += '<div style="font-size:26px;font-weight:700;color:' + c.color + ';margin-bottom:12px">' + c.label + '</div>';
-      html += '<div style="display:flex;gap:28px">';
-      html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>';
-      html += '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>';
-      html += '</div></div>';
-    }
+    // Detail card — shows today on load, updates when a calendar day is clicked
+    var todayStr = AttendanceView._todayCdmx();
+    AttendanceView._selectedDate = isCurrentMonth ? todayStr : null;
+    html += AttendanceView._dayCard(isCurrentMonth ? 'Hoy' : null, isCurrentMonth ? (todayRec || null) : null);
 
     // Month navigation + view toggle
     var isCal  = AttendanceView._empView === 'calendar';
@@ -4110,6 +4093,51 @@ var AttendanceView = {
       : AttendanceView._renderEmployeeList(monthData);
     html += '</div>';
     return html;
+  },
+
+  _dayCard: function(dateLabel, rec) {
+    var ST = {
+      a_tiempo:  { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
+      retardo:   { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
+      ausente:   { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
+      pendiente: { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' }
+    };
+    if (!dateLabel) {
+      return '<div id="att-day-card" class="card" style="margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center">' +
+        '<span style="color:var(--muted);font-size:13px">Selecciona un día en el calendario</span></div>';
+    }
+    var s  = rec ? (ST[rec.status] || ST.ausente) : ST.pendiente;
+    var ci = rec && rec.checkIn  ? AttendanceView._fmtTime(rec.checkIn)  : '—';
+    var co = rec && rec.checkOut ? AttendanceView._fmtTime(rec.checkOut) : '—';
+    return '<div id="att-day-card" class="card" style="margin-bottom:16px;background:' + s.bg + ';border-color:' + s.color + '33">' +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:' + s.color + ';margin-bottom:4px">' + dateLabel + '</div>' +
+      '<div style="font-size:26px;font-weight:700;color:' + s.color + ';margin-bottom:12px">' + s.text + '</div>' +
+      '<div style="display:flex;gap:28px">' +
+      '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Entrada</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + ci + '</div></div>' +
+      '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Salida</div><div style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">' + co + '</div></div>' +
+      '</div></div>';
+  },
+
+  _selectDay: function(dateStr) {
+    // Swap selection ring
+    var old = AttendanceView._selectedDate;
+    if (old) {
+      var oldCell = document.getElementById('att-cd-' + old.replace(/-/g, ''));
+      if (oldCell) oldCell.style.outline = '';
+    }
+    AttendanceView._selectedDate = dateStr;
+    var newCell = document.getElementById('att-cd-' + dateStr.replace(/-/g, ''));
+    if (newCell) newCell.style.outline = '2px solid var(--primary)';
+
+    // Update card
+    var card = document.getElementById('att-day-card');
+    if (!card || !AttendanceView._empMonthData) return;
+    var rec = null;
+    AttendanceView._empMonthData.days.forEach(function(d) { if (d.date === dateStr) rec = d; });
+    var label = dateStr === AttendanceView._todayCdmx() ? 'Hoy' : AttendanceView._fmtDate(dateStr);
+    var tmp = document.createElement('div');
+    tmp.innerHTML = AttendanceView._dayCard(label, rec);
+    card.replaceWith(tmp.firstChild);
   },
 
   _switchEmpView: function(view) {
@@ -4199,17 +4227,21 @@ var AttendanceView = {
         html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;opacity:0.25;text-align:center">';
         html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
       } else if (rec) {
-        var c  = ST[rec.status] || { bg: 'var(--surface)', fg: 'var(--muted)', brd: 'var(--border)' };
-        var ci = rec.checkIn ? AttendanceView._fmtTime(rec.checkIn) : '';
-        var ring = isToday ? ';box-shadow:0 0 0 2px ' + c.fg : '';
-        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;background:' + c.bg + ';border:1px solid ' + c.brd + ring + ';text-align:center">';
+        var c   = ST[rec.status] || { bg: 'var(--surface)', fg: 'var(--muted)', brd: 'var(--border)' };
+        var ci  = rec.checkIn ? AttendanceView._fmtTime(rec.checkIn) : '';
+        var sel = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
+        var cid = 'att-cd-' + dateStr.replace(/-/g, '');
+        html += '<div id="' + cid + '" onclick="AttendanceView._selectDay(\'' + dateStr + '\')" ';
+        html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:' + c.bg + ';border:1px solid ' + c.brd + sel + ';text-align:center;cursor:pointer">';
         html += '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + ';color:' + c.fg + '">' + d + '</div>';
         if (ci) html += '<div style="font-size:10px;color:' + c.fg + ';margin-top:3px;font-variant-numeric:tabular-nums">' + ci + '</div>';
         if (rec.source === 'remoto') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
         html += '</div>';
       } else {
-        var ring2 = isToday ? ';box-shadow:0 0 0 2px var(--primary)' : '';
-        html += '<div style="border-radius:6px;padding:6px 4px;min-height:52px;background:var(--surface);border:1px solid var(--border)' + ring2 + ';text-align:center">';
+        var sel2 = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
+        var cid2 = 'att-cd-' + dateStr.replace(/-/g, '');
+        html += '<div id="' + cid2 + '" onclick="AttendanceView._selectDay(\'' + dateStr + '\')" ';
+        html += 'style="border-radius:6px;padding:6px 4px;min-height:52px;background:var(--surface);border:1px solid var(--border)' + sel2 + ';text-align:center;cursor:pointer">';
         html += '<div style="font-size:12px;color:var(--muted)">' + d + '</div></div>';
       }
     }
