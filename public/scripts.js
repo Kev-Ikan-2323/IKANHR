@@ -4142,12 +4142,16 @@ var AttendanceView = {
     var n = (data.workdays || 0) * (s.total || 1);
     var pct = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
 
+    AttendanceView._dashData = { data: data, year: year, month: month, label: MONTHS_ES[month - 1] + ' ' + year };
+
     var html = '';
 
-    // Header: back + month nav
+    // Header: back + export + month nav
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
     html += '<button onclick="AttendanceView._loadAdmin(AttendanceView._todayCdmx())" ';
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px">← Hoy</button>';
+    html += '<button onclick="AttendanceView._exportDashboard()" ';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #16a34a;background:#16a34a;color:#fff;cursor:pointer;font-size:13px;font-weight:500">↓ Exportar CSV</button>';
     html += '<div style="flex:1"></div>';
     html += '<button onclick="AttendanceView._loadDashboard(' + prevYear + ',' + prevMonth + ')" ';
     html += 'style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px">‹</button>';
@@ -4201,6 +4205,47 @@ var AttendanceView = {
 
     html += '</tbody></table></div></div>';
     return html;
+  },
+
+  _exportDashboard: function() {
+    var d = AttendanceView._dashData;
+    if (!d || !d.data || !d.data.employees) return;
+    var rows = [
+      ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', '% Puntualidad']
+    ];
+    d.data.employees.forEach(function(e) {
+      var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
+      rows.push([
+        (e.firstName + ' ' + e.lastName).trim(),
+        e.department || '',
+        e.workdays,
+        e.aTime,
+        e.retardo,
+        e.ausente,
+        pct + '%'
+      ]);
+    });
+    var s = d.data.summary;
+    var n = (d.data.workdays || 0) * (s.total || 1);
+    var pctTotal = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
+    rows.push(['TOTAL', s.total + ' empleados', d.data.workdays, s.aTime, s.retardo, s.ausente, pctTotal + '%']);
+
+    var csv = '﻿' + rows.map(function(r) {
+      return r.map(function(v) {
+        var str = String(v);
+        return str.indexOf(',') > -1 || str.indexOf('"') > -1 ? '"' + str.replace(/"/g, '""') + '"' : str;
+      }).join(',');
+    }).join('\r\n');
+
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href   = url;
+    a.download = 'asistencia-' + d.label.toLowerCase().replace(/ /g, '-') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   },
 
   _tile: function(value, label, color) {
