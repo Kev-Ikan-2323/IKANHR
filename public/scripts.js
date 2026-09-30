@@ -165,6 +165,17 @@ var MiniCal = {
   }
 };
 
+// ── MOBILE SIDEBAR DRAWER ────────────────────────────────────
+function toggleSidebar() {
+  var sidebar  = document.getElementById('sidebar');
+  var overlay  = document.getElementById('sidebar-overlay');
+  if (!sidebar) return;
+  var opening = !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', opening);
+  if (overlay) overlay.classList.toggle('visible', opening);
+  document.body.style.overflow = opening ? 'hidden' : '';
+}
+
 // ── APP CORE ─────────────────────────────────────────────────
 var APP = {
   user: null,
@@ -239,6 +250,9 @@ var APP = {
 
   navigate: function(view) {
     APP.currentView = view;
+    // Close mobile drawer on navigation
+    var _s = document.getElementById('sidebar');
+    if (_s && _s.classList.contains('open')) toggleSidebar();
     document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
     var el = document.getElementById('view-' + view);

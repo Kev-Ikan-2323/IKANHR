@@ -267,12 +267,61 @@ textarea { resize: vertical; min-height: 80px; }
 .kpi-row-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
 
 
+/* ── SIDEBAR DRAWER OVERLAY ── */
+#sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 150;
+  animation: fadeIn .2s;
+}
+#sidebar-overlay.visible { display: block; }
+
+/* ── TABLET (≤ 1024px) ── */
+@media (max-width: 1024px) {
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── MOBILE (≤ 768px) — drawer sidebar, full content ── */
 @media (max-width: 768px) {
-  :root { --sidebar-w: 60px; }
-  .sidebar-logo-text, .sidebar-user-info, .nav-item span:not(.material-icons-round):not(.nav-badge) { display: none; }
-  .nav-item { justify-content: center; }
+  :root { --sidebar-w: 0px; }
+
+  /* Sidebar becomes off-canvas drawer */
+  #sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 260px !important;
+    z-index: 200;
+    transform: translateX(-260px);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  #sidebar.open { transform: translateX(0); box-shadow: 6px 0 32px rgba(0,0,0,.35); }
+
+  /* Padding & layout */
+  header { padding: 0 16px; }
+  #content { padding: 16px; }
+  .card { padding: 14px; }
+  .view-title { font-size: 17px; margin-bottom: 14px; }
+
+  /* Grid collapses */
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-  .vacation-balance { grid-template-columns: repeat(2,1fr); }
+  .vacation-balance { grid-template-columns: repeat(2, 1fr); }
   .form-row { grid-template-columns: 1fr; }
+
+  /* Tables scroll horizontally */
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+
+  /* Tabs scroll horizontally */
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding-bottom: 2px; }
+  .tab { white-space: nowrap; flex-shrink: 0; }
+
+  /* Vacation request cards wrap */
+  .request-card { flex-wrap: wrap; }
+
+  /* Hide search, adjust toast */
   .header-search { display: none; }
+  #toast-container { bottom: 16px; right: 16px; left: 16px; align-items: flex-end; }
+  .toast { max-width: 100%; }
 }

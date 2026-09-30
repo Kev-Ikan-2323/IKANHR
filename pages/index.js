@@ -131,9 +131,11 @@ var SHELL = `
   </div>
 </aside>
 
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
 <div id="main">
   <header>
-    <button class="icon-btn" onclick="(function(){var s=document.getElementById('sidebar');s.style.display=s.style.display==='none'?'flex':'none'})()">
+    <button class="icon-btn" onclick="toggleSidebar()">
       <span class="material-icons-round">menu</span>
     </button>
     <div class="header-title" id="header-title">HR Platform</div>
