@@ -4768,10 +4768,16 @@ var AttendanceView = {
     var blob = AttendanceView._dataUrlToBlob(dataUrl);
     var fd = new FormData();
     fd.append('file', blob, filename);
-    fetch('/api/upload-evidence', { method: 'POST', body: fd, credentials: 'include' })
-      .then(function(r) { return r.json(); })
-      .then(function(j) { j.url ? callback(null, j.url) : callback(j.error || 'Error al subir'); })
-      .catch(function(e) { callback(e.message); });
+    var doUpload = function(token) {
+      var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      fetch('/api/upload-evidence', { method: 'POST', body: fd, headers: headers })
+        .then(function(r) { return r.json(); })
+        .then(function(j) { j.url ? callback(null, j.url) : callback(j.error || 'Error al subir'); })
+        .catch(function(e) { callback(e.message); });
+    };
+    if (_sb) {
+      _sb.auth.getSession().then(function(res) { doUpload(res.data.session ? res.data.session.access_token : null); });
+    } else { doUpload(null); }
   },
 
   _submitRemote: function() {
@@ -4858,19 +4864,25 @@ var AttendanceView = {
     var file   = fileEl.files[0];
     var fd = new FormData();
     fd.append('file', file, file.name);
-    fetch('/api/upload-evidence', { method: 'POST', body: fd, credentials: 'include' })
-      .then(function(r) { return r.json(); })
-      .then(function(j) {
-        if (!j.url) { APP.toast('Error al subir: ' + (j.error || 'desconocido'), 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } return; }
-        APP.api('remote.request', { type: 'falta_justificada', reason: reason, documentUrl: j.url }, function(err) {
-          if (err) { APP.toast(err, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } return; }
-          APP.toast('Solicitud enviada a RH ✓', 'success');
-          var m = document.getElementById('att-jmodal');
-          if (m) m.remove();
-          AttendanceView._loadEmployee();
-        });
-      })
-      .catch(function(e) { APP.toast('Error: ' + e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } });
+    var doJUpload = function(token) {
+      var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      fetch('/api/upload-evidence', { method: 'POST', body: fd, headers: headers })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          if (!j.url) { APP.toast('Error al subir: ' + (j.error || 'desconocido'), 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } return; }
+          APP.api('remote.request', { type: 'falta_justificada', reason: reason, documentUrl: j.url }, function(err) {
+            if (err) { APP.toast(err, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } return; }
+            APP.toast('Solicitud enviada a RH ✓', 'success');
+            var m = document.getElementById('att-jmodal');
+            if (m) m.remove();
+            AttendanceView._loadEmployee();
+          });
+        })
+        .catch(function(e) { APP.toast('Error: ' + e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud'; } });
+    };
+    if (_sb) {
+      _sb.auth.getSession().then(function(res) { doJUpload(res.data.session ? res.data.session.access_token : null); });
+    } else { doJUpload(null); }
   },
 
   // ─────────────────────────────────────────────────────────────
