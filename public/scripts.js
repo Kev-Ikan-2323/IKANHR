@@ -2479,7 +2479,7 @@ var AdminHR = {
         var rem = v.isRemote===true||v.isRemote==='true';
         var trackBg = rem ? '#3b82f6' : 'var(--border)';
         var knobLeft = rem ? '21px' : '3px';
-        var onChange = "var c=this.checked,t=document.getElementById('ef-rt'),k=document.getElementById('ef-rk'),p=document.getElementById('ef-pin-wrap'),rd=document.getElementById('ef-remote-days-wrap');t.style.background=c?'#3b82f6':'var(--border)';k.style.left=c?'21px':'3px';p.style.opacity=c?'0.4':'1';p.querySelector('input').disabled=c;if(rd)rd.style.display=c?'block':'none';";
+        var onChange = "var c=this.checked,t=document.getElementById('ef-rt'),k=document.getElementById('ef-rk'),p=document.getElementById('ef-pin-wrap');t.style.background=c?'#3b82f6':'var(--border)';k.style.left=c?'21px':'3px';p.style.opacity=c?'0.4':'1';p.querySelector('input').disabled=c;";
         return '<div class="form-group" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px;cursor:pointer" onclick="document.getElementById(\'ef-remote\').click()">' +
           '<div style="position:relative;width:40px;height:22px;flex-shrink:0;pointer-events:none">' +
           '<input type="checkbox" id="ef-remote" style="position:absolute;opacity:0;width:0;height:0"' + (rem?' checked':'') + ' onchange="' + onChange + '">' +
@@ -2490,7 +2490,6 @@ var AdminHR = {
           '</div>';
       })() +
       (function() {
-        var rem = v.isRemote===true||v.isRemote==='true';
         var remDays = Array.isArray(v.remoteDays) ? v.remoteDays : [];
         var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'},{d:6,l:'Sáb'}];
         var pillsHtml = '';
@@ -2502,10 +2501,10 @@ var AdminHR = {
             item.l + '</button>';
         });
         return '<input type="hidden" id="ef-remote-days-val" value="' + JSON.stringify(remDays) + '">' +
-          '<div id="ef-remote-days-wrap" style="display:' + (rem ? 'block' : 'none') + ';margin-bottom:12px">' +
-          '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">Días autorizados de home office</label>' +
+          '<div id="ef-remote-days-wrap" style="margin-bottom:12px">' +
+          '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">Días de home office autorizados</label>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' + pillsHtml + '</div>' +
-          '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = cualquier día. Si elige un día no autorizado, requerirá aprobación del manager.</p>' +
+          '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = sin restricción de días. Check-in en día no autorizado requiere aprobación del manager.</p>' +
           '</div>';
       })() +
       '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
