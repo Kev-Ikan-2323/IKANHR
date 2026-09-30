@@ -4473,6 +4473,12 @@ var AttendanceView = {
       return html;
     }
 
+    // Build tardiness lookup for dashboard column
+    var tardMap = {};
+    var tardItems = (AttendanceView._tardinessData && AttendanceView._tardinessData.items) || [];
+    tardItems.forEach(function(t) { tardMap[t.employeeId] = t; });
+    var hasTard = tardItems.length > 0;
+
     html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto">';
     html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left">';
@@ -4484,6 +4490,9 @@ var AttendanceView = {
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Vacaciones</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Remotos</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Justificadas</th>';
+    if (hasTard) {
+      html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center" title="Retardos acumulados en 6 meses · días a descontar por política">Retardos acum. / Días desc.</th>';
+    }
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:right">% Puntual</th>';
     html += '</tr></thead><tbody>';
 
@@ -4491,6 +4500,7 @@ var AttendanceView = {
       var name = (e.firstName || '') + ' ' + (e.lastName || '');
       var pctE = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
       var pctColor = pctE >= 90 ? '#16a34a' : pctE >= 75 ? '#d97706' : '#dc2626';
+      var tard = tardMap[e.employeeId] || null;
       html += '<tr style="border-bottom:1px solid var(--border)">';
       html += '<td style="padding:8px 10px">' + name + '</td>';
       html += '<td style="padding:8px 10px;color:var(--muted)">' + (e.department || '—') + '</td>';
@@ -4500,6 +4510,18 @@ var AttendanceView = {
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.vacaciones || 0) > 0 ? ';color:#0284c7;font-weight:600' : '') + '">' + (e.vacaciones || 0) + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.remoto || 0) > 0 ? ';color:#2563eb;font-weight:600' : '') + '">' + (e.remoto || 0) + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.justificada || 0) > 0 ? ';color:#7c3aed;font-weight:600' : '') + '">' + (e.justificada || 0) + '</td>';
+      if (hasTard) {
+        if (tard && (tard.count > 0 || tard.daysToDeduct > 0)) {
+          var descColor = tard.daysToDeduct > 0 ? '#7e22ce' : '#64748b';
+          html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums">';
+          html += '<span style="color:#d97706;font-weight:600">' + tard.count + '</span>';
+          html += '<span style="color:#94a3b8;margin:0 3px">/</span>';
+          html += '<span style="color:' + descColor + ';font-weight:' + (tard.daysToDeduct > 0 ? '700' : '400') + '">' + tard.daysToDeduct + 'd</span>';
+          html += '</td>';
+        } else {
+          html += '<td style="padding:8px 10px;text-align:center;color:#94a3b8">—</td>';
+        }
+      }
       html += '<td style="padding:8px 10px;text-align:right;font-weight:600;color:' + pctColor + '">' + pctE + '%</td>';
       html += '</tr>';
     });
