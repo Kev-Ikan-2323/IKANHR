@@ -5,6 +5,12 @@
 
 import { RemoteCheckinModule } from '../../../modules/remote-checkin.js'
 
+// Actions:
+//   reminder      → 4pm and 7pm CDMX: remind managers of pending remote check-ins
+//   autoclose     → midnight CDMX: auto-deny still-pending requests
+//   absent-alert  → 9:10am CDMX: notify managers of absent employees
+//   remote-reminder → 9:05am CDMX: remind isRemote employees to check in
+
 export default async function handler(req, res) {
   var authHeader = req.headers['authorization']
   var cronSecret = process.env.CRON_SECRET
@@ -18,6 +24,10 @@ export default async function handler(req, res) {
     var result
     if (action === 'autoclose') {
       result = await RemoteCheckinModule.autoClose()
+    } else if (action === 'absent-alert') {
+      result = await RemoteCheckinModule.absentAlert()
+    } else if (action === 'remote-reminder') {
+      result = await RemoteCheckinModule.remoteReminder()
     } else {
       result = await RemoteCheckinModule.sendReminders()
     }

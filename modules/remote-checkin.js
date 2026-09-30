@@ -249,6 +249,106 @@ export var RemoteCheckinModule = {
   // Returns config data (reasons list) for the frontend
   async getConfig() {
     return { reasons: REASONS_REMOTO }
+  },
+
+  // At 9:10 AM CDMX: email each manager listing their absent employees
+  async absentAlert() {
+    var today         = todayCdmx()
+    var sb            = sbClient()
+    var todayUtcStart = today + 'T06:00:00.000Z'
+    var todayUtcEnd   = new Date(new Date(today + 'T06:00:00Z').getTime() + 24 * 3600 * 1000).toISOString()
+
+    // Who punched in today?
+    var { data: punches } = await sb.from('attendance_punches')
+      .select('employee_id')
+      .gte('punched_at', todayUtcStart)
+      .lt('punched_at',  todayUtcEnd)
+    var punchedSet = new Set((punches || []).map(function(p) { return p.employee_id }))
+
+    // Who already has an approved or pending remote check-in today?
+    var { data: remotes } = await sb.from('remote_checkins')
+      .select('employee_id')
+      .eq('date', today)
+      .in('status', ['aprobado', 'pendiente'])
+    var remoteSet = new Set((remotes || []).map(function(r) { return r.employee_id }))
+
+    var employees = await DB.query(CONFIG.SHEETS.EMPLOYEES, {})
+
+    // Only employees tracked in attendance (have checadorPin or are isRemote)
+    var absent = employees.filter(function(e) {
+      var tracked = e.checadorPin || e.isRemote === true || e.isRemote === 'true'
+      return tracked && !punchedSet.has(e.id) && !remoteSet.has(e.id)
+    })
+
+    if (absent.length === 0) return { sent: 0, absentCount: 0 }
+
+    var empMap = {}
+    employees.forEach(function(e) { empMap[e.id] = e })
+
+    // Group absent employees by their direct manager
+    var byManager = {}
+    absent.forEach(function(e) {
+      if (!e.managerId) return
+      if (!byManager[e.managerId]) byManager[e.managerId] = []
+      byManager[e.managerId].push(e)
+    })
+
+    var sent = 0
+    for (var mgrId in byManager) {
+      var mgr = empMap[mgrId]
+      if (!mgr || !mgr.email) continue
+      try {
+        await _sendAbsentAlertEmail(mgr, byManager[mgrId], today)
+        sent++
+      } catch (e) {
+        console.error('[RemoteCheckin] AbsentAlert error:', e.message)
+      }
+    }
+
+    return { sent: sent, absentCount: absent.length }
+  },
+
+  // At 9:05 AM CDMX: remind isRemote employees who haven't checked in yet
+  async remoteReminder() {
+    var today         = todayCdmx()
+    var sb            = sbClient()
+    var todayUtcStart = today + 'T06:00:00.000Z'
+    var todayUtcEnd   = new Date(new Date(today + 'T06:00:00Z').getTime() + 24 * 3600 * 1000).toISOString()
+
+    var employees  = await DB.query(CONFIG.SHEETS.EMPLOYEES, {})
+    var remoteEmps = employees.filter(function(e) {
+      return (e.isRemote === true || e.isRemote === 'true') && e.email
+    })
+    if (remoteEmps.length === 0) return { sent: 0 }
+
+    // Exclude those who already punched or submitted/approved remote check-in
+    var { data: punches } = await sb.from('attendance_punches')
+      .select('employee_id')
+      .gte('punched_at', todayUtcStart)
+      .lt('punched_at',  todayUtcEnd)
+    var punchedSet = new Set((punches || []).map(function(p) { return p.employee_id }))
+
+    var { data: remotes } = await sb.from('remote_checkins')
+      .select('employee_id')
+      .eq('date', today)
+      .in('status', ['aprobado', 'pendiente'])
+    var checkedSet = new Set((remotes || []).map(function(r) { return r.employee_id }))
+
+    var toRemind = remoteEmps.filter(function(e) {
+      return !punchedSet.has(e.id) && !checkedSet.has(e.id)
+    })
+
+    var sent = 0
+    for (var i = 0; i < toRemind.length; i++) {
+      try {
+        await _sendRemoteDailyReminderEmail(toRemind[i], today)
+        sent++
+      } catch (e) {
+        console.error('[RemoteCheckin] RemoteReminder error:', e.message)
+      }
+    }
+
+    return { sent: sent }
   }
 }
 
@@ -357,6 +457,57 @@ async function _sendReviewEmail(rec, emp, approved, notes) {
   await MailService.send({
     to:       emp.email,
     subject:  '[IKAN HR] Tu ' + typeLabel + ' del ' + rec.date + ' fue ' + (approved ? 'aprobado ✅' : 'rechazado ❌'),
+    htmlBody: htmlBody
+  })
+}
+
+async function _sendAbsentAlertEmail(manager, absentList, date) {
+  var mgrName = ((manager.firstName || '') + ' ' + (manager.lastName || '')).trim()
+
+  var listHtml = absentList.map(function(e) {
+    var name    = ((e.firstName || '') + ' ' + (e.lastName || '')).trim()
+    var isRem   = e.isRemote === true || e.isRemote === 'true'
+    var typeTag = isRem ? ' <span style="font-size:11px;color:#2563eb">(Remoto)</span>' : ''
+    return '<li style="padding:4px 0;font-size:13px;color:#374151;font-family:Arial,sans-serif"><strong>' + name + '</strong>' + typeTag + '</li>'
+  }).join('')
+
+  var htmlBody = buildEmail({
+    icon:    '⚠️',
+    title:   absentList.length + ' empleado' + (absentList.length !== 1 ? 's' : '') + ' sin registro a las 9:10',
+    bodyHTML: '<p style="font-size:14px;color:#374151;font-family:Arial,sans-serif">Buenos días <strong>' + mgrName + '</strong>, los siguientes empleados de tu equipo no tienen registro de asistencia al corte de las 9:10 AM:</p>' +
+      '<ul style="margin:12px 0;padding-left:20px">' + listHtml + '</ul>' +
+      '<p style="font-size:13px;color:#64748b;font-family:Arial,sans-serif">Si tienen una razón válida, pueden solicitar su check-in remoto o falta justificada desde la aplicación. De lo contrario quedarán marcados como <strong>ausentes</strong> al final del día.</p>',
+    details: [
+      { label: 'Fecha',    value: date },
+      { label: 'Ausentes', value: String(absentList.length) }
+    ],
+    actions: [{ label: 'Ver asistencia →', url: appUrl() }]
+  })
+
+  await MailService.send({
+    to:       manager.email,
+    subject:  '[IKAN HR] ⚠️ ' + absentList.length + ' empleado' + (absentList.length !== 1 ? 's' : '') + ' sin registro · ' + date,
+    htmlBody: htmlBody
+  })
+}
+
+async function _sendRemoteDailyReminderEmail(emp, date) {
+  var empName = ((emp.firstName || '') + ' ' + (emp.lastName || '')).trim()
+
+  var htmlBody = buildEmail({
+    icon:    '🏠',
+    title:   'Recuerda registrar tu check-in remoto',
+    bodyHTML: '<p style="font-size:14px;color:#374151;font-family:Arial,sans-serif">Buenos días <strong>' + empName + '</strong>, recuerda que debes registrar tu check-in remoto diario antes de las 9:10 AM.</p>' +
+      '<p style="font-size:13px;color:#64748b;font-family:Arial,sans-serif">Ve a la sección de <strong>Asistencia</strong> y usa el botón <em>"Check-in remoto"</em> en la tarjeta de Hoy.</p>',
+    details: [
+      { label: 'Fecha', value: date }
+    ],
+    actions: [{ label: 'Ir a la app →', url: appUrl() }]
+  })
+
+  await MailService.send({
+    to:       emp.email,
+    subject:  '[IKAN HR] 🏠 Recuerda tu check-in remoto · ' + date,
     htmlBody: htmlBody
   })
 }

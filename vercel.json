@@ -5,6 +5,14 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/attendance-reminder?action=remote-reminder",
+      "schedule": "5 15 * * 1-5"
+    },
+    {
+      "path": "/api/cron/attendance-reminder?action=absent-alert",
+      "schedule": "10 15 * * 1-5"
+    },
+    {
       "path": "/api/cron/attendance-reminder?action=reminder",
       "schedule": "0 22 * * 1-5"
     },
