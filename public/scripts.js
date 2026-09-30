@@ -3588,7 +3588,7 @@ var AdminHR = {
         '</div>';
       APP.modal('Configuración del sistema', html,
         '<button class="btn btn-primary" onclick="APP.closeModal()">Cerrar</button>');
-    });
+    }
   },
 
   saveEmailEnabled: function(enabled) {
