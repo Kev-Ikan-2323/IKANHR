@@ -182,6 +182,25 @@ async function _getHistory(employeeId, days) {
   })
 }
 
+// Build Set of vacation dates (YYYY-MM-DD) for a given month from an array of approved requests
+function _buildVacationSet(requests, year, month) {
+  var mon        = String(month).padStart(2, '0')
+  var monthStart = year + '-' + mon + '-01'
+  var monthEnd   = year + '-' + mon + '-' + String(new Date(year, month, 0).getDate()).padStart(2, '0')
+  var dates      = new Set()
+  requests.forEach(function(req) {
+    var s = req.startDate, e = req.endDate
+    if (!s || !e || e < monthStart || s > monthEnd) return
+    var curr = new Date((s >= monthStart ? s : monthStart) + 'T12:00:00')
+    var end  = new Date((e <= monthEnd   ? e : monthEnd)   + 'T12:00:00')
+    while (curr <= end) {
+      dates.add(curr.toISOString().split('T')[0])
+      curr.setDate(curr.getDate() + 1)
+    }
+  })
+  return dates
+}
+
 // Weekdays (Mon–Fri) in a month up to today in CDMX
 function workdaysInMonth(year, month) {
   var today   = todayCdmx()
@@ -205,30 +224,40 @@ async function _getEmployeeMonth(employeeId, year, month) {
   var dayStart = year + '-' + mon + '-01T00:00:00-06:00'
   var dayEnd   = year + '-' + mon + '-' + String(lastDay).padStart(2, '0') + 'T23:59:59-06:00'
 
-  var { data: punches, error } = await sb
-    .from('attendance_punches')
-    .select('punched_at, source')
-    .eq('employee_id', employeeId)
-    .gte('punched_at', dayStart)
-    .lte('punched_at', dayEnd)
+  var [punchRes, vacRequests] = await Promise.all([
+    sb.from('attendance_punches')
+      .select('punched_at, source')
+      .eq('employee_id', employeeId)
+      .gte('punched_at', dayStart)
+      .lte('punched_at', dayEnd),
+    DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { employeeId: employeeId, status: 'Aprobado' })
+  ])
 
-  if (error) throw new Error('Error: ' + error.message)
+  if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
 
   var byDate = {}
-  ;(punches || []).forEach(function(p) {
+  ;(punchRes.data || []).forEach(function(p) {
     var d = toCdmxDate(p.punched_at)
     if (!byDate[d]) byDate[d] = []
     byDate[d].push(p)
   })
 
+  var vacDates = _buildVacationSet(vacRequests, year, month)
+
   var wdays   = workdaysInMonth(year, month)
-  var summary = { aTime: 0, retardo: 0, ausente: 0, workdays: wdays.length }
+  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
-    var fl     = firstLast(byDate[dateStr] || [])
-    var status = toStatus(fl.checkIn, dateStr)
-    if (status === 'a_tiempo') summary.aTime++
-    else if (status === 'retardo') summary.retardo++
-    else if (status === 'ausente') summary.ausente++
+    var fl  = firstLast(byDate[dateStr] || [])
+    var status
+    if (!fl.checkIn && vacDates.has(dateStr)) {
+      status = 'vacaciones'
+    } else {
+      status = toStatus(fl.checkIn, dateStr)
+    }
+    if (status === 'a_tiempo')  summary.aTime++
+    else if (status === 'retardo')    summary.retardo++
+    else if (status === 'ausente')    summary.ausente++
+    else if (status === 'vacaciones') summary.vacaciones++
     return {
       date:     dateStr,
       checkIn:  fl.checkIn,
@@ -250,15 +279,28 @@ async function _getAllMonth(year, month) {
 
   var wdays = workdaysInMonth(year, month)
 
-  var [employees, punchRes] = await Promise.all([
+  var [employees, punchRes, vacAll] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
     sb.from('attendance_punches')
       .select('employee_id, punched_at')
       .gte('punched_at', dayStart)
-      .lte('punched_at', dayEnd)
+      .lte('punched_at', dayEnd),
+    DB.query(CONFIG.SHEETS.VACATION_REQUESTS, { status: 'Aprobado' })
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
+
+  // Build vacation set per employee for this month
+  var vacRawByEmp = {}
+  vacAll.forEach(function(req) {
+    if (!req.employeeId) return
+    if (!vacRawByEmp[req.employeeId]) vacRawByEmp[req.employeeId] = []
+    vacRawByEmp[req.employeeId].push(req)
+  })
+  var vacByEmp = {}
+  Object.keys(vacRawByEmp).forEach(function(empId) {
+    vacByEmp[empId] = _buildVacationSet(vacRawByEmp[empId], year, month)
+  })
 
   var byEmpDate = {}
   ;(punchRes.data || []).forEach(function(p) {
@@ -274,24 +316,32 @@ async function _getAllMonth(year, month) {
   })
 
   var empStats = withPin.map(function(emp) {
-    var empDays = byEmpDate[emp.id] || {}
-    var stats   = { aTime: 0, retardo: 0, ausente: 0 }
+    var empDays   = byEmpDate[emp.id] || {}
+    var empVacSet = vacByEmp[emp.id]  || new Set()
+    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0 }
     wdays.forEach(function(dateStr) {
       var fl = firstLast(empDays[dateStr] || [])
-      var s  = toStatus(fl.checkIn, dateStr)
-      if (s === 'a_tiempo') stats.aTime++
-      else if (s === 'retardo') stats.retardo++
-      else if (s === 'ausente') stats.ausente++
+      var s
+      if (!fl.checkIn && empVacSet.has(dateStr)) {
+        s = 'vacaciones'
+      } else {
+        s = toStatus(fl.checkIn, dateStr)
+      }
+      if (s === 'a_tiempo')       stats.aTime++
+      else if (s === 'retardo')   stats.retardo++
+      else if (s === 'ausente')   stats.ausente++
+      else if (s === 'vacaciones') stats.vacaciones++
     })
     return {
-      employeeId: emp.id,
-      firstName:  emp.firstName  || '',
-      lastName:   emp.lastName   || '',
-      department: emp.department || '',
-      aTime:      stats.aTime,
-      retardo:    stats.retardo,
-      ausente:    stats.ausente,
-      workdays:   wdays.length
+      employeeId:  emp.id,
+      firstName:   emp.firstName  || '',
+      lastName:    emp.lastName   || '',
+      department:  emp.department || '',
+      aTime:       stats.aTime,
+      retardo:     stats.retardo,
+      ausente:     stats.ausente,
+      vacaciones:  stats.vacaciones,
+      workdays:    wdays.length
     }
   })
 
@@ -301,11 +351,12 @@ async function _getAllMonth(year, month) {
   })
 
   var totals = empStats.reduce(function(acc, e) {
-    acc.aTime   += e.aTime
-    acc.retardo += e.retardo
-    acc.ausente += e.ausente
+    acc.aTime      += e.aTime
+    acc.retardo    += e.retardo
+    acc.ausente    += e.ausente
+    acc.vacaciones += e.vacaciones
     return acc
-  }, { aTime: 0, retardo: 0, ausente: 0 })
+  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0 })
 
   var n = wdays.length * (empStats.length || 1)
 
@@ -315,11 +366,12 @@ async function _getAllMonth(year, month) {
     workdays: wdays.length,
     employees: empStats,
     summary: {
-      total:   empStats.length,
-      aTime:   totals.aTime,
-      retardo: totals.retardo,
-      ausente: totals.ausente,
-      pct:     n > 0 ? Math.round((totals.aTime / n) * 100) : 0
+      total:      empStats.length,
+      aTime:      totals.aTime,
+      retardo:    totals.retardo,
+      ausente:    totals.ausente,
+      vacaciones: totals.vacaciones,
+      pct:        n > 0 ? Math.round((totals.aTime / n) * 100) : 0
     }
   }
 }

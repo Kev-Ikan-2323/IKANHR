@@ -4089,8 +4089,9 @@ var AttendanceView = {
     html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
     html += AttendanceView._pill(s.workdays + ' laborable' + (s.workdays !== 1 ? 's' : ''), '#475569');
     html += AttendanceView._pill(s.aTime + ' a tiempo', '#3b82f6');
-    if (s.retardo > 0) html += AttendanceView._pill(s.retardo + ' retardo' + (s.retardo !== 1 ? 's' : ''), '#f59e0b');
-    if (s.ausente > 0) html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
+    if (s.retardo > 0)    html += AttendanceView._pill(s.retardo + ' retardo' + (s.retardo !== 1 ? 's' : ''), '#f59e0b');
+    if (s.ausente > 0)    html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
+    if (s.vacaciones > 0) html += AttendanceView._pill(s.vacaciones + ' día' + (s.vacaciones !== 1 ? 's' : '') + ' vacaciones', '#0ea5e9');
     html += '</div>';
 
     html += '<div id="att-emp-body">';
@@ -4103,10 +4104,11 @@ var AttendanceView = {
 
   _dayCard: function(dateLabel, rec) {
     var ST = {
-      a_tiempo:  { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
-      retardo:   { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
-      ausente:   { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
-      pendiente: { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' }
+      a_tiempo:   { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
+      retardo:    { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
+      ausente:    { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
+      vacaciones: { bg: '#e0f2fe', color: '#0284c7', text: 'Vacaciones' },
+      pendiente:  { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' }
     };
     if (!dateLabel) {
       return '<div id="att-day-card" class="card" style="margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center">' +
@@ -4202,9 +4204,10 @@ var AttendanceView = {
     var lastDay  = new Date(year, month, 0).getDate();
 
     var ST = {
-      a_tiempo:  { bg: '#ecfdf5', fg: '#16a34a', brd: '#bbf7d0' },
-      retardo:   { bg: '#fffbeb', fg: '#d97706', brd: '#fde68a' },
-      ausente:   { bg: '#fef2f2', fg: '#dc2626', brd: '#fecaca' }
+      a_tiempo:   { bg: '#ecfdf5', fg: '#16a34a', brd: '#bbf7d0' },
+      retardo:    { bg: '#fffbeb', fg: '#d97706', brd: '#fde68a' },
+      ausente:    { bg: '#fef2f2', fg: '#dc2626', brd: '#fecaca' },
+      vacaciones: { bg: '#e0f2fe', fg: '#0284c7', brd: '#bae6fd' }
     };
 
     var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
@@ -4315,6 +4318,7 @@ var AttendanceView = {
     html += AttendanceView._tile(pct + '%', 'Puntualidad', '#3b82f6');
     html += AttendanceView._tile(s.retardo, 'Retardos', '#f59e0b');
     html += AttendanceView._tile(s.ausente, 'Ausencias', '#ef4444');
+    html += AttendanceView._tile(s.vacaciones || 0, 'Vacaciones', '#0ea5e9');
     html += AttendanceView._tile(data.workdays, 'Días laborables', '#64748b');
     html += AttendanceView._tile(s.total, 'Empleados', '#7c3aed');
     html += '</div>';
@@ -4332,6 +4336,7 @@ var AttendanceView = {
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">A tiempo</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Retardos</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Ausentes</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Vacaciones</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:right">% Puntual</th>';
     html += '</tr></thead><tbody>';
 
@@ -4345,6 +4350,7 @@ var AttendanceView = {
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums">' + e.aTime + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + (e.retardo > 0 ? ';color:#d97706;font-weight:600' : '') + '">' + e.retardo + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + (e.ausente > 0 ? ';color:#dc2626;font-weight:600' : '') + '">' + e.ausente + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.vacaciones || 0) > 0 ? ';color:#0284c7;font-weight:600' : '') + '">' + (e.vacaciones || 0) + '</td>';
       html += '<td style="padding:8px 10px;text-align:right;font-weight:600;color:' + pctColor + '">' + pctE + '%</td>';
       html += '</tr>';
     });
@@ -4357,7 +4363,7 @@ var AttendanceView = {
     var d = AttendanceView._dashData;
     if (!d || !d.data || !d.data.employees) return;
     var rows = [
-      ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', '% Puntualidad']
+      ['Empleado', 'Departamento', 'Días Laborables', 'A Tiempo', 'Retardos', 'Ausencias', 'Vacaciones', '% Puntualidad']
     ];
     d.data.employees.forEach(function(e) {
       var pct = e.workdays > 0 ? Math.round((e.aTime / e.workdays) * 100) : 0;
@@ -4368,13 +4374,14 @@ var AttendanceView = {
         e.aTime,
         e.retardo,
         e.ausente,
+        e.vacaciones || 0,
         pct + '%'
       ]);
     });
     var s = d.data.summary;
     var n = (d.data.workdays || 0) * (s.total || 1);
     var pctTotal = n > 0 ? Math.round((s.aTime / n) * 100) : 0;
-    rows.push(['TOTAL', s.total + ' empleados', d.data.workdays, s.aTime, s.retardo, s.ausente, pctTotal + '%']);
+    rows.push(['TOTAL', s.total + ' empleados', d.data.workdays, s.aTime, s.retardo, s.ausente, s.vacaciones || 0, pctTotal + '%']);
 
     var csv = '﻿' + rows.map(function(r) {
       return r.map(function(v) {
@@ -4442,10 +4449,11 @@ var AttendanceView = {
 
   _badge: function(status) {
     var map = {
-      a_tiempo:  ['#ecfdf5', '#16a34a', 'A tiempo'],
-      retardo:   ['#fffbeb', '#d97706', 'Retardo'],
-      ausente:   ['#fef2f2', '#dc2626', 'Ausente'],
-      pendiente: ['#f8fafc', '#64748b', 'Pendiente']
+      a_tiempo:   ['#ecfdf5', '#16a34a', 'A tiempo'],
+      retardo:    ['#fffbeb', '#d97706', 'Retardo'],
+      ausente:    ['#fef2f2', '#dc2626', 'Ausente'],
+      vacaciones: ['#e0f2fe', '#0284c7', 'Vacaciones'],
+      pendiente:  ['#f8fafc', '#64748b', 'Pendiente']
     };
     var s = map[status] || ['#f8fafc', '#64748b', status];
     return '<span style="padding:2px 8px;border-radius:4px;background:' + s[0] + ';color:' + s[1] + ';font-size:12px;font-weight:600">' + s[2] + '</span>';
