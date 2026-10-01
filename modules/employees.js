@@ -79,7 +79,18 @@ export var EmployeeModule = {
 
   async update(id, changes, user) {
     if (user.id !== id) {
-      if (!user.isAdmin && !user.isHR) throw new Error('Acceso denegado. Se requiere uno de los roles: admin, hr')
+      if (!user.isAdmin && !user.isHR) {
+        if (user.isManager) {
+          var targetEmp = await DB.getById(CONFIG.SHEETS.EMPLOYEES, id)
+          if (!targetEmp || targetEmp.managerId !== user.id) throw new Error('Acceso denegado.')
+          var managerFiltered = {}
+          if (changes.remoteDays !== undefined) managerFiltered.remoteDays = changes.remoteDays
+          if (Object.keys(managerFiltered).length === 0) throw new Error('Acceso denegado.')
+          changes = managerFiltered
+        } else {
+          throw new Error('Acceso denegado. Se requiere uno de los roles: admin, hr')
+        }
+      }
     } else if (!user.isAdmin && !user.isHR) {
       // Regular employee editing their own profile — restricted fields only
       var allowed = ['phone', 'personalEmail', 'address', 'emergencyContact', 'emergencyPhone', 'photoUrl']
