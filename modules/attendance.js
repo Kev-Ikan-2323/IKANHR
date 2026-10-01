@@ -407,6 +407,11 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     }
   })
 
+  var rcoByDate = {}
+  ;(rcoMonthRes.data || []).forEach(function(r) {
+    rcoByDate[r.date] = r.checked_out_at
+  })
+
   var wdays   = workdaysInMonth(year, month, quincena)
   var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
@@ -453,11 +458,6 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
                              documentUrl: rc.document_url } : null,
       appeal:         ap ? { id: ap.id, status: ap.status, reason: ap.reason } : null
     }
-  })
-
-  var rcoByDate = {}
-  ;(rcoMonthRes.data || []).forEach(function(r) {
-    rcoByDate[r.date] = r.checked_out_at
   })
 
   var remoteDays = (empRow && Array.isArray(empRow.remoteDays)) ? empRow.remoteDays : []
