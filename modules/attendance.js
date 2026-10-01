@@ -61,7 +61,7 @@ export var AttendanceModule = {
   // Admin/HR → all employees for a date; everyone else → own record for a date
   async getDay(data, user) {
     var date = data.date || todayCdmx()
-    if (user.isAdmin || user.isHR) return _getAllDay(date)
+    if (!data.personal && (user.isAdmin || user.isHR)) return _getAllDay(date)
     return _getEmployeeDay(user.id, date)
   },
 

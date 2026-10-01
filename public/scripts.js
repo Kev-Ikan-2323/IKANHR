@@ -4149,7 +4149,7 @@ var AttendanceView = {
     ];
     if (isCurrentMonth) {
       var today = AttendanceView._todayCdmx();
-      reqs.push(new Promise(function(res) { APP.api('attendance.getDay', { date: today }, function(e, d) { res(e ? [] : (d || [])); }); }));
+      reqs.push(new Promise(function(res) { APP.api('attendance.getDay', { date: today, personal: true }, function(e, d) { res(e ? [] : (d || [])); }); }));
     }
     Promise.all(reqs).then(function(results) {
       var monthData = results[0];
