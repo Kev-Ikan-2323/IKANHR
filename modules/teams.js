@@ -62,7 +62,10 @@ export var TeamsModule = {
         photoUrl:   emp.photoUrl,
         isLeader:   team && team.leaderId   === emp.id,
         isCoLeader: team && team.coLeaderId === emp.id,
-        hireDate:   emp.hireDate
+        hireDate:   emp.hireDate,
+        managerId:  emp.managerId || null,
+        remoteDays: Array.isArray(emp.remoteDays) ? emp.remoteDays : [],
+        isRemote:   emp.isRemote === true || emp.isRemote === 'true'
       }
     })
   },

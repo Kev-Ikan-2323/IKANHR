@@ -5531,13 +5531,23 @@ var TeamView = {
         if (err2) { APP.toast(err2, 'error'); return; }
         var canManage = APP.user.isAdmin || APP.user.isHR ||
           APP.user.ledTeams.indexOf(id) > -1 || APP.user.coledTeams.indexOf(id) > -1;
+        var dayLabels = {1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb'};
         var memberCards = (members||[]).map(function(m) {
           var badge = m.isLeader ? '<span style="font-size:10px;background:var(--primary);color:#fff;padding:1px 6px;border-radius:10px">Líder</span>' :
                       m.isCoLeader ? '<span style="font-size:10px;background:var(--warning);color:#fff;padding:1px 6px;border-radius:10px">Co-Líder</span>' : '';
+          var hoDays = Array.isArray(m.remoteDays) ? m.remoteDays : [];
+          var hoLabel = !m.isRemote && hoDays.length > 0
+            ? ' · <span style="color:#0891b2">🏠 ' + hoDays.map(function(d){return dayLabels[d]||d;}).join(' ') + '</span>'
+            : '';
+          var canEditHo = canManage && (APP.user.isAdmin || APP.user.isHR || m.managerId === APP.user.id);
+          var hoBtn = canEditHo
+            ? '<button onclick="TeamView.openHomeOfficeDays(\'' + m.id + '\',\'' + m.fullName.replace(/'/g,"\\'") + '\',\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#0891b2;padding:2px 6px" title="Días de home office"><span class="material-icons-round" style="font-size:16px">home_work</span></button>'
+            : '';
           return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
             '<div class="emp-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">' + APP.initials(m.fullName) + '</div>' +
             '<div style="flex:1"><div class="font-600 text-sm">' + m.fullName + ' ' + badge + '</div>' +
-            '<div class="text-xs text-muted">' + (m.jobTitle||'—') + ' · ' + (m.department||'—') + '</div></div>' +
+            '<div class="text-xs text-muted">' + (m.jobTitle||'—') + ' · ' + (m.department||'—') + hoLabel + '</div></div>' +
+            hoBtn +
             (canManage ? '<button onclick="TeamView.removeMember(\'' + id + '\',\'' + m.id + '\',\'' + m.fullName.replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px 6px" title="Quitar del equipo"><span class="material-icons-round" style="font-size:16px">person_remove</span></button>' : '') +
           '</div>';
         }).join('');
@@ -5653,6 +5663,61 @@ var TeamView = {
       APP.toast('✅ Miembro quitado', 'success');
       TeamView.openDetail(teamId);
     });
+  },
+
+  openHomeOfficeDays: function(empId, empName, teamId) {
+    APP.api('employees.get', { id: empId }, function(err, emp) {
+      if (err) { APP.toast(err, 'error'); return; }
+      var remDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : [];
+      var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'}];
+      var pillsHtml = dayList.map(function(item) {
+        var sel = remDays.indexOf(item.d) > -1;
+        return '<button type="button" onclick="TeamView._toggleHoDay(this,' + item.d + ')" ' +
+          'style="padding:6px 16px;border-radius:20px;font-size:13px;cursor:pointer;transition:.15s;border:1px solid ' +
+          (sel ? '#93c5fd;background:#dbeafe;color:#1d4ed8;font-weight:600' : 'var(--border);background:var(--surface);color:var(--fg);font-weight:400') + '">' +
+          item.l + '</button>';
+      }).join('');
+      var body =
+        '<input type="hidden" id="tv-ho-days-val" value="' + JSON.stringify(remDays) + '">' +
+        '<p class="text-sm text-muted mb-12">Días que <strong>' + empName + '</strong> puede hacer home office. Sin selección = cualquier día OK.</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + pillsHtml + '</div>';
+      APP.modal('🏠 Home Office · ' + empName, body,
+        '<button class="btn btn-outline" onclick="TeamView.openDetail(\'' + teamId + '\')">← Volver</button>' +
+        '<button class="btn btn-primary" onclick="TeamView.saveHomeOfficeDays(\'' + empId + '\',\'' + teamId + '\')"><span class="material-icons-round">save</span>Guardar</button>');
+    });
+  },
+
+  saveHomeOfficeDays: function(empId, teamId) {
+    var inp = document.getElementById('tv-ho-days-val');
+    var days = [];
+    try { days = JSON.parse(inp ? inp.value : '[]'); } catch(e) {}
+    APP.api('employees.update', { id: empId, remoteDays: days.length ? days : null }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ Días de home office actualizados', 'success');
+      TeamView.openDetail(teamId);
+    });
+  },
+
+  _toggleHoDay: function(btn, day) {
+    var inp = document.getElementById('tv-ho-days-val');
+    if (!inp) return;
+    var days = [];
+    try { days = JSON.parse(inp.value || '[]'); } catch(e) {}
+    var idx = days.indexOf(day);
+    if (idx > -1) {
+      days.splice(idx, 1);
+      btn.style.background = 'var(--surface)';
+      btn.style.color = 'var(--fg)';
+      btn.style.borderColor = 'var(--border)';
+      btn.style.fontWeight = '400';
+    } else {
+      days.push(day);
+      btn.style.background = '#dbeafe';
+      btn.style.color = '#1d4ed8';
+      btn.style.borderColor = '#93c5fd';
+      btn.style.fontWeight = '600';
+    }
+    inp.value = JSON.stringify(days);
   }
 };
 
