@@ -4251,6 +4251,8 @@ var AttendanceView = {
     var showBtns   = dateLabel === 'Hoy' && (curStatus === 'ausente' || curStatus === 'pendiente');
     var appealStatus = rec && rec.appeal ? rec.appeal.status : null;
     var canAppeal  = curStatus === 'retardo' && appealStatus !== 'pendiente' && appealStatus !== 'aprobado';
+    var arrivedSt  = ['a_tiempo', 'retardo', 'retardo_apelado', 'remoto'];
+    var canCheckout = dateLabel === 'Hoy' && rec && arrivedSt.indexOf(curStatus) !== -1 && !rec.checkOut;
     var appealDate = (dateLabel === 'Hoy') ? AttendanceView._todayCdmx() : (rec && rec.date ? rec.date : '');
 
     var html = '<div id="att-day-card" class="card" style="margin-bottom:16px;background:' + s.bg + ';border-color:' + s.color + '33">';
@@ -4264,6 +4266,11 @@ var AttendanceView = {
       html += '<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid ' + s.color + '33">';
       html += '<button onclick="AttendanceView._openRemoteModal()" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:600">🏠 Check-in remoto</button>';
       html += '<button onclick="AttendanceView._openJustifiedModal()" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:#7c3aed;color:#fff;cursor:pointer;font-size:12px;font-weight:600">📋 Falta justificada</button>';
+      html += '</div>';
+    }
+    if (canCheckout) {
+      html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid ' + s.color + '33">';
+      html += '<button onclick="AttendanceView._doRemoteCheckout()" style="width:100%;padding:8px 6px;border-radius:8px;border:none;background:#0f766e;color:#fff;cursor:pointer;font-size:12px;font-weight:600">🚪 Registrar salida</button>';
       html += '</div>';
     }
     if (canAppeal && appealDate) {
@@ -4893,6 +4900,35 @@ var AttendanceView = {
         if (done) popup.remove();
       }, 1200);
     });
+  },
+
+  // ── Remote checkout ───────────────────────────────────────────
+
+  _doRemoteCheckout: function() {
+    var now      = new Date();
+    var cdmxMins = ((now.getUTCHours() - 6 + 24) % 24) * 60 + now.getUTCMinutes();
+    var EXIT_MINS = 17 * 60; // 5:00 PM
+    var proceed = function() {
+      APP.api('attendance.remoteCheckout', {}, function(err) {
+        if (err) return APP.toast(err, 'error');
+        APP.toast('Salida registrada ✓', 'success');
+        var today = AttendanceView._todayCdmx();
+        APP.api('attendance.getDay', { date: today }, function(err2, rows) {
+          if (!err2 && rows && rows[0]) {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = AttendanceView._dayCard('Hoy', Object.assign({ date: today }, rows[0]));
+            var card = document.getElementById('att-day-card');
+            if (card) card.replaceWith(tmp.firstChild);
+          }
+        });
+      });
+    };
+    if (cdmxMins < EXIT_MINS) {
+      var h = String(Math.floor(cdmxMins / 60)).padStart(2, '0');
+      var m = String(cdmxMins % 60).padStart(2, '0');
+      if (!confirm('Son las ' + h + ':' + m + ', el horario de salida es a las 5:00 PM.\n¿Deseas registrar tu salida de todas formas?')) return;
+    }
+    proceed();
   },
 
   // ── Remote check-in multi-step modal ──────────────────────────

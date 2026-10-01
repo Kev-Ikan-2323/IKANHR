@@ -65,6 +65,48 @@ export var AttendanceModule = {
     return _getEmployeeDay(user.id, date)
   },
 
+  // Employee registers remote checkout (no approval needed)
+  async remoteCheckout(data, user) {
+    var sb       = sbClient()
+    var today    = todayCdmx()
+    var now      = new Date().toISOString()
+    var dayStart = today + 'T00:00:00-06:00'
+    var dayEnd   = today + 'T23:59:59-06:00'
+
+    var [punchRes, rcRes, existingRes] = await Promise.all([
+      sb.from('attendance_punches')
+        .select('punched_at')
+        .eq('employee_id', user.id)
+        .gte('punched_at', dayStart)
+        .lte('punched_at', dayEnd),
+      sb.from('remote_checkins')
+        .select('status, type')
+        .eq('employee_id', user.id)
+        .eq('date', today),
+      sb.from('remote_checkouts')
+        .select('id')
+        .eq('employee_id', user.id)
+        .eq('date', today)
+        .maybeSingle()
+    ])
+
+    var fl         = firstLast(punchRes.data || [])
+    var rcApproved = (rcRes.data || []).find(function(r) { return r.status === 'aprobado' && r.type === 'remoto' })
+    if (!fl.checkIn && !rcApproved) throw new Error('No tienes registro de entrada para hoy.')
+    if (existingRes.data) throw new Error('Ya registraste tu salida hoy.')
+
+    var { error } = await sb.from('remote_checkouts').insert({
+      employee_id:    user.id,
+      date:           today,
+      checked_out_at: now
+    })
+    if (error) {
+      if (error.code === '23505') throw new Error('Ya registraste tu salida hoy.')
+      throw new Error('Error al registrar salida: ' + error.message)
+    }
+    return { ok: true, checkedOutAt: now }
+  },
+
   // Return punch history (last N days) for an employee
   async getHistory(data, user) {
     var employeeId = data.employeeId || user.id
@@ -92,7 +134,7 @@ async function _getAllDay(date) {
   var dayStart = date + 'T00:00:00-06:00'
   var dayEnd   = date + 'T23:59:59-06:00'
 
-  var [employees, punchRes, rcRes] = await Promise.all([
+  var [employees, punchRes, rcRes, rcoRes] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
     sb.from('attendance_punches')
       .select('employee_id, punched_at, source')
@@ -100,6 +142,9 @@ async function _getAllDay(date) {
       .lte('punched_at', dayEnd),
     sb.from('remote_checkins')
       .select('id, employee_id, type, status')
+      .eq('date', date),
+    sb.from('remote_checkouts')
+      .select('employee_id, checked_out_at')
       .eq('date', date)
   ])
 
@@ -111,6 +156,12 @@ async function _getAllDay(date) {
     if (!p.employee_id) return
     if (!byEmp[p.employee_id]) byEmp[p.employee_id] = []
     byEmp[p.employee_id].push(p)
+  })
+
+  // Index remote checkouts by employee_id
+  var rcoByEmp = {}
+  ;(rcoRes.data || []).forEach(function(r) {
+    rcoByEmp[r.employee_id] = r.checked_out_at
   })
 
   // Index remote check-ins by employee_id (aprobado > pendiente > denegado)
@@ -147,7 +198,7 @@ async function _getAllDay(date) {
       checadorPin:  emp.checadorPin || '',
       isRemote:     emp.isRemote === true || emp.isRemote === 'true',
       checkIn:      fl.checkIn,
-      checkOut:     fl.checkOut,
+      checkOut:     fl.checkOut || (rcoByEmp[emp.id] || null),
       status:       status,
       source:       punches.length > 0 ? punches[0].source : null,
       punchCount:   punches.length,
@@ -161,23 +212,29 @@ async function _getEmployeeDay(employeeId, date) {
   var dayStart = date + 'T00:00:00-06:00'
   var dayEnd   = date + 'T23:59:59-06:00'
 
-  var [punchRes, rcRes] = await Promise.all([
+  var [punchRes, rcRes, rcoRes] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
       .gte('punched_at', dayStart)
       .lte('punched_at', dayEnd),
     sb.from('remote_checkins')
-      .select('id, type, status')
+      .select('id, type, status, requested_at')
+      .eq('employee_id', employeeId)
+      .eq('date', date),
+    sb.from('remote_checkouts')
+      .select('checked_out_at')
       .eq('employee_id', employeeId)
       .eq('date', date)
+      .maybeSingle()
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
 
   var punches = punchRes.data || []
-  var fl = firstLast(punches)
-  var rc = (rcRes.data || [])[0] || null
+  var fl  = firstLast(punches)
+  var rc  = (rcRes.data || [])[0] || null
+  var rco = rcoRes.data || null
 
   var status
   if (fl.checkIn) {
@@ -191,8 +248,8 @@ async function _getEmployeeDay(employeeId, date) {
   }
 
   return [{
-    checkIn:    fl.checkIn,
-    checkOut:   fl.checkOut,
+    checkIn:    fl.checkIn || (rc && rc.status === 'aprobado' ? rc.requested_at : null),
+    checkOut:   fl.checkOut || (rco ? rco.checked_out_at : null),
     status:     status,
     source:     punches[0] ? punches[0].source : null,
     punchCount: punches.length,

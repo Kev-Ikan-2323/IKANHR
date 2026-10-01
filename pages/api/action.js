@@ -213,9 +213,10 @@ async function dispatch(action, data, user) {
     'kpi.schedules.runNow': function() { return KPISchedulesModule.runNow(data.id, user) },
 
     // ── ATTENDANCE ─────────────────────────────────────────────
-    'attendance.getDay':     function() { return AttendanceModule.getDay(data, user) },
-    'attendance.getHistory': function() { return AttendanceModule.getHistory(data, user) },
-    'attendance.getMonth':   function() { return AttendanceModule.getMonth(data, user) },
+    'attendance.getDay':           function() { return AttendanceModule.getDay(data, user) },
+    'attendance.getHistory':       function() { return AttendanceModule.getHistory(data, user) },
+    'attendance.getMonth':         function() { return AttendanceModule.getMonth(data, user) },
+    'attendance.remoteCheckout':   function() { return AttendanceModule.remoteCheckout(data, user) },
     'remote.request':        function() { return RemoteCheckinModule.request(data, user) },
     'remote.review':         function() { return RemoteCheckinModule.review(data, user) },
     'remote.getPending':     function() { return RemoteCheckinModule.getPending(data, user) },
