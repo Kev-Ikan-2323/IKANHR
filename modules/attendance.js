@@ -141,7 +141,7 @@ async function _getAllDay(date) {
       .gte('punched_at', dayStart)
       .lte('punched_at', dayEnd),
     sb.from('remote_checkins')
-      .select('id, employee_id, type, status')
+      .select('id, employee_id, type, status, requested_at')
       .eq('date', date),
     sb.from('remote_checkouts')
       .select('employee_id, checked_out_at')
@@ -175,20 +175,25 @@ async function _getAllDay(date) {
   })
 
   return employees.map(function(emp) {
-    var punches = byEmp[emp.id] || []
-    var fl      = firstLast(punches)
-    var rc      = rcByEmp[emp.id] || null
+    var punches      = byEmp[emp.id] || []
+    var fl           = firstLast(punches)
+    var rc           = rcByEmp[emp.id] || null
+    var hasRemoteCI  = rc && rc.status === 'aprobado' && rc.type === 'remoto'
 
     var status
-    if (fl.checkIn) {
-      status = toStatus(fl.checkIn, date)
-    } else if (rc && rc.status === 'aprobado') {
+    if (rc && rc.status === 'aprobado') {
       status = rc.type === 'remoto' ? 'remoto' : 'justificada'
+    } else if (fl.checkIn) {
+      status = toStatus(fl.checkIn, date)
     } else if (rc && rc.status === 'pendiente') {
       status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
     } else {
       status = toStatus(null, date)
     }
+
+    var effectiveCheckOut = hasRemoteCI && punches.length > 0
+      ? (fl.checkOut || fl.checkIn)         // physical punch(es) = checkout
+      : (fl.checkOut || (rcoByEmp[emp.id] || null))
 
     return {
       employeeId:   emp.id,
@@ -197,8 +202,8 @@ async function _getAllDay(date) {
       department:   emp.department || '',
       checadorPin:  emp.checadorPin || '',
       isRemote:     emp.isRemote === true || emp.isRemote === 'true',
-      checkIn:      fl.checkIn,
-      checkOut:     fl.checkOut || (rcoByEmp[emp.id] || null),
+      checkIn:      hasRemoteCI ? (rc.requested_at || null) : fl.checkIn,
+      checkOut:     effectiveCheckOut,
       status:       status,
       source:       punches.length > 0 ? punches[0].source : null,
       punchCount:   punches.length,
@@ -231,25 +236,30 @@ async function _getEmployeeDay(employeeId, date) {
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
 
-  var punches = punchRes.data || []
-  var fl  = firstLast(punches)
-  var rc  = (rcRes.data || [])[0] || null
-  var rco = rcoRes.data || null
+  var punches     = punchRes.data || []
+  var fl          = firstLast(punches)
+  var rc          = (rcRes.data || [])[0] || null
+  var rco         = rcoRes.data || null
+  var hasRemoteCI = rc && rc.status === 'aprobado' && rc.type === 'remoto'
 
   var status
-  if (fl.checkIn) {
-    status = toStatus(fl.checkIn, date)
-  } else if (rc && rc.status === 'aprobado') {
+  if (rc && rc.status === 'aprobado') {
     status = rc.type === 'remoto' ? 'remoto' : 'justificada'
+  } else if (fl.checkIn) {
+    status = toStatus(fl.checkIn, date)
   } else if (rc && rc.status === 'pendiente') {
     status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
   } else {
     status = toStatus(null, date)
   }
 
+  var effectiveCheckOut = hasRemoteCI && punches.length > 0
+    ? (fl.checkOut || fl.checkIn)       // physical punch(es) = checkout
+    : (fl.checkOut || (rco ? rco.checked_out_at : null))
+
   return [{
-    checkIn:    fl.checkIn || (rc && rc.status === 'aprobado' ? rc.requested_at : null),
-    checkOut:   fl.checkOut || (rco ? rco.checked_out_at : null),
+    checkIn:    hasRemoteCI ? (rc.requested_at || null) : fl.checkIn,
+    checkOut:   effectiveCheckOut,
     status:     status,
     source:     punches[0] ? punches[0].source : null,
     punchCount: punches.length,
@@ -400,17 +410,19 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var wdays   = workdaysInMonth(year, month, quincena)
   var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
-    var fl     = firstLast(byDate[dateStr] || [])
-    var rc     = remotoByDate[dateStr]
-    var ap     = appealByDate[dateStr]
+    var punches     = byDate[dateStr] || []
+    var fl          = firstLast(punches)
+    var rc          = remotoByDate[dateStr]
+    var ap          = appealByDate[dateStr]
+    var hasRemoteCI = rc && rc.status === 'aprobado' && rc.type === 'remoto'
     var status
 
-    if (fl.checkIn) {
+    if (rc && rc.status === 'aprobado') {
+      status = rc.type === 'remoto' ? 'remoto' : 'justificada'
+    } else if (fl.checkIn) {
       status = toStatus(fl.checkIn, dateStr)
       // If retardo but appeal approved → retardo_apelado
       if (status === 'retardo' && ap && ap.status === 'aprobado') status = 'retardo_apelado'
-    } else if (rc && rc.status === 'aprobado') {
-      status = rc.type === 'remoto' ? 'remoto' : 'justificada'
     } else if (rc && rc.status === 'pendiente' && dateStr === today) {
       status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
     } else if (vacDates.has(dateStr)) {
@@ -426,10 +438,14 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     else if (status === 'remoto')         summary.remoto++
     else if (status === 'justificada')    summary.justificada++
 
+    var effectiveCheckOut = hasRemoteCI && punches.length > 0
+      ? (fl.checkOut || fl.checkIn)
+      : (fl.checkOut || (rcoByDate[dateStr] || null))
+
     return {
       date:           dateStr,
-      checkIn:        fl.checkIn || (rc && rc.status === 'aprobado' ? rc.requested_at : null),
-      checkOut:       fl.checkOut || (rcoByDate[dateStr] || null),
+      checkIn:        hasRemoteCI ? (rc.requested_at || null) : (fl.checkIn || null),
+      checkOut:       effectiveCheckOut,
       status:         status,
       source:         byDate[dateStr] && byDate[dateStr][0] ? byDate[dateStr][0].source : (rc ? 'remoto' : null),
       remoteCheckin:  rc ? { id: rc.id, type: rc.type, reason: rc.reason, status: rc.status,
