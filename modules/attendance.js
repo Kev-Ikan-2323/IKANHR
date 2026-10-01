@@ -340,7 +340,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var dateMin  = year + '-' + mon + '-01'
   var dateMax  = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [punchRes, vacRequests, remotoRes, empRow, appealRes] = await Promise.all([
+  var [punchRes, vacRequests, remotoRes, empRow, appealRes, rcoMonthRes] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
@@ -355,6 +355,11 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId),
     sb.from('tardiness_appeals')
       .select('id, date, status, reason')
+      .eq('employee_id', employeeId)
+      .gte('date', dateMin)
+      .lte('date', dateMax),
+    sb.from('remote_checkouts')
+      .select('date, checked_out_at')
       .eq('employee_id', employeeId)
       .gte('date', dateMin)
       .lte('date', dateMax)
@@ -424,7 +429,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     return {
       date:           dateStr,
       checkIn:        fl.checkIn || (rc && rc.status === 'aprobado' ? rc.requested_at : null),
-      checkOut:       fl.checkOut,
+      checkOut:       fl.checkOut || (rcoByDate[dateStr] || null),
       status:         status,
       source:         byDate[dateStr] && byDate[dateStr][0] ? byDate[dateStr][0].source : (rc ? 'remoto' : null),
       remoteCheckin:  rc ? { id: rc.id, type: rc.type, reason: rc.reason, status: rc.status,
@@ -432,6 +437,11 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
                              documentUrl: rc.document_url } : null,
       appeal:         ap ? { id: ap.id, status: ap.status, reason: ap.reason } : null
     }
+  })
+
+  var rcoByDate = {}
+  ;(rcoMonthRes.data || []).forEach(function(r) {
+    rcoByDate[r.date] = r.checked_out_at
   })
 
   var remoteDays = (empRow && Array.isArray(empRow.remoteDays)) ? empRow.remoteDays : []
