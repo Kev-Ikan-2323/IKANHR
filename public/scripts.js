@@ -264,12 +264,12 @@ var APP = {
   },
 
   viewTitles: {
-    dashboard: 'Mi Dashboard', employees: 'Directorio', orgchart: 'Organigrama',
-    kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Reportes KPI por Área',
-    vacations: 'Vacaciones', 'vac-calendar': 'Calendario de Vacaciones', 'vac-history': 'Historial de Vacaciones', 'vac-balance': 'Concentrado de Vacaciones',
-    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Configuración', policies: 'Políticas',
+    dashboard: 'Mi Dashboard', employees: 'El Team', orgchart: 'Estructura',
+    kpis: 'KPIs & Evaluaciones', 'kpi-reports': 'Stats KPI por área',
+    vacations: 'Time Off', 'vac-calendar': 'Calendario Time Off', 'vac-history': 'Historial Time Off', 'vac-balance': 'Balance Time Off',
+    birthdays: 'Cumpleaños', team: 'Mi Equipo', settings: 'Settings', policies: 'Guidelines',
     announcements: 'Comunicados',
-    attendance:    'Asistencia'
+    attendance:    'Check-ins'
   },
 
   loadView: function(view) {
@@ -374,7 +374,7 @@ var APP = {
           '<span style="color:#fff;font-weight:800;font-size:22px">IK</span>' +
         '</div>' +
         '<h1 style="font-size:26px;font-weight:700;margin:0 0 8px;color:var(--text)">IKAN HR</h1>' +
-        '<p style="color:var(--text-muted);margin:0 0 32px;font-size:15px;line-height:1.5">Plataforma de Recursos Humanos.<br>Inicia sesión con tu cuenta corporativa.</p>' +
+        '<p style="color:var(--text-muted);margin:0 0 32px;font-size:15px;line-height:1.5">La plataforma de tu equipo.<br>Entra con tu cuenta IKAN.</p>' +
         '<button onclick="_sb.auth.signInWithOAuth({provider:\'google\',options:{redirectTo:window.location.origin}})" style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--primary);color:#fff;padding:13px 24px;border-radius:10px;border:none;cursor:pointer;font-weight:600;font-size:15px;width:100%;transition:background .15s" onmouseover="this.style.background=\'var(--primary-dark)\'" onmouseout="this.style.background=\'var(--primary)\'">' +
           '<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>' +
           'Iniciar sesión con Google' +
@@ -395,7 +395,7 @@ var APP = {
         '<span class="material-icons-round" style="font-size:64px;color:var(--text-muted);display:block;margin-bottom:16px">lock</span>' +
         '<h2 style="margin:0 0 12px;font-size:22px;color:var(--text)">Sin acceso</h2>' +
         '<p style="color:var(--text-muted);line-height:1.6;margin:0 0 24px">Tu cuenta de Google no está registrada en la plataforma. Contacta a Recursos Humanos para que te den de alta.</p>' +
-        '<button class="btn btn-primary" onclick="_sb.auth.signOut().then(function(){window.location.reload()})">Cerrar sesión</button>' +
+        '<button class="btn btn-primary" onclick="_sb.auth.signOut().then(function(){window.location.reload()})">Log out</button>' +
       '</div>';
     el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:9999;';
     document.body.appendChild(el);
@@ -480,9 +480,9 @@ var APP = {
     if (s === null || s === undefined || s === '') return '—';
     var n = parseFloat(s);
     if (isNaN(n)) return '—';
-    if (n >= 75) return '🟢 Logrado';
-    if (n >= 25) return '🟡 Parcialmente';
-    return '🔴 No logrado';
+    if (n >= 75) return '✅ Nailed it';
+    if (n >= 25) return '⚡ Getting there';
+    return '❌ Off track';
   },
   scoreColor: function(s) { var n=parseFloat(s); if(isNaN(n)) return ''; if(n>=9) return 'green'; if(n>=7) return ''; if(n>=5) return 'orange'; return 'red'; },
   badgeStatus: function(s) {
@@ -524,16 +524,16 @@ var DashboardView = {
     var isApprover = APP.user && (APP.user.isAdmin || APP.user.isHR || APP.user.isManager);
     document.getElementById('dash-pending-vac').textContent = isApprover ? ((d.team && d.team.pendingVacApproval) || 0) : (vac.pendingRequests || 0);
     var vacLabel = document.getElementById('dash-pending-vac-label');
-    if (vacLabel) vacLabel.textContent = isApprover ? 'Por aprobar' : 'Solicitudes pendientes';
+    if (vacLabel) vacLabel.textContent = 'Por revisar';
 
     var bdays = (d.birthdays || []).slice(0, 5);
     document.getElementById('dash-birthdays').innerHTML = bdays.length
       ? '<div class="bday-list">' + bdays.map(DashboardView.bdayItem).join('') + '</div>'
-      : '<div class="empty-state"><span class="material-icons-round">cake</span><p>Sin cumpleaños próximos</p></div>';
+      : '<div class="empty-state"><span class="material-icons-round">cake</span><p>De momento ninguno 🎂</p></div>';
 
     var kpi = d.kpi || {};
     var trend = kpi.trend === 'up' ? '📈' : kpi.trend === 'down' ? '📉' : '';
-    document.getElementById('dash-kpi-label').textContent = hasKpiScore ? kpi.avgScore + ' pts ' + trend : 'Sin calificar';
+    document.getElementById('dash-kpi-label').textContent = hasKpiScore ? kpi.avgScore + ' pts ' + trend : 'Sin score todavía';
 
     var ann = (d.announcements || []).slice(0, 4);
     document.getElementById('dash-announcements').innerHTML = ann.length
@@ -574,7 +574,7 @@ var EmployeesView = {
   all: [],
   load: function() {
     if (EmployeesView.all.length) { EmployeesView.render(); return; }
-    document.getElementById('view-employees').innerHTML = '<div class="loader"><div class="spinner"></div> Cargando directorio...</div>';
+    document.getElementById('view-employees').innerHTML = '<div class="loader"><div class="spinner"></div> Cargando el team...</div>';
     APP.api('employees.directory', {}, function(err, data) {
       if (err) { APP.toast(err, 'error'); return; }
       EmployeesView.all = data || [];
@@ -586,13 +586,13 @@ var EmployeesView = {
   },
   skeleton: function() {
     var isAdmin = APP.user && (APP.user.isAdmin || APP.user.isHR);
-    return '<div class="view-title"><span class="material-icons-round">people</span>Directorio de Empleados' +
+    return '<div class="view-title"><span class="material-icons-round">people</span>El Team' +
       '<span id="emp-count" class="badge badge-gray" style="margin-left:10px"></span>' +
-      (isAdmin ? '<button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="AdminHR.openNewEmployee()"><span class="material-icons-round">person_add</span>Agregar Empleado</button>' : '') +
+      (isAdmin ? '<button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="AdminHR.openNewEmployee()"><span class="material-icons-round">person_add</span>Nuevo integrante</button>' : '') +
       '</div>' +
       '<div class="card mb-20"><div class="flex gap-8 items-center">' +
-      '<div class="header-search" style="width:100%;max-width:340px"><span class="material-icons-round">search</span><input id="emp-search" placeholder="Buscar por nombre, email..."></div>' +
-      '<select id="emp-dept-filter" onchange="EmployeesView.filter()" style="width:200px"><option value="">Todos los departamentos</option></select>' +
+      '<div class="header-search" style="width:100%;max-width:340px"><span class="material-icons-round">search</span><input id="emp-search" placeholder="Buscar en el team..."></div>' +
+      '<select id="emp-dept-filter" onchange="EmployeesView.filter()" style="width:200px"><option value="">Todas las áreas</option></select>' +
       '</div></div><div id="emp-grid" class="emp-grid"></div>';
   },
   render: function() {
@@ -642,14 +642,14 @@ var EmployeesView = {
         EmployeesView.field('Teléfono', emp.phone) +
         EmployeesView.field('Equipo', emp.teamName) +
         EmployeesView.field('Manager', emp.managerName) +
-        EmployeesView.field('Antigüedad', (emp.yearsOfService||0) + ' año(s)') +
-        EmployeesView.field('Fecha ingreso', APP.fmtDate(emp.hireDate)) +
+        EmployeesView.field('Seniority', (emp.yearsOfService||0) + ' año(s)') +
+        EmployeesView.field('Start date', APP.fmtDate(emp.hireDate)) +
         (isAdmin ? EmployeesView.field('Vacaciones/año', emp.vacationDaysPerYear + ' días') : '') +
         '</div>',
         isAdmin
           ? '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>' +
             '<button class="btn btn-primary" onclick="AdminHR.openEditEmployee(\'' + emp.id + '\')"><span class="material-icons-round">edit</span>Editar</button>' +
-            (emp.status === 'activo' ? '<button class="btn btn-danger btn-sm" onclick="AdminHR.deactivateEmployee(\'' + emp.id + '\',\'' + emp.fullName + '\')"><span class="material-icons-round">person_off</span>Dar de baja</button>' : '')
+            (emp.status === 'activo' ? '<button class="btn btn-danger btn-sm" onclick="AdminHR.deactivateEmployee(\'' + emp.id + '\',\'' + emp.fullName + '\')"><span class="material-icons-round">person_off</span>Offboard</button>' : '')
           : '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>'
       );
     });
@@ -925,7 +925,7 @@ var OrgChartView = {
     var tree = document.getElementById('org-tree');
     if (!tree) return;
     tree.className = 'loader';
-    tree.innerHTML = '<div class="spinner"></div> Cargando pirámide...';
+    tree.innerHTML = '<div class="spinner"></div> Cargando estructura...';
     APP.api('employees.list', {}, function(err, emps) {
       if (err) { APP.toast(err, 'error'); return; }
       var t = document.getElementById('org-tree');
@@ -1242,7 +1242,7 @@ var KPIsView = {
     var isManager = APP.user && (APP.user.isManager || APP.user.isAdmin || APP.user.isHR);
     el.innerHTML = '<div class="tabs">' +
       '<div class="tab active" onclick="KPIsView.loadTab(\'self\')" id="tab-self">📊 Mis KPIs</div>' +
-      (isManager ? '<div class="tab" onclick="KPIsView.loadTab(\'review\')" id="tab-review">✏️ Por Revisar <span id="kpi-review-count" class="nav-badge" style="background:var(--warning);color:#fff;margin-left:4px"></span></div>' : '') +
+      (isManager ? '<div class="tab" onclick="KPIsView.loadTab(\'review\')" id="tab-review">✏️ Por revisar <span id="kpi-review-count" class="nav-badge" style="background:var(--warning);color:#fff;margin-left:4px"></span></div>' : '') +
       (isManager ? '<div class="tab" onclick="KPIsView.loadTab(\'team\')" id="tab-team">👥 Mi Equipo</div>' : '') +
       (APP.user && (APP.user.isAdmin||APP.user.isHR) ? '<div class="tab" onclick="KPIsView.loadTab(\'config\')" id="tab-config">⚙️ Configurar</div>' : '') +
       '</div><div id="kpi-tab-content"><div class="loader"><div class="spinner"></div></div></div>';
@@ -1269,7 +1269,7 @@ var KPIsView = {
       });
     } else if (tab === 'team') {
       var teams = APP.user.ledTeams && APP.user.ledTeams[0];
-      if (!teams) { content.innerHTML = '<div class="empty-state"><span class="material-icons-round">group</span><p>No tienes equipos asignados</p></div>'; return; }
+      if (!teams) { content.innerHTML = '<div class="empty-state"><span class="material-icons-round">group</span><p>Sin equipos asignados aún</p></div>'; return; }
       APP.api('kpi.teamDashboard', { teamId: teams }, function(err, data) {
         if (err) { content.innerHTML = '<p>Error: ' + err + '</p>'; return; }
         content.innerHTML = KPIsView.renderTeamDashboard(data);
@@ -1285,9 +1285,9 @@ var KPIsView = {
   // ── P2: semaphore HTML helper ─────────────────────────────────
   _semHtml: function(key, curVal) {
     var opts = [
-      { val: 0,   label: '🔴 No logrado',   cls: 'red'    },
-      { val: 50,  label: '🟡 Parcialmente', cls: 'yellow' },
-      { val: 100, label: '🟢 Logrado',      cls: 'green'  }
+      { val: 0,   label: '❌ Off track',     cls: 'red'    },
+      { val: 50,  label: '⚡ Getting there', cls: 'yellow' },
+      { val: 100, label: '✅ Nailed it',     cls: 'green'  }
     ];
     var cur = (curVal !== undefined && curVal !== '') ? parseInt(curVal) : null;
     var btns = opts.map(function(o) {
@@ -1316,7 +1316,7 @@ var KPIsView = {
     var avgLabel = d.avgScore !== null && d.avgScore !== undefined ? APP.semLabel(d.avgScore) : '—';
     var html = '<div class="grid grid-3 mb-20">' +
       '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">analytics</span></div><div><div class="stat-value" style="font-size:18px">' + avgLabel + '</div><div class="stat-label">Resultado general</div></div></div>' +
-      '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">pending_actions</span></div><div><div class="stat-value">' + pending + '</div><div class="stat-label">Períodos pendientes</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">pending_actions</span></div><div><div class="stat-value">' + pending + '</div><div class="stat-label">Períodos por completar</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">trending_up</span></div><div><div class="stat-value">' + (d.kpisForRole||d.kpisForPosition||[]).length + '</div><div class="stat-label">KPIs en tu puesto</div></div></div>' +
       '</div>';
 
@@ -1335,10 +1335,10 @@ var KPIsView = {
         var period = pg.period;
         KPIsView._pendingPeriods[pid] = pg.items.map(function(i) { return i.kpi.id; });
         html += '<div class="card mb-20">' +
-          '<div class="card-title">⚡ Autoevaluación — ' + period.name + '</div>' +
+          '<div class="card-title">⚡ Self review — ' + period.name + '</div>' +
           (period.selfAssessmentDeadline
             ? '<p class="text-sm text-muted mb-16">📅 Fecha límite: <strong>' + APP.fmtDate(period.selfAssessmentDeadline) + '</strong></p>'
-            : '<p class="text-sm text-muted mb-16">Período activo. Selecciona tu resultado en cada KPI.</p>');
+            : '<p class="text-sm text-muted mb-16">Período abierto. Marca tu resultado en cada KPI.</p>');
         pg.items.forEach(function(item) {
           var kpi = item.kpi;
           var draftScore   = item.draft && item.draft.selfScore !== '' ? item.draft.selfScore : undefined;
@@ -1368,14 +1368,14 @@ var KPIsView = {
         });
         html += '<div style="text-align:right;margin-top:16px">' +
           '<button class="btn btn-primary" onclick="KPIsView.submitPeriodSelf(\'' + pid + '\')">' +
-            '<span class="material-icons-round">send</span> Enviar autoevaluación →</button></div>' +
+            '<span class="material-icons-round">send</span> Enviar self review →</button></div>' +
         '</div>';
       });
     }
 
-    html += '<div class="card"><div class="card-title">📅 Historial de Evaluaciones</div>';
+    html += '<div class="card"><div class="card-title">📅 Mis reviews</div>';
     if (!(d.periodResults||[]).length) {
-      html += '<div class="empty-state"><span class="material-icons-round">history</span><p>Sin evaluaciones aún</p></div>';
+      html += '<div class="empty-state"><span class="material-icons-round">history</span><p>Nada aquí todavía</p></div>';
     }
     (d.periodResults||[]).forEach(function(pr) {
       var label = pr.overallScore !== null ? APP.semLabel(pr.overallScore) : null;
@@ -1455,7 +1455,7 @@ var KPIsView = {
       }
       APP.api('kpi.reviews.selfSubmit', { kpiDefinitionId: kpiId, periodId: periodId, selfScore: score, selfComments: selfComments },
         function(err) {
-          if (err) { APP.toast(err, 'error'); btns.forEach(function(b){b.disabled=false;b.textContent='Enviar autoevaluación →';}); return; }
+          if (err) { APP.toast(err, 'error'); btns.forEach(function(b){b.disabled=false;b.textContent='Enviar self review →';}); return; }
           next();
         }
       );
@@ -1473,7 +1473,7 @@ var KPIsView = {
     });
     KPIsView._reviewGroups = groups;
     KPIsView._reviewOrder  = order;
-    var html = '<div class="card"><div class="card-title">Evaluaciones pendientes de tu revisión <span class="badge badge-warning" style="margin-left:8px">' + order.length + ' persona(s) · ' + reviews.length + ' KPI(s)</span></div>';
+    var html = '<div class="card"><div class="card-title">Pendientes de tu review <span class="badge badge-warning" style="margin-left:8px">' + order.length + ' persona(s) · ' + reviews.length + ' KPI(s)</span></div>';
     order.forEach(function(empName, idx) {
       var empReviews = groups[empName];
       var isLast = idx === order.length - 1;
@@ -1481,7 +1481,7 @@ var KPIsView = {
         '<div class="flex items-center gap-10 mb-10">' +
           '<div class="emp-avatar" style="width:40px;height:40px;font-size:14px;flex-shrink:0">' + APP.initials(empName) + '</div>' +
           '<div style="flex:1"><div class="font-600">' + empName + '</div><div class="text-xs text-muted">' + empReviews.length + ' KPI(s) por revisar</div></div>' +
-          '<button class="btn btn-primary btn-sm" onclick="KPIsView.openEmployeeReview(' + idx + ')"><span class="material-icons-round">rate_review</span>Revisar evaluación</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="KPIsView.openEmployeeReview(' + idx + ')"><span class="material-icons-round">rate_review</span>Review del manager</button>' +
         '</div>' +
         '<div style="margin-left:50px">' +
           empReviews.map(function(r) {
@@ -1511,13 +1511,13 @@ var KPIsView = {
       return '<div style="' + sep + '">' +
         '<div class="font-600 text-sm mb-8" style="display:flex;align-items:center">' + r.kpiName + evalBadge + '</div>' +
         '<div style="background:var(--bg);border-radius:6px;padding:10px 12px;margin-bottom:12px">' +
-          '<div class="text-xs" style="color:var(--text-muted)">Autoevaluación: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + APP.fmtTarget(r.kpiTarget, r.kpiMeasureType) : '') + '</div>' +
+          '<div class="text-xs" style="color:var(--text-muted)">Tu self review: <strong>' + APP.semLabel(r.selfScore) + '</strong>' + (r.kpiTarget ? ' · Meta: ' + APP.fmtTarget(r.kpiTarget, r.kpiMeasureType) : '') + '</div>' +
           (r.selfComments ? '<div class="text-xs mt-4" style="color:var(--text-muted);white-space:pre-line">' + APP.fmtComments(r.selfComments) + '</div>' : '') +
         '</div>' +
         '<div class="form-group"><label>Tu evaluación *</label>' +
           KPIsView._semHtml('mr-' + r.id, '') +
         '</div>' +
-        '<div class="form-group"><label>Retroalimentación</label><textarea id="mr-comments-' + r.id + '" rows="2" placeholder="Comentarios para ' + empName + '..."></textarea></div>' +
+        '<div class="form-group"><label>Retroalimentación</label><textarea id="mr-comments-' + r.id + '" rows="2" placeholder="Feedback para ' + empName + '..."></textarea></div>' +
       '</div>';
     }).join('');
     // Store IDs on the element to avoid double-quote conflict inside onclick attribute
@@ -1554,7 +1554,7 @@ var KPIsView = {
   renderTeamDashboard: function(d) {
     return '<div class="grid grid-3 mb-20">' +
       '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">people</span></div><div><div class="stat-value">' + d.memberCount + '</div><div class="stat-label">Miembros del equipo</div></div></div>' +
-      '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">analytics</span></div><div><div class="stat-value" style="font-size:16px">' + (d.teamScore !== null ? APP.semLabel(d.teamScore) : '—') + '</div><div class="stat-label">Resultado del equipo</div></div></div>' +
+      '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">analytics</span></div><div><div class="stat-value" style="font-size:16px">' + (d.teamScore !== null ? APP.semLabel(d.teamScore) : '—') + '</div><div class="stat-label">Score del team</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">pending</span></div><div><div class="stat-value">' + d.pendingTotal + '</div><div class="stat-label">Revisiones pendientes</div></div></div>' +
       '</div><div class="card"><div class="card-title">Resultados por miembro</div>' +
       '<div class="table-wrap"><table><thead><tr><th>Empleado</th><th>Resultado</th><th>Pendientes</th></tr></thead><tbody>' +
@@ -1605,7 +1605,7 @@ var KPIReportsView = {
       if (statsEl) statsEl.innerHTML = KPIReportsView._statsRow(depts);
       if (el) el.innerHTML = depts.length
         ? depts.map(function(d) { return KPIReportsView._deptCard(d); }).join('')
-        : '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Sin evaluaciones en este período.</p></div>';
+        : '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Nada por aquí aún.</p></div>';
     });
   },
 
@@ -1618,7 +1618,7 @@ var KPIReportsView = {
       }).join('');
 
     var html =
-      '<div class="view-title"><span class="material-icons-round">bar_chart</span>Reportes KPI por Área</div>' +
+      '<div class="view-title"><span class="material-icons-round">bar_chart</span>Stats KPI por área</div>' +
       '<div class="card mb-20" style="padding:12px 16px">' +
         '<div class="flex gap-8 items-center">' +
           '<span class="material-icons-round" style="color:var(--text-muted);font-size:18px">filter_list</span>' +
@@ -1637,7 +1637,7 @@ var KPIReportsView = {
     html += '<div id="krpt-depts" class="grid grid-2 gap-16">' +
       (depts.length
         ? depts.map(function(d) { return KPIReportsView._deptCard(d); }).join('')
-        : '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Sin evaluaciones registradas aún.</p></div>') +
+        : '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Nada aquí todavía</p></div>') +
       '</div>';
 
     var el = document.getElementById('kpi-reports-content');
@@ -1662,7 +1662,7 @@ var KPIReportsView = {
       '<div class="card stat-card"><div class="stat-icon blue"><span class="material-icons-round">domain</span></div>' +
         '<div><div class="stat-value">' + depts.length + '</div><div class="stat-label">Áreas</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon green"><span class="material-icons-round">people</span></div>' +
-        '<div><div class="stat-value">' + totalEmps + '</div><div class="stat-label">Total empleados</div></div></div>' +
+        '<div><div class="stat-value">' + totalEmps + '</div><div class="stat-label">Total crew</div></div></div>' +
       '<div class="card stat-card"><div class="stat-icon orange"><span class="material-icons-round">analytics</span></div>' +
         '<div><div class="stat-value" style="color:' + semColor + ';font-size:20px">' + (globalAvg !== null ? globalAvg + ' pts' : '—') + '</div>' +
         '<div class="stat-label">Score global <span style="font-size:10px;display:block;color:var(--text-muted)">' + scoredLabel + '</span></div></div></div>' +
@@ -1760,7 +1760,7 @@ var KPIReportsView = {
       if (err) { APP.toast(err, 'error'); return; }
       var results = data.periodResults || [];
       var body = results.length === 0
-        ? '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Sin evaluaciones registradas</p></div>'
+        ? '<div class="empty-state"><span class="material-icons-round">bar_chart</span><p>Nada aquí todavía</p></div>'
         : results.map(function(pr) {
             var scoreColor = pr.overallScore === null ? 'var(--text-muted)' : pr.overallScore >= 75 ? '#16A34A' : pr.overallScore >= 25 ? '#D97706' : '#DC2626';
             var kpiRows = (pr.reviews || []).map(function(r) {
@@ -1922,7 +1922,7 @@ var VacCalendarView = {
     // People out this month list
     var listHTML = '';
     if (requests.length) {
-      listHTML = '<div class="card mt-20"><div class="card-title"><span class="material-icons-round" style="margin-right:6px">people</span>Ausencias este mes (' + requests.length + ')</div>' +
+      listHTML = '<div class="card mt-20"><div class="card-title"><span class="material-icons-round" style="margin-right:6px">people</span>Ausencias del mes (' + requests.length + ')</div>' +
         '<div class="table-wrap"><table><thead><tr><th>Empleado</th><th>Departamento</th><th>Inicio</th><th>Fin</th><th>Días hábiles</th></tr></thead><tbody>' +
         requests.map(function(r) {
           var col    = empColors[r.employeeId];
@@ -1986,7 +1986,7 @@ var VacHistoryView = {
     html += '<div class="card mb-16" style="padding:12px 16px">' +
       '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">' +
         '<div class="form-group" style="margin:0;flex:1;min-width:200px">' +
-          '<input id="vhist-search" placeholder="Buscar empleado o área..." value="' + (f.search || '') + '" ' +
+          '<input id="vhist-search" placeholder="Buscar en el team..." value="' + (f.search || '') + '" ' +
           'oninput="VacHistoryView._onSearch(this.value)" style="width:100%">' +
         '</div>' +
         '<div class="form-group" style="margin:0">' +
@@ -2065,17 +2065,17 @@ var VacBalanceView = {
       '<div class="card mb-16" style="padding:12px 16px">' +
         '<div style="display:flex;align-items:center;gap:8px">' +
           '<span class="material-icons-round" style="color:var(--text-muted);font-size:18px">search</span>' +
-          '<input placeholder="Buscar empleado, departamento o nivel..." oninput="VacBalanceView._onSearch(this.value)" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text)">' +
+          '<input placeholder="Buscar en el team..." oninput="VacBalanceView._onSearch(this.value)" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text)">' +
           (isAdmin ? '<button class="btn btn-outline btn-sm" onclick="VacBalanceView.recalcAll()"><span class="material-icons-round" style="font-size:15px">refresh</span>Recalcular balances</button>' : '') +
         '</div>' +
       '</div>' +
       '<div class="card" style="padding:0"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
       '<thead><tr style="border-bottom:2px solid var(--border)">' +
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Empleado</th>' +
-        '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Nivel Jerárquico</th>' +
+        '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Nivel en el team</th>' +
         '<th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Departamento</th>' +
-        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Fecha<br>de ingreso</th>' +
-        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Antigüedad</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Start date</th>' +
+        '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted);white-space:nowrap">Seniority</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Días<br>asignados</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Usados</th>' +
         '<th style="text-align:center;padding:10px 14px;font-size:12px;color:var(--text-muted)">Pendientes</th>' +
@@ -2146,7 +2146,7 @@ var VacBalanceView = {
       '<p class="text-sm text-muted mb-16">Empleado: <strong>' + empName + '</strong> · Disponibles actualmente: <strong>' + currentDays + ' días</strong></p>' +
       '<div class="form-row">' +
         '<div class="form-group">' +
-          '<label>Ajuste (días) *</label>' +
+          '<label>Ajuste de días *</label>' +
           '<input type="number" id="adj-delta" placeholder="Ej: 3 para agregar, -2 para quitar" style="width:100%">' +
           '<span class="text-xs text-muted">Número positivo = agregar · negativo = quitar</span>' +
         '</div>' +
@@ -2195,7 +2195,7 @@ var VacationsView = {
   render: function(bal, reqs, hols) {
     var el = document.getElementById('vac-content'); if (!el) return;
     bal = bal || {};
-    var html = '<div class="card mb-20"><div class="card-title">🏖️ Mi Saldo de Vacaciones ' + new Date().getFullYear() + '</div>' +
+    var html = '<div class="card mb-20"><div class="card-title">🏖️ Mi saldo de time off ' + new Date().getFullYear() + '</div>' +
       '<div class="vacation-balance">' +
       '<div class="balance-box"><div class="balance-num">' + (bal.daysEntitled||0) + '</div><div class="balance-lbl">Días disponibles (LFT)</div></div>' +
       '<div class="balance-box"><div class="balance-num" style="color:var(--success)">' + (bal.daysRemaining||0) + '</div><div class="balance-lbl">Días restantes</div></div>' +
@@ -2204,13 +2204,13 @@ var VacationsView = {
       '</div><div class="mt-16"><div class="progress-wrap"><div class="progress-fill" style="width:' + Math.round(((bal.daysUsed||0)/(bal.daysEntitled||12))*100) + '%"></div></div>' +
       '<div class="text-xs text-muted mt-4">' + (bal.daysUsed||0) + ' de ' + (bal.daysEntitled||0) + ' días usados</div></div></div>';
     html += '<div class="flex gap-12 mb-20">' +
-      '<button class="btn btn-primary" onclick="VacationsView.openRequest()"><span class="material-icons-round">add</span>Solicitar Vacaciones</button>' +
+      '<button class="btn btn-primary" onclick="VacationsView.openRequest()"><span class="material-icons-round">add</span>Pedir time off</button>' +
       (APP.user.isAdmin||APP.user.isHR||(APP.user.isManager&&APP.user.canApproveVacations) ? '<button class="btn btn-outline" onclick="VacationsView.loadTeamRequests()"><span class="material-icons-round">group</span>Ver equipo</button>' : '') +
       (APP.user.isAdmin||APP.user.isHR ? '<button class="btn btn-outline" onclick="VacationsView.recalcBalances()"><span class="material-icons-round">sync</span>Recalcular balances</button>' : '') +
       '</div>';
     var sorted = reqs.slice().sort(function(a,b){ return (b.startDate||'') > (a.startDate||'') ? 1 : -1; });
     html += '<div class="card mb-20">' +
-      '<div class="card-title"><span class="material-icons-round" style="margin-right:6px">history</span>Historial de Solicitudes</div>';
+      '<div class="card-title"><span class="material-icons-round" style="margin-right:6px">history</span>Mis requests</div>';
     if (!sorted.length) {
       html += '<div class="empty-state"><span class="material-icons-round">beach_access</span><p>Sin solicitudes aún</p></div>';
     } else {
@@ -2255,13 +2255,13 @@ var VacationsView = {
   },
   openRequest: function() {
     var today = new Date().toISOString().split('T')[0];
-    APP.modal('🏖️ Solicitar Vacaciones',
-      '<div class="alert info mb-16">ℹ️ Solo se contarán días hábiles (lunes a viernes, excluyendo feriados).</div>' +
-      '<div id="vac-short-notice-warn" class="alert warning mb-16" style="display:none">⚠️ La fecha de inicio tiene menos de 7 días de anticipación. Tu solicitud se enviará de todas formas, pero los aprobadores verán este aviso.</div>' +
+    APP.modal('🏖️ Pedir time off',
+      '<div class="alert info mb-16">ℹ️ Solo días entre semana, sin feriados.</div>' +
+      '<div id="vac-short-notice-warn" class="alert warning mb-16" style="display:none">⚠️ La fecha de inicio tiene menos de 7 días de anticipación). El request igual se manda, pero tu manager lo verá.</div>' +
       '<div class="form-row"><div class="form-group"><label>Fecha inicio</label><input type="date" id="vac-start" min="' + today + '"></div>' +
       '<div class="form-group"><label>Fecha fin</label><input type="date" id="vac-end" min="' + today + '"></div></div>' +
-      '<div class="form-group"><label>Días hábiles estimados</label><div id="vac-days-calc" class="alert info">Selecciona las fechas para calcular</div></div>' +
-      '<div class="form-group"><label>Motivo (opcional)</label><input id="vac-reason" placeholder="Vacaciones familiares, viaje..."></div>',
+      '<div class="form-group"><label>Días hábiles estimados</label><div id="vac-days-calc" class="alert info">Elige las fechas para ver cuántos días</div></div>' +
+      '<div class="form-group"><label>¿Algún contexto? (opcional)</label><input id="vac-reason" placeholder="¿Algún contexto? (opcional)"></div>',
       '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
       '<button class="btn btn-primary" onclick="VacationsView.submitRequest()"><span class="material-icons-round">send</span>Enviar solicitud</button>'
     );
@@ -2317,7 +2317,7 @@ var VacationsView = {
   },
   loadTeamRequests: function() {
     var isHROrAdmin = APP.user.isAdmin || APP.user.isHR;
-    var title = isHROrAdmin ? '👥 Solicitudes Pendientes (Revisión RH)' : '👥 Solicitudes Pendientes de tu Aprobación';
+    var title = isHROrAdmin ? '👥 Requests por revisar (RH)' : '👥 Requests por tu OK';
     APP.api('vacations.teamRequests', {}, function(err, data) {
       if (err) { APP.toast(err, 'error'); return; }
       if (!data || !data.length) { APP.toast('Sin solicitudes pendientes', 'info'); return; }
@@ -2349,8 +2349,8 @@ var VacationsView = {
   },
   rejectReq: function(id) {
     APP.modal('❌ Rechazar Solicitud de Vacaciones',
-      '<div class="alert warning mb-12">El empleado será notificado y los días regresarán a su saldo disponible.</div>' +
-      '<div class="form-group"><label>Motivo de rechazo</label><textarea id="rej-reason" rows="3" placeholder="Explica por qué no se puede aprobar..."></textarea></div>',
+      '<div class="alert warning mb-12">Le avisamos y los días regresan a su saldo.</div>' +
+      '<div class="form-group"><label>¿Por qué declinas?</label><textarea id="rej-reason" rows="3" placeholder="¿Por qué no aplica esta vez?"></textarea></div>',
       '<button class="btn btn-outline" onclick="APP.closeModal()">Cancelar</button>' +
       '<button class="btn btn-danger" onclick="VacationsView._doReject(\'' + id + '\')">Confirmar Rechazo</button>'
     );
@@ -2463,7 +2463,7 @@ var AdminHR = {
     var mgrOpts     = [{value:'',label:'— Sin manager directo —'}].concat((managers||[]).map(function(m){return{value:m.id||m.employeeId,label:m.fullName||((m.firstName||'')+' '+(m.lastName||''))};}));
     var posOpts     = [{value:'',label:'— Sin puesto específico —'}].concat((positions||[]).map(function(p){return{value:p.id,label:p.name};}));
     var deptOpts    = ['Dirección','Sales','Sales Operations','Operations','INT OPS','Nodalink','Ikan Hub','RH','Marketing','Contabilidad'].map(function(d){return{value:d,label:d};});
-    var typeOpts    = ['Planta','Contrato','Por Proyecto','Temporal'].map(function(t){return{value:t,label:t};});
+    var typeOpts    = [{value:'Planta',label:'Full-time'},{value:'Contrato',label:'Contrato'},{value:'Por Proyecto',label:'Por proyecto'},{value:'Temporal',label:'Temporal'}];
     var countryOpts = [{value:'MX',label:'🇲🇽 México'},{value:'AR',label:'🇦🇷 Argentina'},{value:'BR',label:'🇧🇷 Brasil'},{value:'US',label:'🇺🇸 EE.UU.'},{value:'JP',label:'🇯🇵 Japón'},{value:'CO',label:'🇨🇴 Colombia'},{value:'PA',label:'🇵🇦 Panamá'}];
     var hierOpts    = [{value:'',label:'— Sin asignar —'},{value:'CEO',label:'CEO'},{value:'Heads',label:'Heads'},{value:'Managers',label:'Managers'},{value:'Supervisores',label:'Supervisores'},{value:'Operativo y Administrativo',label:'Operativo y Administrativo'}];
     return '<div class="form-row">' +
@@ -2477,7 +2477,7 @@ var AdminHR = {
       '<div class="form-group"><label>Puesto (KPIs) *</label>' + sel('ef-pos', posOpts, v.positionId||'') + '</div>' +
       '</div><div class="form-row">' +
       '<div class="form-group"><label>Departamento</label>' + sel('ef-dept', deptOpts, v.department) + '</div>' +
-      '<div class="form-group"><label>Fecha de ingreso *</label><input type="date" id="ef-hire" value="' + (v.hireDate||'') + '"></div>' +
+      '<div class="form-group"><label>Start date *</label><input type="date" id="ef-hire" value="' + (v.hireDate||'') + '"></div>' +
       '</div><div class="form-row">' +
       '<div class="form-group"><label>Fecha de nacimiento</label><input type="date" id="ef-bday" value="' + (v.birthDate||'') + '"></div>' +
       '<div class="form-group"><label>Rol / Permisos *</label>' + sel('ef-role', roleOpts, v.roleId) + '</div>' +
@@ -2485,7 +2485,7 @@ var AdminHR = {
       '<div class="form-group"><label>Manager directo</label>' + sel('ef-mgr', mgrOpts, v.managerId) + '</div>' +
       '<div class="form-group"><label>Tipo de empleo</label>' + sel('ef-type', typeOpts, v.contractType||'Planta') + '</div>' +
       '</div><div class="form-row">' +
-      '<div class="form-group"><label>Nivel jerárquico</label>' + sel('ef-hier', hierOpts, v.hierarchyLevel||'') + '</div>' +
+      '<div class="form-group"><label>Nivel en el team</label>' + sel('ef-hier', hierOpts, v.hierarchyLevel||'') + '</div>' +
       '<div class="form-group"><label>País</label>' + sel('ef-country', countryOpts, v.country||'MX') + '</div>' +
       '<div class="form-group"><label>Status</label>' + sel('ef-status', [{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}], v.status||'activo') + '</div>' +
       '</div>' +
@@ -2530,7 +2530,7 @@ var AdminHR = {
           '<div id="ef-remote-days-wrap" style="margin-bottom:12px">' +
           '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">Días de home office autorizados</label>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' + pillsHtml + '</div>' +
-          (canEditHoDays ? '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = sin restricción de días. Check-in en día no autorizado requiere aprobación del manager.</p>' : '') +
+          (canEditHoDays ? '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = cualquier día OK. Un día fuera del rango requiere OK del manager.</p>' : '') +
           '</div>';
       })() +
       '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
@@ -2947,7 +2947,7 @@ var AdminHR = {
       '<div class="form-group"><label>Aplica al puesto</label>'+sel('kf-pos',posOpts,v.positionId||'')+'</div>' +
       '</div>' +
       '<div class="form-group"><label>Descripción</label><textarea id="kf-desc" rows="2" placeholder="Breve descripción del KPI y cómo se mide...">'+(v.description||'')+'</textarea></div>' +
-      '<div class="form-group"><label>Instrucciones para el empleado</label><textarea id="kf-inst" placeholder="Cómo medir este KPI...">'+(v.instructions||'')+'</textarea></div>' +
+      '<div class="form-group"><label>Instrucciones para el colaborador</label><textarea id="kf-inst" placeholder="Cómo medir este KPI...">'+(v.instructions||'')+'</textarea></div>' +
       '<div class="form-group"><label>Meses en que aplica</label>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="kf-month-all"'+(active.length===12?' checked':'')+' style="width:auto;margin:0" onchange="AdminHR._toggleAllMonths(this.checked)"><strong style="font-size:12px">Todos</strong></label></div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px">'+checks+'</div></div>';
@@ -3803,7 +3803,7 @@ var PoliciesView = {
       : policies.map(function(p) { return PoliciesView._card(p, canEdit); }).join('');
 
     el.innerHTML =
-      '<div class="view-title"><span class="material-icons-round">policy</span>Políticas</div>' +
+      '<div class="view-title"><span class="material-icons-round">policy</span>Guidelines</div>' +
       '<div class="card mb-20" style="padding:16px 20px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' + tabs + '</div>' +
@@ -4072,14 +4072,14 @@ var AttendanceView = {
     html += '<button onclick="AttendanceView._loadDashboard()" ';
     html += 'style="padding:6px 14px;border-radius:6px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-size:13px;font-weight:500">Dashboard →</button>';
     html += '<button onclick="AttendanceView._loadTardinessReport()" ';
-    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #dc2626;background:#dc2626;color:#fff;cursor:pointer;font-size:13px;font-weight:500">Retardos →</button>';
+    html += 'style="padding:6px 14px;border-radius:6px;border:1px solid #dc2626;background:#dc2626;color:#fff;cursor:pointer;font-size:13px;font-weight:500">Tardanzas →</button>';
     html += '</div>';
 
     html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
     html += AttendanceView._pill(present + ' presentes', '#16a34a');
     html += AttendanceView._pill(aTime + ' a tiempo', '#3b82f6');
-    html += AttendanceView._pill(retardo + ' retardo' + (retardo !== 1 ? 's' : ''), '#f59e0b');
-    html += AttendanceView._pill(absent + ' ausente' + (absent !== 1 ? 's' : ''), '#ef4444');
+    html += AttendanceView._pill(retardo + ' tardanza' + (retardo !== 1 ? 's' : ''), '#f59e0b');
+    html += AttendanceView._pill(absent + ' no show' + (absent !== 1 ? 's' : ''), '#ef4444');
     if (isToday && pend > 0) html += AttendanceView._pill(pend + ' pendiente' + (pend !== 1 ? 's' : ''), '#94a3b8');
     if (sinPin > 0) html += AttendanceView._pill(sinPin + ' sin huella', '#94a3b8');
     html += '</div>';
@@ -4211,9 +4211,9 @@ var AttendanceView = {
     html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
     html += AttendanceView._pill(s.workdays + ' laborable' + (s.workdays !== 1 ? 's' : ''), '#475569');
     html += AttendanceView._pill(s.aTime + ' a tiempo', '#3b82f6');
-    if (s.retardo > 0)    html += AttendanceView._pill(s.retardo + ' retardo' + (s.retardo !== 1 ? 's' : ''), '#f59e0b');
-    if (s.ausente > 0)    html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
-    if (s.vacaciones > 0) html += AttendanceView._pill(s.vacaciones + ' día' + (s.vacaciones !== 1 ? 's' : '') + ' vacaciones', '#0ea5e9');
+    if (s.retardo > 0)    html += AttendanceView._pill(s.retardo + ' tardanza' + (s.retardo !== 1 ? 's' : ''), '#f59e0b');
+    if (s.ausente > 0)    html += AttendanceView._pill(s.ausente + ' no show' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
+    if (s.vacaciones > 0) html += AttendanceView._pill(s.vacaciones + ' día' + (s.vacaciones !== 1 ? 's' : '') + ' de time off', '#0ea5e9');
     if (s.homeOffice > 0) html += AttendanceView._pill(s.homeOffice + ' home office', '#0891b2');
     html += '</div>';
 
@@ -4230,15 +4230,15 @@ var AttendanceView = {
   _dayCard: function(dateLabel, rec) {
     var ST = {
       a_tiempo:              { bg: '#ecfdf5', color: '#16a34a', text: 'A tiempo' },
-      retardo:               { bg: '#fffbeb', color: '#d97706', text: 'Retardo' },
-      retardo_apelado:       { bg: '#fefce8', color: '#16a34a', text: 'Retardo apelado ✓' },
-      ausente:               { bg: '#fef2f2', color: '#dc2626', text: 'Ausente' },
-      vacaciones:            { bg: '#e0f2fe', color: '#0284c7', text: 'Vacaciones' },
+      retardo:               { bg: '#fffbeb', color: '#d97706', text: 'Tarde' },
+      retardo_apelado:       { bg: '#fefce8', color: '#16a34a', text: 'Tarde (ok) ✓' },
+      ausente:               { bg: '#fef2f2', color: '#dc2626', text: 'No show' },
+      vacaciones:            { bg: '#e0f2fe', color: '#0284c7', text: 'Time Off ✓' },
       remoto:                { bg: '#eff6ff', color: '#2563eb', text: 'Remoto ✓' },
-      justificada:           { bg: '#f5f3ff', color: '#7c3aed', text: 'Justificada ✓' },
-      pendiente_remoto:      { bg: '#fff7ed', color: '#ea580c', text: 'Pendiente (remoto)' },
-      pendiente_justificada: { bg: '#fdf4ff', color: '#c026d3', text: 'Pendiente (just.)' },
-      pendiente:             { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' },
+      justificada:           { bg: '#f5f3ff', color: '#7c3aed', text: 'Cubierto ✓' },
+      pendiente_remoto:      { bg: '#fff7ed', color: '#ea580c', text: 'En revisión (remoto)' },
+      pendiente_justificada: { bg: '#fdf4ff', color: '#c026d3', text: 'En revisión (just.)' },
+      pendiente:             { bg: '#f8fafc', color: '#64748b', text: 'Por registrar' },
       home_office:           { bg: '#ecfeff', color: '#0891b2', text: 'Home Office ✓' }
     };
     if (!dateLabel) {
@@ -4449,11 +4449,11 @@ var AttendanceView = {
     // Legend
     html += '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfdf5;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">A tiempo</span></div>';
-    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fffbeb;border:1px solid #fde68a"></div><span style="font-size:12px;color:var(--muted)">Retardo</span></div>';
-    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fefce8;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">Retardo apelado</span></div>';
-    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca"></div><span style="font-size:12px;color:var(--muted)">Ausente</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fffbeb;border:1px solid #fde68a"></div><span style="font-size:12px;color:var(--muted)">Tarde</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fefce8;border:1px solid #bbf7d0"></div><span style="font-size:12px;color:var(--muted)">Tarde (ok)</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca"></div><span style="font-size:12px;color:var(--muted)">No show</span></div>';
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#eff6ff;border:1px solid #bfdbfe"></div><span style="font-size:12px;color:var(--muted)">Remoto</span></div>';
-    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#f5f3ff;border:1px solid #ddd6fe"></div><span style="font-size:12px;color:var(--muted)">Justificada</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#f5f3ff;border:1px solid #ddd6fe"></div><span style="font-size:12px;color:var(--muted)">Cubierto</span></div>';
     if (userHoDays.length > 0) {
       html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfeff;border-top:3px solid #0891b2;border-right:1px solid #a5f3fc;border-bottom:1px solid #a5f3fc;border-left:1px solid #a5f3fc"></div><span style="font-size:12px;color:var(--muted)">Día home office</span></div>';
       html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfeff;border:1px solid #a5f3fc"></div><span style="font-size:12px;color:var(--muted)">Home office ✓</span></div>';
@@ -4528,11 +4528,11 @@ var AttendanceView = {
     // Summary tiles
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-bottom:20px">';
     html += AttendanceView._tile(pct + '%', 'Puntualidad', '#3b82f6');
-    html += AttendanceView._tile(s.retardo, 'Retardos', '#f59e0b');
-    html += AttendanceView._tile(s.ausente, 'Ausencias', '#ef4444');
+    html += AttendanceView._tile(s.retardo, 'Tardanzas', '#f59e0b');
+    html += AttendanceView._tile(s.ausente, 'No shows', '#ef4444');
     html += AttendanceView._tile(s.vacaciones || 0, 'Vacaciones', '#0ea5e9');
     html += AttendanceView._tile(s.remoto || 0, 'Remotos', '#2563eb');
-    html += AttendanceView._tile(s.justificada || 0, 'Justificadas', '#7c3aed');
+    html += AttendanceView._tile(s.justificada || 0, 'Cubiertos', '#7c3aed');
     html += AttendanceView._tile(data.workdays, 'Días lab.', '#64748b');
     html += AttendanceView._tile(s.total, 'Empleados', '#475569');
     html += '</div>';
@@ -4554,11 +4554,11 @@ var AttendanceView = {
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Empleado</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted)">Depto.</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">A tiempo</th>';
-    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Retardos</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Tardanzas</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Ausentes</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Vacaciones</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Remotos</th>';
-    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Justificadas</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Cubiertos</th>';
     if (hasTard) {
       html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center" title="Retardos acumulados en 6 meses · días a descontar por política">Retardos acum. / Días desc.</th>';
     }
@@ -5144,7 +5144,7 @@ var AttendanceView = {
     html += '</div><div style="padding:20px">';
     html += '<p style="font-size:13px;color:var(--muted);margin:0 0 16px">Sube tu justificante (receta, comprobante, etc.). El área de RH lo revisará y aprobará tu ausencia.</p>';
     html += '<div style="margin-bottom:14px">';
-    html += '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Motivo (opcional)</label>';
+    html += '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">¿Algún contexto? (opcional)</label>';
     html += '<input type="text" id="att-jreason" placeholder="Ej: Cita médica" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)" />';
     html += '</div>';
     html += '<div style="margin-bottom:16px">';
@@ -5443,15 +5443,15 @@ var AttendanceView = {
   _badge: function(status) {
     var map = {
       a_tiempo:              ['#ecfdf5', '#16a34a', 'A tiempo'],
-      retardo:               ['#fffbeb', '#d97706', 'Retardo'],
-      retardo_apelado:       ['#fefce8', '#16a34a', 'Retardo apelado ✓'],
-      ausente:               ['#fef2f2', '#dc2626', 'Ausente'],
-      vacaciones:            ['#e0f2fe', '#0284c7', 'Vacaciones'],
+      retardo:               ['#fffbeb', '#d97706', 'Tarde'],
+      retardo_apelado:       ['#fefce8', '#16a34a', 'Tarde (ok) ✓'],
+      ausente:               ['#fef2f2', '#dc2626', 'No show'],
+      vacaciones:            ['#e0f2fe', '#0284c7', 'Time Off ✓'],
       remoto:                ['#eff6ff', '#2563eb', 'Remoto'],
-      justificada:           ['#f5f3ff', '#7c3aed', 'Justificada'],
-      pendiente_remoto:      ['#fff7ed', '#ea580c', 'Pendiente (remoto)'],
-      pendiente_justificada: ['#fdf4ff', '#c026d3', 'Pendiente (just.)'],
-      pendiente:             ['#f8fafc', '#64748b', 'Pendiente'],
+      justificada:           ['#f5f3ff', '#7c3aed', 'Cubierto'],
+      pendiente_remoto:      ['#fff7ed', '#ea580c', 'En revisión (remoto)'],
+      pendiente_justificada: ['#fdf4ff', '#c026d3', 'En revisión (just.)'],
+      pendiente:             ['#f8fafc', '#64748b', 'Por registrar'],
       home_office:           ['#ecfeff', '#0891b2', 'Home Office']
     };
     var s = map[status] || ['#f8fafc', '#64748b', status];

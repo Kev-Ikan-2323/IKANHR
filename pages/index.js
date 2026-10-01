@@ -28,10 +28,10 @@ var SHELL = `
         <span class="material-icons-round">dashboard</span><span>Mi Dashboard</span>
       </div>
       <div class="nav-item" data-view="employees" onclick="APP.navigate('employees')">
-        <span class="material-icons-round">people</span><span>Directorio</span>
+        <span class="material-icons-round">people</span><span>Team</span>
       </div>
       <div class="nav-item" data-view="orgchart" onclick="APP.navigate('orgchart')">
-        <span class="material-icons-round">account_tree</span><span>Organigrama</span>
+        <span class="material-icons-round">account_tree</span><span>Estructura</span>
       </div>
     </div>
 
@@ -45,19 +45,19 @@ var SHELL = `
         <span class="material-icons-round">bar_chart</span><span>Reportes KPI</span>
       </div>
       <div class="nav-item" data-view="vacations" onclick="APP.navigate('vacations')">
-        <span class="material-icons-round">beach_access</span><span>Vacaciones</span>
+        <span class="material-icons-round">beach_access</span><span>Time Off</span>
       </div>
       <div class="nav-item" data-view="birthdays" onclick="APP.navigate('birthdays')">
         <span class="material-icons-round">cake</span><span>Cumpleaños</span>
       </div>
       <div class="nav-item" data-view="policies" onclick="APP.navigate('policies')">
-        <span class="material-icons-round">policy</span><span>Políticas</span>
+        <span class="material-icons-round">policy</span><span>Guidelines</span>
       </div>
       <div class="nav-item" data-view="announcements" onclick="APP.navigate('announcements')">
         <span class="material-icons-round">campaign</span><span>Comunicados</span>
       </div>
       <div class="nav-item" data-view="attendance" onclick="APP.navigate('attendance')">
-        <span class="material-icons-round">fingerprint</span><span>Asistencia</span>
+        <span class="material-icons-round">fingerprint</span><span>Check-ins</span>
       </div>
     </div>
 
@@ -69,10 +69,10 @@ var SHELL = `
           <span class="nav-badge" id="nav-vac-badge-approver" style="display:none"></span>
         </div>
         <div class="nav-item" data-view="vac-calendar" onclick="APP.navigate('vac-calendar')">
-          <span class="material-icons-round">event</span><span>Calendario Vacaciones</span>
+          <span class="material-icons-round">event</span><span>Calendario Time Off</span>
         </div>
         <div class="nav-item" data-view="vac-balance" onclick="APP.navigate('vac-balance')">
-          <span class="material-icons-round">table_chart</span><span>Concentrado Vacaciones</span>
+          <span class="material-icons-round">table_chart</span><span>Balance Time Off</span>
         </div>
       </div>
     </div>
@@ -81,10 +81,10 @@ var SHELL = `
       <div class="nav-section">
         <div class="nav-label">Administración</div>
         <div class="nav-item" onclick="AdminHR.openNewEmployee()">
-          <span class="material-icons-round">person_add</span><span>Agregar Empleado</span>
+          <span class="material-icons-round">person_add</span><span>Nuevo integrante</span>
         </div>
         <div class="nav-item" onclick="APP.navigate('employees')">
-          <span class="material-icons-round">manage_accounts</span><span>Directorio (Admin)</span>
+          <span class="material-icons-round">manage_accounts</span><span>Team (Admin)</span>
         </div>
         <div class="nav-item" onclick="AdminHR.openKPIAdmin()">
           <span class="material-icons-round">tune</span><span>Configurar KPIs</span>
@@ -103,16 +103,16 @@ var SHELL = `
           <span class="nav-badge" id="nav-vac-badge-admin" style="display:none"></span>
         </div>
         <div class="nav-item" data-view="vac-calendar" onclick="APP.navigate('vac-calendar')">
-          <span class="material-icons-round">event</span><span>Calendario Vacaciones</span>
+          <span class="material-icons-round">event</span><span>Calendario Time Off</span>
         </div>
         <div class="nav-item" data-view="vac-history" onclick="APP.navigate('vac-history')">
-          <span class="material-icons-round">manage_search</span><span>Historial Vacaciones</span>
+          <span class="material-icons-round">manage_search</span><span>Historial Time Off</span>
         </div>
         <div class="nav-item" data-view="vac-balance" onclick="APP.navigate('vac-balance')">
-          <span class="material-icons-round">table_chart</span><span>Concentrado Vacaciones</span>
+          <span class="material-icons-round">table_chart</span><span>Balance Time Off</span>
         </div>
         <div class="nav-item" onclick="AdminHR.openSystemConfig()">
-          <span class="material-icons-round">settings</span><span>Configuración</span>
+          <span class="material-icons-round">settings</span><span>Settings</span>
         </div>
         <div class="nav-item" onclick="DebugView.open()">
           <span class="material-icons-round">manage_search</span><span>Debug</span>
@@ -123,7 +123,7 @@ var SHELL = `
 
   <div style="padding:12px 16px;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#475569;font-size:11px">IKAN HR · v14.0</span>
+      <span style="color:#475569;font-size:11px">IKAN HR · v14.1</span>
       <button onclick="window._sb&&window._sb.auth.signOut().then(function(){window.location.reload()})" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px">
         Salir
       </button>
@@ -142,7 +142,7 @@ var SHELL = `
     <div class="header-actions">
       <div class="header-search">
         <span class="material-icons-round">search</span>
-        <input placeholder="Buscar empleado..." id="global-search">
+        <input placeholder="Buscar en el team..." id="global-search">
       </div>
       <button class="icon-btn" title="Notificaciones" style="position:relative" onclick="APP.openNotifications()">
         <span class="material-icons-round">notifications</span>
@@ -160,7 +160,7 @@ var SHELL = `
       <div class="grid grid-4 mb-20">
         <div class="card stat-card" onclick="APP.navigate('vacations')" style="cursor:pointer">
           <div class="stat-icon blue"><span class="material-icons-round">beach_access</span></div>
-          <div><div class="stat-value" id="dash-vac-days">—</div><div class="stat-label">Días de vacaciones</div></div>
+          <div><div class="stat-value" id="dash-vac-days">—</div><div class="stat-label">Días de time off</div></div>
         </div>
         <div class="card stat-card" onclick="APP.navigate('kpis')" style="cursor:pointer">
           <div class="stat-icon green"><span class="material-icons-round">analytics</span></div>
@@ -168,11 +168,11 @@ var SHELL = `
         </div>
         <div class="card stat-card" onclick="APP.navigate('kpis')" style="cursor:pointer">
           <div class="stat-icon orange"><span class="material-icons-round">pending_actions</span></div>
-          <div><div class="stat-value" id="dash-pending-kpi">0</div><div class="stat-label">KPIs pendientes</div></div>
+          <div><div class="stat-value" id="dash-pending-kpi">0</div><div class="stat-label">KPIs por completar</div></div>
         </div>
         <div class="card stat-card" onclick="APP.navigate('vacations')" style="cursor:pointer">
           <div class="stat-icon red"><span class="material-icons-round">hourglass_empty</span></div>
-          <div><div class="stat-value" id="dash-pending-vac">0</div><div class="stat-label" id="dash-pending-vac-label">Solicitudes pendientes</div></div>
+          <div><div class="stat-value" id="dash-pending-vac">0</div><div class="stat-label" id="dash-pending-vac-label">Por revisar</div></div>
         </div>
       </div>
       <div class="grid grid-2 gap-16">
@@ -191,9 +191,9 @@ var SHELL = `
         <div class="card">
           <div class="card-title"><span class="material-icons-round" style="margin-right:6px">bolt</span>Accesos Rápidos</div>
           <div class="grid grid-2 gap-8 mt-8">
-            <button class="btn btn-outline" onclick="VacationsView.openRequest()"><span class="material-icons-round">add</span>Solicitar vacaciones</button>
+            <button class="btn btn-outline" onclick="VacationsView.openRequest()"><span class="material-icons-round">add</span>Pedir time off</button>
             <button class="btn btn-outline" onclick="APP.navigate('kpis')"><span class="material-icons-round">analytics</span>Ver mis KPIs</button>
-            <button class="btn btn-outline" onclick="APP.navigate('employees')"><span class="material-icons-round">people</span>Directorio</button>
+            <button class="btn btn-outline" onclick="APP.navigate('employees')"><span class="material-icons-round">people</span>Team</button>
             <button class="btn btn-outline" onclick="APP.navigate('birthdays')"><span class="material-icons-round">cake</span>Cumpleaños</button>
           </div>
         </div>
@@ -238,7 +238,7 @@ var SHELL = `
 
     <!-- VACATIONS -->
     <div id="view-vacations" class="view">
-      <div class="view-title"><span class="material-icons-round">beach_access</span>Vacaciones</div>
+      <div class="view-title"><span class="material-icons-round">beach_access</span>Time Off</div>
       <div id="vac-content"></div>
     </div>
 
@@ -261,7 +261,7 @@ var SHELL = `
 
     <!-- ATTENDANCE -->
     <div id="view-attendance" class="view">
-      <div class="view-title"><span class="material-icons-round">fingerprint</span>Asistencia</div>
+      <div class="view-title"><span class="material-icons-round">fingerprint</span>Check-ins</div>
       <div id="att-content"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
