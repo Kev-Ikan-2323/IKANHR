@@ -4214,6 +4214,7 @@ var AttendanceView = {
     if (s.retardo > 0)    html += AttendanceView._pill(s.retardo + ' retardo' + (s.retardo !== 1 ? 's' : ''), '#f59e0b');
     if (s.ausente > 0)    html += AttendanceView._pill(s.ausente + ' ausente' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
     if (s.vacaciones > 0) html += AttendanceView._pill(s.vacaciones + ' día' + (s.vacaciones !== 1 ? 's' : '') + ' vacaciones', '#0ea5e9');
+    if (s.homeOffice > 0) html += AttendanceView._pill(s.homeOffice + ' home office', '#0891b2');
     html += '</div>';
 
     html += '<div id="att-tardiness-banner" style="margin-bottom:14px"></div>';
@@ -4237,7 +4238,8 @@ var AttendanceView = {
       justificada:           { bg: '#f5f3ff', color: '#7c3aed', text: 'Justificada ✓' },
       pendiente_remoto:      { bg: '#fff7ed', color: '#ea580c', text: 'Pendiente (remoto)' },
       pendiente_justificada: { bg: '#fdf4ff', color: '#c026d3', text: 'Pendiente (just.)' },
-      pendiente:             { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' }
+      pendiente:             { bg: '#f8fafc', color: '#64748b', text: 'Sin registro aún' },
+      home_office:           { bg: '#ecfeff', color: '#0891b2', text: 'Home Office ✓' }
     };
     if (!dateLabel) {
       return '<div id="att-day-card" class="card" style="margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center">' +
@@ -4373,7 +4375,8 @@ var AttendanceView = {
       remoto:                { bg: '#eff6ff', fg: '#2563eb', brd: '#bfdbfe' },
       justificada:           { bg: '#f5f3ff', fg: '#7c3aed', brd: '#ddd6fe' },
       pendiente_remoto:      { bg: '#fff7ed', fg: '#ea580c', brd: '#fed7aa' },
-      pendiente_justificada: { bg: '#fdf4ff', fg: '#c026d3', brd: '#f0abfc' }
+      pendiente_justificada: { bg: '#fdf4ff', fg: '#c026d3', brd: '#f0abfc' },
+      home_office:           { bg: '#ecfeff', fg: '#0891b2', brd: '#a5f3fc' }
     };
 
     var hoDayNames = {1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb',0:'Dom'};
@@ -4430,6 +4433,7 @@ var AttendanceView = {
         if (rec.status === 'justificada') html += '<div style="font-size:10px;margin-top:2px">📋</div>';
         if (rec.status === 'pendiente_remoto') html += '<div style="font-size:10px;margin-top:2px">⏳</div>';
         if (rec.status === 'pendiente_justificada') html += '<div style="font-size:10px;margin-top:2px">⏳</div>';
+        if (rec.status === 'home_office') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
         html += '</div>';
       } else {
         var sel2 = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
@@ -4452,6 +4456,7 @@ var AttendanceView = {
     html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#f5f3ff;border:1px solid #ddd6fe"></div><span style="font-size:12px;color:var(--muted)">Justificada</span></div>';
     if (userHoDays.length > 0) {
       html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfeff;border-top:3px solid #0891b2;border-right:1px solid #a5f3fc;border-bottom:1px solid #a5f3fc;border-left:1px solid #a5f3fc"></div><span style="font-size:12px;color:var(--muted)">Día home office</span></div>';
+      html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#ecfeff;border:1px solid #a5f3fc"></div><span style="font-size:12px;color:var(--muted)">Home office ✓</span></div>';
     }
     html += '</div>';
     return html;
@@ -5446,7 +5451,8 @@ var AttendanceView = {
       justificada:           ['#f5f3ff', '#7c3aed', 'Justificada'],
       pendiente_remoto:      ['#fff7ed', '#ea580c', 'Pendiente (remoto)'],
       pendiente_justificada: ['#fdf4ff', '#c026d3', 'Pendiente (just.)'],
-      pendiente:             ['#f8fafc', '#64748b', 'Pendiente']
+      pendiente:             ['#f8fafc', '#64748b', 'Pendiente'],
+      home_office:           ['#ecfeff', '#0891b2', 'Home Office']
     };
     var s = map[status] || ['#f8fafc', '#64748b', status];
     return '<span style="padding:2px 8px;border-radius:4px;background:' + s[0] + ';color:' + s[1] + ';font-size:12px;font-weight:600">' + s[2] + '</span>';

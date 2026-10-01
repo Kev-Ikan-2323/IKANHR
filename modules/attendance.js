@@ -5,6 +5,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { DB } from '../lib/db.js'
 import { CONFIG } from '../lib/auth.js'
+import { getDemoAttendeesForDate, getDemoAttendeesForMonth } from '../lib/google-calendar.js'
 
 function sbClient() {
   return createClient(
@@ -54,6 +55,15 @@ function firstLast(punches) {
     checkIn:  sorted[0].punched_at,
     checkOut: sorted.length > 1 ? sorted[sorted.length - 1].punched_at : null
   }
+}
+
+function isHomeOfficeDay(emp, dateStr) {
+  if (!emp) return false
+  if (emp.isRemote === true || emp.isRemote === 'true') return false
+  var days = Array.isArray(emp.remoteDays) ? emp.remoteDays : []
+  if (days.length === 0) return false
+  var dow = new Date(dateStr + 'T12:00:00').getDay()
+  return days.indexOf(dow) > -1
 }
 
 export var AttendanceModule = {
@@ -134,7 +144,7 @@ async function _getAllDay(date) {
   var dayStart = date + 'T00:00:00-06:00'
   var dayEnd   = date + 'T23:59:59-06:00'
 
-  var [employees, punchRes, rcRes, rcoRes] = await Promise.all([
+  var [employees, punchRes, rcRes, rcoRes, demoEmails] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
     sb.from('attendance_punches')
       .select('employee_id, punched_at, source')
@@ -145,7 +155,8 @@ async function _getAllDay(date) {
       .eq('date', date),
     sb.from('remote_checkouts')
       .select('employee_id, checked_out_at')
-      .eq('date', date)
+      .eq('date', date),
+    getDemoAttendeesForDate(date)
   ])
 
   if (punchRes.error) throw new Error('Error obteniendo checadas: ' + punchRes.error.message)
@@ -180,13 +191,16 @@ async function _getAllDay(date) {
     var rc           = rcByEmp[emp.id] || null
     var hasRemoteCI  = rc && rc.status === 'aprobado' && rc.type === 'remoto'
 
+    var empEmail = (emp.email || '').toLowerCase()
     var status
     if (rc && rc.status === 'aprobado') {
       status = rc.type === 'remoto' ? 'remoto' : 'justificada'
     } else if (fl.checkIn) {
-      status = toStatus(fl.checkIn, date)
+      status = (empEmail && demoEmails.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, date)
     } else if (rc && rc.status === 'pendiente') {
       status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
+    } else if (isHomeOfficeDay(emp, date)) {
+      status = 'home_office'
     } else {
       status = toStatus(null, date)
     }
@@ -217,7 +231,7 @@ async function _getEmployeeDay(employeeId, date) {
   var dayStart = date + 'T00:00:00-06:00'
   var dayEnd   = date + 'T23:59:59-06:00'
 
-  var [punchRes, rcRes, rcoRes] = await Promise.all([
+  var [punchRes, rcRes, rcoRes, empRow, demoEmails] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
@@ -231,7 +245,9 @@ async function _getEmployeeDay(employeeId, date) {
       .select('checked_out_at')
       .eq('employee_id', employeeId)
       .eq('date', date)
-      .maybeSingle()
+      .maybeSingle(),
+    DB.getById(CONFIG.SHEETS.EMPLOYEES, employeeId),
+    getDemoAttendeesForDate(date)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -242,13 +258,16 @@ async function _getEmployeeDay(employeeId, date) {
   var rco         = rcoRes.data || null
   var hasRemoteCI = rc && rc.status === 'aprobado' && rc.type === 'remoto'
 
+  var empEmail = empRow ? (empRow.email || '').toLowerCase() : ''
   var status
   if (rc && rc.status === 'aprobado') {
     status = rc.type === 'remoto' ? 'remoto' : 'justificada'
   } else if (fl.checkIn) {
-    status = toStatus(fl.checkIn, date)
+    status = (empEmail && demoEmails.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, date)
   } else if (rc && rc.status === 'pendiente') {
     status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
+  } else if (isHomeOfficeDay(empRow, date)) {
+    status = 'home_office'
   } else {
     status = toStatus(null, date)
   }
@@ -350,7 +369,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   var dateMin  = year + '-' + mon + '-01'
   var dateMax  = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [punchRes, vacRequests, remotoRes, empRow, appealRes, rcoMonthRes] = await Promise.all([
+  var [punchRes, vacRequests, remotoRes, empRow, appealRes, rcoMonthRes, demoAttendees] = await Promise.all([
     sb.from('attendance_punches')
       .select('punched_at, source')
       .eq('employee_id', employeeId)
@@ -372,7 +391,8 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
       .select('date, checked_out_at')
       .eq('employee_id', employeeId)
       .gte('date', dateMin)
-      .lte('date', dateMax)
+      .lte('date', dateMax),
+    getDemoAttendeesForMonth(year, month)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -413,7 +433,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   })
 
   var wdays   = workdaysInMonth(year, month, quincena)
-  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, workdays: wdays.length }
+  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
     var punches     = byDate[dateStr] || []
     var fl          = firstLast(punches)
@@ -422,16 +442,20 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     var hasRemoteCI = rc && rc.status === 'aprobado' && rc.type === 'remoto'
     var status
 
+    var demoEmailsForDate = demoAttendees[dateStr] || new Set()
+    var empEmail = empRow ? (empRow.email || '').toLowerCase() : ''
     if (rc && rc.status === 'aprobado') {
       status = rc.type === 'remoto' ? 'remoto' : 'justificada'
     } else if (fl.checkIn) {
-      status = toStatus(fl.checkIn, dateStr)
+      status = (empEmail && demoEmailsForDate.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, dateStr)
       // If retardo but appeal approved → retardo_apelado
       if (status === 'retardo' && ap && ap.status === 'aprobado') status = 'retardo_apelado'
     } else if (rc && rc.status === 'pendiente' && dateStr === today) {
       status = rc.type === 'remoto' ? 'pendiente_remoto' : 'pendiente_justificada'
     } else if (vacDates.has(dateStr)) {
       status = 'vacaciones'
+    } else if (isHomeOfficeDay(empRow, dateStr)) {
+      status = 'home_office'
     } else {
       status = toStatus(null, dateStr)
     }
@@ -442,6 +466,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     else if (status === 'vacaciones')     summary.vacaciones++
     else if (status === 'remoto')         summary.remoto++
     else if (status === 'justificada')    summary.justificada++
+    else if (status === 'home_office')    summary.homeOffice++
 
     var effectiveCheckOut = hasRemoteCI && punches.length > 0
       ? (fl.checkOut || fl.checkIn)
@@ -475,7 +500,7 @@ async function _getAllMonth(year, month, quincena) {
   var dateMin = year + '-' + mon + '-01'
   var dateMax = year + '-' + mon + '-' + String(lastDay).padStart(2, '0')
 
-  var [employees, punchRes, vacAll, remotoRes] = await Promise.all([
+  var [employees, punchRes, vacAll, remotoRes, demoAttendees] = await Promise.all([
     DB.query(CONFIG.SHEETS.EMPLOYEES, { status: 'activo' }),
     sb.from('attendance_punches')
       .select('employee_id, punched_at')
@@ -485,7 +510,8 @@ async function _getAllMonth(year, month, quincena) {
     sb.from('remote_checkins')
       .select('employee_id, date, type, status, requested_at')
       .gte('date', dateMin)
-      .lte('date', dateMax)
+      .lte('date', dateMax),
+    getDemoAttendeesForMonth(year, month)
   ])
 
   if (punchRes.error) throw new Error('Error: ' + punchRes.error.message)
@@ -534,19 +560,23 @@ async function _getAllMonth(year, month, quincena) {
     var empDays   = byEmpDate[emp.id]         || {}
     var empVacSet = vacByEmp[emp.id]          || new Set()
     var empRem    = remotoByEmpDate[emp.id]   || {}
-    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0 }
+    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0 }
+    var empEmail  = (emp.email || '').toLowerCase()
 
     wdays.forEach(function(dateStr) {
       var fl  = firstLast(empDays[dateStr] || [])
       var rc  = empRem[dateStr]
       var s
 
+      var demoEmailsForDate = demoAttendees[dateStr] || new Set()
       if (fl.checkIn) {
-        s = toStatus(fl.checkIn, dateStr)
+        s = (empEmail && demoEmailsForDate.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, dateStr)
       } else if (rc && rc.status === 'aprobado') {
         s = rc.type === 'remoto' ? 'remoto' : 'justificada'
       } else if (empVacSet.has(dateStr)) {
         s = 'vacaciones'
+      } else if (isHomeOfficeDay(emp, dateStr)) {
+        s = 'home_office'
       } else {
         s = toStatus(null, dateStr)
       }
@@ -557,6 +587,7 @@ async function _getAllMonth(year, month, quincena) {
       else if (s === 'vacaciones')  stats.vacaciones++
       else if (s === 'remoto')      stats.remoto++
       else if (s === 'justificada') stats.justificada++
+      else if (s === 'home_office') stats.homeOffice++
     })
 
     return {
@@ -571,6 +602,7 @@ async function _getAllMonth(year, month, quincena) {
       vacaciones:  stats.vacaciones,
       remoto:      stats.remoto,
       justificada: stats.justificada,
+      homeOffice:  stats.homeOffice,
       workdays:    wdays.length
     }
   })
@@ -587,8 +619,9 @@ async function _getAllMonth(year, month, quincena) {
     acc.vacaciones += e.vacaciones
     acc.remoto     += e.remoto
     acc.justificada+= e.justificada
+    acc.homeOffice += e.homeOffice
     return acc
-  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0 })
+  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0 })
 
   var n = wdays.length * (empStats.length || 1)
 
@@ -605,6 +638,7 @@ async function _getAllMonth(year, month, quincena) {
       vacaciones:  totals.vacaciones,
       remoto:      totals.remoto,
       justificada: totals.justificada,
+      homeOffice:  totals.homeOffice,
       pct:         n > 0 ? Math.round((totals.aTime / n) * 100) : 0
     }
   }
