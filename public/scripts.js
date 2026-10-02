@@ -671,7 +671,7 @@ var EmployeesView = {
     APP.api('employees.get', { id: empId }, function(err, emp) {
       if (err) { APP.toast(err, 'error'); return; }
       var remDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : [];
-      var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'}];
+      var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'}];
       var pillsHtml = dayList.map(function(item) {
         var sel = remDays.indexOf(item.d) > -1;
         return '<button type="button" onclick="TeamView._toggleHoDay(this,' + item.d + ')" ' +
@@ -2549,7 +2549,7 @@ var AdminHR = {
       })() +
       (function() {
         var remDays = Array.isArray(v.remoteDays) ? v.remoteDays : [];
-        var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:6,l:'Sáb'}];
+        var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'}];
         var canEditHoDays = APP.user && (APP.user.isAdmin || APP.user.isHR || v.managerId === APP.user.id);
         var pillsHtml = '';
         if (canEditHoDays) {
@@ -5713,7 +5713,7 @@ var TeamView = {
     APP.api('employees.get', { id: empId }, function(err, emp) {
       if (err) { APP.toast(err, 'error'); return; }
       var remDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : [];
-      var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'}];
+      var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'}];
       var pillsHtml = dayList.map(function(item) {
         var sel = remDays.indexOf(item.d) > -1;
         return '<button type="button" onclick="TeamView._toggleHoDay(this,' + item.d + ')" ' +
