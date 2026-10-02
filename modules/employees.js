@@ -12,15 +12,27 @@ export var EmployeeModule = {
 
     var all = await DB.getAll(CONFIG.SHEETS.EMPLOYEES)
 
-    // If not admin/HR, only see own team/reports
+    // If not admin/HR, show self + full managed subtree (transitive closure)
     if (!user.isAdmin && !user.isHR) {
-      all = all.filter(function(emp) {
-        if (emp.id === user.id) return true
-        if (emp.managerId === user.id) return true
-        if (user.ledTeams.indexOf(emp.teamId) > -1) return true
-        if (user.coledTeams.indexOf(emp.teamId) > -1) return true
-        return false
+      var managed = new Set([user.id])
+      // Seed with direct reports and led/coled team members
+      all.forEach(function(e) {
+        if (e.managerId === user.id) managed.add(e.id)
+        if (user.ledTeams.indexOf(e.teamId) > -1) managed.add(e.id)
+        if (user.coledTeams.indexOf(e.teamId) > -1) managed.add(e.id)
       })
+      // Propagate down: keep adding employees whose manager is already in the set
+      var changed = true
+      while (changed) {
+        changed = false
+        all.forEach(function(e) {
+          if (!managed.has(e.id) && managed.has(e.managerId)) {
+            managed.add(e.id)
+            changed = true
+          }
+        })
+      }
+      all = all.filter(function(emp) { return managed.has(emp.id) })
     }
 
     if (params.department) all = all.filter(function(e) { return e.department === params.department })
