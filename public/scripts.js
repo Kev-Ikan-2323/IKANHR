@@ -630,7 +630,7 @@ var EmployeesView = {
     APP.api('employees.get', { id: id }, function(err, emp) {
       if (err) { APP.toast(err, 'error'); return; }
       var isAdmin = APP.user && (APP.user.isAdmin || APP.user.isHR);
-      var isMyReport = !isAdmin && APP.user && APP.user.isManager && emp.managerId === APP.user.id;
+      var isMyReport = !isAdmin && APP.user && APP.user.isManager;
       var hoDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : [];
       var dayLabels = {1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb'};
       var hoSection = (!emp.isRemote && (isAdmin || isMyReport))
