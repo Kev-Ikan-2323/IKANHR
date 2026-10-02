@@ -638,7 +638,7 @@ var EmployeesView = {
           '<div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Home Office</div>' +
           (hoDays.length > 0
             ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + hoDays.map(function(d){ return '<span style="padding:3px 10px;border-radius:20px;font-size:12px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-weight:600">' + (dayLabels[d]||d) + '</span>'; }).join('') + '</div>'
-            : '<span class="text-sm text-muted">Cualquier día OK</span>') +
+            : '<span class="text-sm text-muted">Ningún día de home office asignado</span>') +
           '</div>'
         : '';
       APP.modal('👤 ' + emp.fullName,
@@ -681,7 +681,7 @@ var EmployeesView = {
       }).join('');
       APP.modal('🏠 Home Office · ' + empName,
         '<input type="hidden" id="tv-ho-days-val" value="' + JSON.stringify(remDays) + '">' +
-        '<p class="text-sm text-muted mb-12">Días autorizados para <strong>' + empName + '</strong>. Sin selección = cualquier día OK.</p>' +
+        '<p class="text-sm text-muted mb-12">Selecciona los días autorizados para <strong>' + empName + '</strong>. Sin selección = sin días de home office.</p>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + pillsHtml + '</div>',
         '<button class="btn btn-outline" onclick="EmployeesView.showDetail(\'' + empId + '\')">← Volver</button>' +
         '<button class="btn btn-primary" onclick="EmployeesView.saveHomeOfficeDays(\'' + empId + '\',\'' + empName.replace(/'/g,"\\'") + '\')"><span class="material-icons-round">save</span>Guardar</button>');
@@ -2574,7 +2574,7 @@ var AdminHR = {
           '<div id="ef-remote-days-wrap" style="margin-bottom:12px">' +
           '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">Días de home office autorizados</label>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' + pillsHtml + '</div>' +
-          (canEditHoDays ? '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = cualquier día OK. Un día fuera del rango requiere OK del manager.</p>' : '') +
+          (canEditHoDays ? '<p style="margin:6px 0 0;font-size:11px;color:var(--muted)">Sin selección = sin días de home office asignados.</p>' : '') +
           '</div>';
       })() +
       '<div id="ef-pin-wrap" style="' + (v.isRemote===true||v.isRemote==='true'?'opacity:.4':'opacity:1') + '">' +
@@ -5723,7 +5723,7 @@ var TeamView = {
       }).join('');
       var body =
         '<input type="hidden" id="tv-ho-days-val" value="' + JSON.stringify(remDays) + '">' +
-        '<p class="text-sm text-muted mb-12">Días que <strong>' + empName + '</strong> puede hacer home office. Sin selección = cualquier día OK.</p>' +
+        '<p class="text-sm text-muted mb-12">Selecciona los días autorizados para <strong>' + empName + '</strong>. Sin selección = sin días de home office.</p>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + pillsHtml + '</div>';
       APP.modal('🏠 Home Office · ' + empName, body,
         '<button class="btn btn-outline" onclick="TeamView.openDetail(\'' + teamId + '\')">← Volver</button>' +
