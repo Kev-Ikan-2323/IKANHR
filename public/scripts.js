@@ -630,6 +630,17 @@ var EmployeesView = {
     APP.api('employees.get', { id: id }, function(err, emp) {
       if (err) { APP.toast(err, 'error'); return; }
       var isAdmin = APP.user && (APP.user.isAdmin || APP.user.isHR);
+      var isMyReport = !isAdmin && APP.user && APP.user.isManager && emp.managerId === APP.user.id;
+      var hoDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : [];
+      var dayLabels = {1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb'};
+      var hoSection = (!emp.isRemote && (isAdmin || isMyReport))
+        ? '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">' +
+          '<div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Home Office</div>' +
+          (hoDays.length > 0
+            ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + hoDays.map(function(d){ return '<span style="padding:3px 10px;border-radius:20px;font-size:12px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-weight:600">' + (dayLabels[d]||d) + '</span>'; }).join('') + '</div>'
+            : '<span class="text-sm text-muted">Cualquier día OK</span>') +
+          '</div>'
+        : '';
       APP.modal('👤 ' + emp.fullName,
         '<div class="flex gap-12 items-center mb-16">' +
         '<div class="emp-avatar" style="width:72px;height:72px;font-size:26px;flex-shrink:0">' + APP.initials(emp.fullName) + '</div>' +
@@ -645,13 +656,46 @@ var EmployeesView = {
         EmployeesView.field('Seniority', (emp.yearsOfService||0) + ' año(s)') +
         EmployeesView.field('Start date', APP.fmtDate(emp.hireDate)) +
         (isAdmin ? EmployeesView.field('Vacaciones/año', emp.vacationDaysPerYear + ' días') : '') +
-        '</div>',
+        '</div>' + hoSection,
         isAdmin
           ? '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>' +
             '<button class="btn btn-primary" onclick="AdminHR.openEditEmployee(\'' + emp.id + '\')"><span class="material-icons-round">edit</span>Editar</button>' +
             (emp.status === 'activo' ? '<button class="btn btn-danger btn-sm" onclick="AdminHR.deactivateEmployee(\'' + emp.id + '\',\'' + emp.fullName + '\')"><span class="material-icons-round">person_off</span>Offboard</button>' : '')
-          : '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>'
+          : '<button class="btn btn-outline" onclick="APP.closeModal()">Cerrar</button>' +
+            (isMyReport ? '<button class="btn btn-primary btn-sm" onclick="EmployeesView.openHomeOfficeDays(\'' + emp.id + '\',\'' + emp.fullName.replace(/'/g,"\\'") + '\')"><span class="material-icons-round">home_work</span>Home Office</button>' : '')
       );
+    });
+  },
+
+  openHomeOfficeDays: function(empId, empName) {
+    APP.api('employees.get', { id: empId }, function(err, emp) {
+      if (err) { APP.toast(err, 'error'); return; }
+      var remDays = Array.isArray(emp.remoteDays) ? emp.remoteDays : [];
+      var dayList = [{d:1,l:'Lun'},{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'},{d:5,l:'Vie'}];
+      var pillsHtml = dayList.map(function(item) {
+        var sel = remDays.indexOf(item.d) > -1;
+        return '<button type="button" onclick="TeamView._toggleHoDay(this,' + item.d + ')" ' +
+          'style="padding:6px 16px;border-radius:20px;font-size:13px;cursor:pointer;transition:.15s;border:1px solid ' +
+          (sel ? '#93c5fd;background:#dbeafe;color:#1d4ed8;font-weight:600' : 'var(--border);background:var(--surface);color:var(--fg);font-weight:400') + '">' +
+          item.l + '</button>';
+      }).join('');
+      APP.modal('🏠 Home Office · ' + empName,
+        '<input type="hidden" id="tv-ho-days-val" value="' + JSON.stringify(remDays) + '">' +
+        '<p class="text-sm text-muted mb-12">Días autorizados para <strong>' + empName + '</strong>. Sin selección = cualquier día OK.</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + pillsHtml + '</div>',
+        '<button class="btn btn-outline" onclick="EmployeesView.showDetail(\'' + empId + '\')">← Volver</button>' +
+        '<button class="btn btn-primary" onclick="EmployeesView.saveHomeOfficeDays(\'' + empId + '\',\'' + empName.replace(/'/g,"\\'") + '\')"><span class="material-icons-round">save</span>Guardar</button>');
+    });
+  },
+
+  saveHomeOfficeDays: function(empId, empName) {
+    var inp = document.getElementById('tv-ho-days-val');
+    var days = [];
+    try { days = JSON.parse(inp ? inp.value : '[]'); } catch(e) {}
+    APP.api('employees.update', { id: empId, remoteDays: days.length ? days : null }, function(err) {
+      if (err) { APP.toast(err, 'error'); return; }
+      APP.toast('✅ Días de home office actualizados para ' + empName, 'success');
+      APP.closeModal();
     });
   },
   field: function(label, value) {
