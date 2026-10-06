@@ -2548,6 +2548,20 @@ var AdminHR = {
           '</div>';
       })() +
       (function() {
+        var trav = v.isTraveling===true||v.isTraveling==='true';
+        var travBg = trav ? '#f59e0b' : 'var(--border)';
+        var travLeft = trav ? '21px' : '3px';
+        var travChange = "var c=this.checked,t=document.getElementById('ef-tt'),k=document.getElementById('ef-tk');t.style.background=c?'#f59e0b':'var(--border)';k.style.left=c?'21px':'3px';";
+        return '<div class="form-group" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px;cursor:pointer" onclick="document.getElementById(\'ef-traveling\').click()">' +
+          '<div style="position:relative;width:40px;height:22px;flex-shrink:0;pointer-events:none">' +
+          '<input type="checkbox" id="ef-traveling" style="position:absolute;opacity:0;width:0;height:0"' + (trav?' checked':'') + ' onchange="' + travChange + '">' +
+          '<div id="ef-tt" style="position:absolute;inset:0;background:' + travBg + ';border-radius:22px;transition:.2s"></div>' +
+          '<div id="ef-tk" style="position:absolute;height:16px;width:16px;left:' + travLeft + ';bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>' +
+          '</div>' +
+          '<div><strong style="font-size:13px">En viaje de trabajo ✈️</strong><br><span style="font-size:11px;color:var(--muted)">Asistencia automática, sin check-in</span></div>' +
+          '</div>';
+      })() +
+      (function() {
         var remDays = Array.isArray(v.remoteDays) ? v.remoteDays : [];
         var dayList = [{d:2,l:'Mar'},{d:3,l:'Mié'},{d:4,l:'Jue'}];
         var canEditHoDays = APP.user && (APP.user.isAdmin || APP.user.isHR || v.managerId === APP.user.id);
@@ -2604,6 +2618,7 @@ var AdminHR = {
       status:    (document.getElementById('ef-status')  ||{value:''}).value,
       notes:     (document.getElementById('ef-notes')||{value:''}).value,
       isRemote:    !!(document.getElementById('ef-remote')&&document.getElementById('ef-remote').checked),
+      isTraveling: !!(document.getElementById('ef-traveling')&&document.getElementById('ef-traveling').checked),
       checadorPin: (document.getElementById('ef-pin')||{value:''}).value.trim() || null,
       canApproveVacations: !!(document.getElementById('ef-cap')&&document.getElementById('ef-cap').checked),
       remoteDays: (function() {
@@ -4259,6 +4274,7 @@ var AttendanceView = {
     if (s.ausente > 0)    html += AttendanceView._pill(s.ausente + ' no show' + (s.ausente !== 1 ? 's' : ''), '#ef4444');
     if (s.vacaciones > 0) html += AttendanceView._pill(s.vacaciones + ' día' + (s.vacaciones !== 1 ? 's' : '') + ' de time off', '#0ea5e9');
     if (s.homeOffice > 0) html += AttendanceView._pill(s.homeOffice + ' home office', '#0891b2');
+    if (s.viaje > 0)      html += AttendanceView._pill(s.viaje + ' en viaje', '#d97706');
     html += '</div>';
 
     html += '<div id="att-tardiness-banner" style="margin-bottom:14px"></div>';
@@ -4283,7 +4299,8 @@ var AttendanceView = {
       pendiente_remoto:      { bg: '#fff7ed', color: '#ea580c', text: 'En revisión (remoto)' },
       pendiente_justificada: { bg: '#fdf4ff', color: '#c026d3', text: 'En revisión (just.)' },
       pendiente:             { bg: '#f8fafc', color: '#64748b', text: 'Por registrar' },
-      home_office:           { bg: '#ecfeff', color: '#0891b2', text: 'Home Office ✓' }
+      home_office:           { bg: '#ecfeff', color: '#0891b2', text: 'Home Office ✓' },
+      viaje:                 { bg: '#fef3c7', color: '#d97706', text: 'En viaje ✈️' }
     };
     if (!dateLabel) {
       return '<div id="att-day-card" class="card" style="margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center">' +
@@ -4420,7 +4437,8 @@ var AttendanceView = {
       justificada:           { bg: '#f5f3ff', fg: '#7c3aed', brd: '#ddd6fe' },
       pendiente_remoto:      { bg: '#fff7ed', fg: '#ea580c', brd: '#fed7aa' },
       pendiente_justificada: { bg: '#fdf4ff', fg: '#c026d3', brd: '#f0abfc' },
-      home_office:           { bg: '#ecfeff', fg: '#0891b2', brd: '#a5f3fc' }
+      home_office:           { bg: '#ecfeff', fg: '#0891b2', brd: '#a5f3fc' },
+      viaje:                 { bg: '#fef3c7', fg: '#d97706', brd: '#fde68a' }
     };
 
     var hoDayNames = {1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb',0:'Dom'};
@@ -4478,6 +4496,7 @@ var AttendanceView = {
         if (rec.status === 'pendiente_remoto') html += '<div style="font-size:10px;margin-top:2px">⏳</div>';
         if (rec.status === 'pendiente_justificada') html += '<div style="font-size:10px;margin-top:2px">⏳</div>';
         if (rec.status === 'home_office') html += '<div style="font-size:10px;margin-top:2px">🏠</div>';
+        if (rec.status === 'viaje') html += '<div style="font-size:10px;margin-top:2px">✈️</div>';
         html += '</div>';
       } else {
         var sel2 = dateStr === AttendanceView._selectedDate ? ';outline:2px solid var(--primary);outline-offset:1px' : '';
@@ -4577,6 +4596,7 @@ var AttendanceView = {
     html += AttendanceView._tile(s.vacaciones || 0, 'Vacaciones', '#0ea5e9');
     html += AttendanceView._tile(s.remoto || 0, 'Remotos', '#2563eb');
     html += AttendanceView._tile(s.justificada || 0, 'Cubiertos', '#7c3aed');
+    if (s.viaje > 0) html += AttendanceView._tile(s.viaje, 'En viaje', '#d97706');
     html += AttendanceView._tile(data.workdays, 'Días lab.', '#64748b');
     html += AttendanceView._tile(s.total, 'Empleados', '#475569');
     html += '</div>';
@@ -4603,6 +4623,7 @@ var AttendanceView = {
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Vacaciones</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Remotos</th>';
     html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Cubiertos</th>';
+    html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center">Viaje</th>';
     if (hasTard) {
       html += '<th style="padding:8px 10px;font-weight:600;color:var(--muted);text-align:center" title="Retardos acumulados en 6 meses · días a descontar por política">Retardos acum. / Días desc.</th>';
     }
@@ -4623,6 +4644,7 @@ var AttendanceView = {
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.vacaciones || 0) > 0 ? ';color:#0284c7;font-weight:600' : '') + '">' + (e.vacaciones || 0) + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.remoto || 0) > 0 ? ';color:#2563eb;font-weight:600' : '') + '">' + (e.remoto || 0) + '</td>';
       html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.justificada || 0) > 0 ? ';color:#7c3aed;font-weight:600' : '') + '">' + (e.justificada || 0) + '</td>';
+      html += '<td style="padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums' + ((e.viaje || 0) > 0 ? ';color:#d97706;font-weight:600' : '') + '">' + (e.viaje || 0) + '</td>';
       if (hasTard) {
         if (tard && (tard.count > 0 || tard.daysToDeduct > 0)) {
           var descColor = tard.daysToDeduct > 0 ? '#7e22ce' : '#64748b';
@@ -5496,7 +5518,8 @@ var AttendanceView = {
       pendiente_remoto:      ['#fff7ed', '#ea580c', 'En revisión (remoto)'],
       pendiente_justificada: ['#fdf4ff', '#c026d3', 'En revisión (just.)'],
       pendiente:             ['#f8fafc', '#64748b', 'Por registrar'],
-      home_office:           ['#ecfeff', '#0891b2', 'Home Office']
+      home_office:           ['#ecfeff', '#0891b2', 'Home Office'],
+      viaje:                 ['#fef3c7', '#d97706', 'En viaje ✈️']
     };
     var s = map[status] || ['#f8fafc', '#64748b', status];
     return '<span style="padding:2px 8px;border-radius:4px;background:' + s[0] + ';color:' + s[1] + ';font-size:12px;font-weight:600">' + s[2] + '</span>';

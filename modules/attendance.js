@@ -193,7 +193,9 @@ async function _getAllDay(date) {
 
     var empEmail = (emp.email || '').toLowerCase()
     var status
-    if (rc && rc.status === 'aprobado') {
+    if (emp.isTraveling === true || emp.isTraveling === 'true') {
+      status = 'viaje'
+    } else if (rc && rc.status === 'aprobado') {
       status = rc.type === 'remoto' ? 'remoto' : 'justificada'
     } else if (fl.checkIn) {
       status = (empEmail && demoEmails.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, date)
@@ -260,7 +262,9 @@ async function _getEmployeeDay(employeeId, date) {
 
   var empEmail = empRow ? (empRow.email || '').toLowerCase() : ''
   var status
-  if (rc && rc.status === 'aprobado') {
+  if (empRow && (empRow.isTraveling === true || empRow.isTraveling === 'true')) {
+    status = 'viaje'
+  } else if (rc && rc.status === 'aprobado') {
     status = rc.type === 'remoto' ? 'remoto' : 'justificada'
   } else if (fl.checkIn) {
     status = (empEmail && demoEmails.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, date)
@@ -433,7 +437,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
   })
 
   var wdays   = workdaysInMonth(year, month, quincena)
-  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0, workdays: wdays.length }
+  var summary = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0, viaje: 0, workdays: wdays.length }
   var records = wdays.slice().reverse().map(function(dateStr) {
     var punches     = byDate[dateStr] || []
     var fl          = firstLast(punches)
@@ -444,7 +448,9 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
 
     var demoEmailsForDate = demoAttendees[dateStr] || new Set()
     var empEmail = empRow ? (empRow.email || '').toLowerCase() : ''
-    if (rc && rc.status === 'aprobado') {
+    if (empRow && (empRow.isTraveling === true || empRow.isTraveling === 'true')) {
+      status = 'viaje'
+    } else if (rc && rc.status === 'aprobado') {
       status = rc.type === 'remoto' ? 'remoto' : 'justificada'
     } else if (fl.checkIn) {
       status = (empEmail && demoEmailsForDate.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, dateStr)
@@ -467,6 +473,7 @@ async function _getEmployeeMonth(employeeId, year, month, quincena) {
     else if (status === 'remoto')         summary.remoto++
     else if (status === 'justificada')    summary.justificada++
     else if (status === 'home_office')    summary.homeOffice++
+    else if (status === 'viaje')          summary.viaje++
 
     var effectiveCheckOut = hasRemoteCI && punches.length > 0
       ? (fl.checkOut || fl.checkIn)
@@ -560,7 +567,7 @@ async function _getAllMonth(year, month, quincena) {
     var empDays   = byEmpDate[emp.id]         || {}
     var empVacSet = vacByEmp[emp.id]          || new Set()
     var empRem    = remotoByEmpDate[emp.id]   || {}
-    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0 }
+    var stats     = { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0, viaje: 0 }
     var empEmail  = (emp.email || '').toLowerCase()
 
     wdays.forEach(function(dateStr) {
@@ -569,7 +576,9 @@ async function _getAllMonth(year, month, quincena) {
       var s
 
       var demoEmailsForDate = demoAttendees[dateStr] || new Set()
-      if (fl.checkIn) {
+      if (emp.isTraveling === true || emp.isTraveling === 'true') {
+        s = 'viaje'
+      } else if (fl.checkIn) {
         s = (empEmail && demoEmailsForDate.has(empEmail)) ? 'a_tiempo' : toStatus(fl.checkIn, dateStr)
       } else if (rc && rc.status === 'aprobado') {
         s = rc.type === 'remoto' ? 'remoto' : 'justificada'
@@ -588,6 +597,7 @@ async function _getAllMonth(year, month, quincena) {
       else if (s === 'remoto')      stats.remoto++
       else if (s === 'justificada') stats.justificada++
       else if (s === 'home_office') stats.homeOffice++
+      else if (s === 'viaje')       stats.viaje++
     })
 
     return {
@@ -603,6 +613,7 @@ async function _getAllMonth(year, month, quincena) {
       remoto:      stats.remoto,
       justificada: stats.justificada,
       homeOffice:  stats.homeOffice,
+      viaje:       stats.viaje,
       workdays:    wdays.length
     }
   })
@@ -620,8 +631,9 @@ async function _getAllMonth(year, month, quincena) {
     acc.remoto     += e.remoto
     acc.justificada+= e.justificada
     acc.homeOffice += e.homeOffice
+    acc.viaje      += e.viaje
     return acc
-  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0 })
+  }, { aTime: 0, retardo: 0, ausente: 0, vacaciones: 0, remoto: 0, justificada: 0, homeOffice: 0, viaje: 0 })
 
   var n = wdays.length * (empStats.length || 1)
 
